@@ -1,0 +1,57 @@
+#ifndef RENDERER_H
+#define RENDERER_H
+
+#include "terrain.h"
+
+#ifdef _WIN32
+#include <SDL.h>
+#elif defined(__linux__)
+#include <SDL2/SDL.h>
+#else
+#include <SDL.h>
+#endif
+#include <GL/gl.h>
+#include <GL/glu.h>
+
+namespace renderer
+{
+
+class Renderer
+{
+  public:
+    Renderer(int width, int height);
+    ~Renderer();
+
+    bool init();
+    void shutdown();
+
+    bool shouldClose() const;
+    void swapBuffers();
+
+    void render(const terrain::TerrainMesh& mesh);
+    void orbit(float deltaYaw, float deltaPitch);
+    void zoom(float deltaDistance);
+    void pan(float deltaX, float deltaY);
+    void moveForward(float amount);
+    void moveRight(float amount);
+    void setTarget(float x, float y, float z);
+
+  private:
+    int width_;
+    int height_;
+    SDL_Window* window_;
+    SDL_GLContext glContext_;
+    bool shouldClose_;
+    float yawDeg_;
+    float pitchDeg_;
+    float distance_;
+    float targetX_;
+    float targetY_;
+    float targetZ_;
+};
+
+void runDemo();
+
+} // namespace renderer
+
+#endif // RENDERER_H

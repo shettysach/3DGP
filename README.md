@@ -1,5 +1,16 @@
-Run
+Build
 
+Linux/macOS:
+```bash
+./build.sh
+./build/terrain_demo
 ```
-g++ -std=c++17 -O2 -Wall -Wextra -pedantic main.cpp terrain.cpp -o test && ./test
+
+Windows (x64):
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022"
+cmake --build build --config Release
+.\build\Release\terrain_demo.exe
 ```
+
+`build.sh` uses CMake (`build/` directory), so repeated builds are incremental.
