@@ -5,13 +5,23 @@
 
 #ifdef _WIN32
 #include <SDL.h>
-#elif defined(__linux__)
-#include <SDL2/SDL.h>
-#else
-#include <SDL.h>
-#endif
 #include <GL/gl.h>
 #include <GL/glu.h>
+
+#elif defined(__APPLE__)
+#include <SDL2/SDL.h>
+#include <OpenGL/gl.h>
+#include <OpenGL/glu.h>
+
+#elif defined(__linux__)
+#include <SDL2/SDL.h>
+#include <GL/gl.h>
+#include <GL/glu.h>
+
+#else
+#error "Unknown platform"
+#endif
+
 
 namespace renderer
 {

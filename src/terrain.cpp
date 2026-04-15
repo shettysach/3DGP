@@ -28,6 +28,116 @@ float clamp01(float x)
 }
 
 } // namespace
+void TerrainGenerator::generateRiver(
+    Field& heightField,
+    Field& riverField
+) const
+{
+    for (int r = 0; r < 20; r++)
+    {
+        int width = heightField.width;
+        int depth = heightField.depth;
+
+        int x = rand() % width;
+        int z = rand() % depth;
+
+        for (int i = 0; i < 600; i++)
+        {
+            for (int dz = -2; dz <= 2; dz++)
+            {
+                for (int dx = -2; dx <= 2; dx++)
+                {
+                    int nx = x + dx;
+                    int nz = z + dz;
+
+                    if (nx >= 0 && nz >= 0 && nx < width && nz < depth)
+                    {
+                        riverField.at(nx, nz) = 1.0f;
+                    }
+                }
+            }
+
+            int bestX = x;
+            int bestZ = z;
+            float bestH = heightField.at(x, z);
+
+            for (int dz = -1; dz <= 1; dz++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    int nx = x + dx;
+                    int nz = z + dz;
+
+                    if (nx < 0 || nz < 0 || nx >= width || nz >= depth)
+                        continue;
+
+                    float h = heightField.at(nx, nz);
+
+                    if (h < bestH)
+                    {
+                        bestH = h;
+                        bestX = nx;
+                        bestZ = nz;
+                    }
+                }
+            }
+
+            x = bestX;
+            z = bestZ;
+        }
+    }
+}
+
+void TerrainGenerator::applyConstraintSystem(
+    Field& heightField,
+    Field& riverField
+) const
+{
+    int width = heightField.width;
+    int depth = heightField.depth;
+
+    Context ctx;
+    ctx.height = heightField;
+    ctx.river  = riverField;
+
+    ctx.delta = Field{width, depth, std::vector<float>(width * depth, 0.0f)};
+    ctx.slope = Field{width, depth, std::vector<float>(width * depth, 0.0f)};
+    ctx.waterDist = Field{width, depth, std::vector<float>(width * depth, 0.0f)};
+
+    std::vector<ConstraintNode*> graph;
+
+    graph.push_back(new SlopeNode());
+    // graph.push_back(new DistanceToWaterNode());
+    graph.push_back(new RiverNode());
+    graph.push_back(new SettlementNode());
+    graph.push_back(new SmoothNode());
+
+    for (int iter = 0; iter < settings_.constraintIterations; iter++)
+    {
+        std::fill(ctx.delta.data.begin(), ctx.delta.data.end(), 0.0f);
+
+        for (ConstraintNode* node : graph)
+        {
+            node->apply(ctx);
+        }
+
+        for (int z = 0; z < depth; z++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                float d = ctx.delta.at(x, z);
+                d = std::max(-0.01f, std::min(0.01f, d));
+
+                ctx.height.at(x, z) += d;
+            }
+        }
+    }
+
+    heightField = ctx.height;
+
+    for (ConstraintNode* node : graph)
+        delete node;
+}
 
 TerrainGenerator::TerrainGenerator(TerrainSettings settings)
     : settings_(settings), permutation_(512, 0)
@@ -243,6 +353,36 @@ TerrainMesh TerrainGenerator::generateMesh() const
             mesh.heights[idx] = height;
             mesh.minHeight = std::min(mesh.minHeight, height);
             mesh.maxHeight = std::max(mesh.maxHeight, height);
+        }
+    }
+
+    Field heightField{
+    settings_.width,
+    settings_.depth,
+    mesh.heights
+    };
+
+    Field riverField{
+        settings_.width,
+        settings_.depth,
+        std::vector<float>(settings_.width * settings_.depth, 0.0f)
+    };
+
+    if (settings_.useConstraints)
+    {
+        generateRiver(heightField, riverField);
+        applyConstraintSystem(heightField, riverField);
+
+        mesh.heights = heightField.data;
+        mesh.riverMask = riverField.data;
+
+        mesh.minHeight = std::numeric_limits<float>::max();
+        mesh.maxHeight = std::numeric_limits<float>::lowest();
+
+        for (float h : mesh.heights)
+        {
+            mesh.minHeight = std::min(mesh.minHeight, h);
+            mesh.maxHeight = std::max(mesh.maxHeight, h);
         }
     }
 

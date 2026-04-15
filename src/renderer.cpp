@@ -253,15 +253,37 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
         const float hB = (b.y - mesh.minHeight) / std::max(0.001f, mesh.maxHeight - mesh.minHeight);
         const float hC = (c.y - mesh.minHeight) / std::max(0.001f, mesh.maxHeight - mesh.minHeight);
 
-        glColor3f(0.18f + 0.45f * hA, 0.26f + 0.43f * hA, 0.14f + 0.18f * hA);
+        float riverA = mesh.riverMask[mesh.indices[i + 0]];
+        float riverB = mesh.riverMask[mesh.indices[i + 1]];
+        float riverC = mesh.riverMask[mesh.indices[i + 2]];
+
+        if (riverA > 0.5f) {
+            glColor3f(0.1f, 0.3f, 0.8f); // blue river
+        } else {
+            glColor3f(0.18f + 0.45f * hA,
+                    0.26f + 0.43f * hA,
+                    0.14f + 0.18f * hA);
+        }
         glNormal3f(a.nx, a.ny, a.nz);
         glVertex3f(a.x, a.y, a.z);
 
-        glColor3f(0.18f + 0.45f * hB, 0.26f + 0.43f * hB, 0.14f + 0.18f * hB);
+        if (riverB > 0.5f) {
+            glColor3f(0.1f, 0.3f, 0.8f);
+        } else {
+            glColor3f(0.18f + 0.45f * hB,
+                    0.26f + 0.43f * hB,
+                    0.14f + 0.18f * hB);
+        }
         glNormal3f(b.nx, b.ny, b.nz);
         glVertex3f(b.x, b.y, b.z);
 
-        glColor3f(0.18f + 0.45f * hC, 0.26f + 0.43f * hC, 0.14f + 0.18f * hC);
+        if (riverC > 0.5f) {
+            glColor3f(0.1f, 0.3f, 0.8f);
+        } else {
+            glColor3f(0.18f + 0.45f * hC,
+                    0.26f + 0.43f * hC,
+                    0.14f + 0.18f * hC);
+        }
         glNormal3f(c.nx, c.ny, c.nz);
         glVertex3f(c.x, c.y, c.z);
     }

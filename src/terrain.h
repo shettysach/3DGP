@@ -4,6 +4,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+#include "constraint_node.h"
+
+struct Context;
+class ConstraintNode;
 
 namespace terrain
 {
@@ -30,6 +34,8 @@ struct TerrainSettings
     float falloffPower = 2.2f;
     uint32_t seed = 2026u;
     NoiseSettings noise;
+    bool useConstraints = true;
+    int constraintIterations = 60;
 };
 
 struct TerrainVertex
@@ -52,6 +58,7 @@ struct TerrainMesh
     std::vector<float> heights;
     std::vector<TerrainVertex> vertices;
     std::vector<uint32_t> indices;
+    std::vector<float> riverMask;
 };
 
 class TerrainGenerator
@@ -78,6 +85,12 @@ class TerrainGenerator
         float lacunarity,
         float gain,
         float sharpness) const;
+        void applyConstraintSystem(
+            Field& heightField,
+            Field& riverField
+        ) const;
+
+        void generateRiver(Field& heightField, Field& riverField) const;
 };
 
 } // namespace terrain

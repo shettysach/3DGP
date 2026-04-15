@@ -10,6 +10,15 @@ if(WIN32)
   include_directories(${SDL2_INCLUDE_DIRS})
   set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
   set(OPENGL_LIBRARIES ${OPENGL_LIBRARIES})
+  
+elseif(APPLE)
+    find_package(SDL2 REQUIRED)
+    find_package(OpenGL REQUIRED)
+
+    include_directories(${SDL2_INCLUDE_DIRS})
+
+    set(SDL2_LIBS ${SDL2_LIBRARIES})
+    set(OPENGL_LIBS OpenGL::GL)
 else()
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(SDL2 REQUIRED sdl2)
