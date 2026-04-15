@@ -33,7 +33,7 @@ void TerrainGenerator::generateRiver(
     Field& riverField
 ) const
 {
-    for (int r = 0; r < 20; r++)
+    for (int r = 0; r < settings_.numRivers; r++)
     {
         int width = heightField.width;
         int depth = heightField.depth;
@@ -108,7 +108,11 @@ void TerrainGenerator::applyConstraintSystem(
 
     graph.push_back(new SlopeNode());
     // graph.push_back(new DistanceToWaterNode());
-    graph.push_back(new RiverNode());
+    if (settings_.enableRiver)
+    {
+        graph.push_back(new RiverNode(settings_.riverWeight,
+                                    settings_.riverDepth));
+    }
     graph.push_back(new SettlementNode());
     graph.push_back(new SmoothNode());
 

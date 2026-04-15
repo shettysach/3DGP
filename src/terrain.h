@@ -35,6 +35,10 @@ struct TerrainSettings
     uint32_t seed = 2026u;
     NoiseSettings noise;
     bool useConstraints = true;
+    bool enableRiver = true;
+    float riverDepth = 8.0f;
+    float riverWeight = 4.0f;
+    int numRivers = 20;
     int constraintIterations = 60;
 };
 

@@ -359,6 +359,51 @@ void runDemo()
                     mesh = generator.generateMesh();
                     std::cout << "Regenerated terrain with seed " << settings.seed << '\n';
                 }
+
+                if (event.key.keysym.sym == SDLK_1)
+                {
+                    settings.enableRiver = !settings.enableRiver;
+                    generator.setSettings(settings);
+                    mesh = generator.generateMesh();
+
+                    std::cout << "Rivers: " << (settings.enableRiver ? "ON" : "OFF") << '\n';
+                }
+
+                if (event.key.keysym.sym == SDLK_2)
+                {
+                    settings.riverDepth += 2.0f;
+                    generator.setSettings(settings);
+                    mesh = generator.generateMesh();
+
+                    std::cout << "River depth: " << settings.riverDepth << '\n';
+                }
+
+                if (event.key.keysym.sym == SDLK_3)
+                {
+                    settings.riverDepth = std::max(1.0f, settings.riverDepth - 2.0f);
+                    generator.setSettings(settings);
+                    mesh = generator.generateMesh();
+
+                    std::cout << "River depth: " << settings.riverDepth << '\n';
+                }
+
+                if (event.key.keysym.sym == SDLK_4)
+                {
+                    settings.numRivers += 5;
+                    generator.setSettings(settings);
+                    mesh = generator.generateMesh();
+
+                    std::cout << "Num rivers: " << settings.numRivers << '\n';
+                }
+
+                if (event.key.keysym.sym == SDLK_5)
+                {
+                    settings.numRivers = std::max(1, settings.numRivers - 5);
+                    generator.setSettings(settings);
+                    mesh = generator.generateMesh();
+
+                    std::cout << "Num rivers: " << settings.numRivers << '\n';
+                }
             }
 
             if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)

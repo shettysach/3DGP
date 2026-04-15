@@ -56,8 +56,10 @@ inline float neighborAvg(const Field& h, int x, int z) {
 
 class RiverNode : public ConstraintNode {
 public:
-    float weight = 4.0f;
-    float depth = 8.0f;
+    float weight;
+    float depth;
+
+    RiverNode(float w, float d) : weight(w), depth(d) {}
 
     void apply(Context& ctx) override {
         for (int z = 1; z < ctx.height.depth - 1; z++) {
