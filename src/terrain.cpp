@@ -2,6 +2,7 @@
 #include "terrain/blending.h"
 #include "terrain/mountains.h"
 #include "terrain/plains.h"
+#include "terrain/rivers.h"
 #include "terrain/terrain_noise.h"
 
 #include <algorithm>
@@ -151,6 +152,11 @@ float TerrainGenerator::ridgedFbm(
                        { return std::pow(std::clamp(1.0f - std::fabs(n), 0.0f, 1.0f), sharpness); });
 }
 
+// Main generation function
+// 1. Generates heightmap for terrain
+// 2. Generates mountain height and weight using heightmap
+// 3. Generates plan height using heightmap
+// 4. Blends terrain and generates mesh
 TerrainMesh TerrainGenerator::generateMesh() const
 {
     TerrainMesh mesh;
@@ -159,6 +165,9 @@ TerrainMesh TerrainGenerator::generateMesh() const
     mesh.horizontalScale = settings_.horizontalScale;
     mesh.heights.resize(static_cast<size_t>(settings_.width) * static_cast<size_t>(settings_.depth), 0.0f);
     std::vector<float> mountainWeights(
+        static_cast<size_t>(settings_.width) * static_cast<size_t>(settings_.depth),
+        0.0f);
+    std::vector<float> riverWeights(
         static_cast<size_t>(settings_.width) * static_cast<size_t>(settings_.depth),
         0.0f);
     mesh.minHeight = 0.0f;
@@ -171,7 +180,7 @@ TerrainMesh TerrainGenerator::generateMesh() const
     const float warpScale = settings_.noise.warpFrequency / baseFrequency;
     const auto idxOf = [this](int x, int z) -> size_t
     {
-        return static_cast<size_t>(z) * static_cast<size_t>(settings_.width) + static_cast<size_t>(x);
+        return static_cast<size_t>(z) * static_cast<size_t>(this->settings_.width) + static_cast<size_t>(x);
     };
 
     for (int z = 0; z < settings_.depth; ++z)
@@ -260,6 +269,16 @@ TerrainMesh TerrainGenerator::generateMesh() const
 
     smoothHeights(mesh.heights, mountainWeights, settings_.width, settings_.depth);
 
+    const RiverPassResult riverPass = runRiverPass(
+        mesh.heights,
+        settings_.width,
+        settings_.depth,
+        settings_.verticalScale,
+        settings_.rivers,
+        settings_.seed);
+    mesh.heights = riverPass.carvedHeights;
+    riverWeights = riverPass.riverWeights;
+
     mesh.minHeight = std::numeric_limits<float>::max();
     mesh.maxHeight = std::numeric_limits<float>::lowest();
     for (float height : mesh.heights)
@@ -282,6 +301,7 @@ TerrainMesh TerrainGenerator::generateMesh() const
             v.z = static_cast<float>(z) * settings_.horizontalScale;
             v.mountainWeight = mountainWeights[idx];
             v.plainsWeight = 1.0f - mountainWeights[idx];
+            v.riverWeight = riverWeights[idx];
             mesh.vertices[idx] = v;
         }
     }
@@ -336,6 +356,25 @@ TerrainMesh TerrainGenerator::generateMesh() const
             mesh.indices.push_back(i01);
         }
     }
+
+    mesh.waterVertices.resize(mesh.vertices.size());
+    for (int z = 0; z < settings_.depth; ++z)
+    {
+        for (int x = 0; x < settings_.width; ++x)
+        {
+            const size_t idx = idxOf(x, z);
+            TerrainVertex water = mesh.vertices[idx];
+            const float w = std::clamp(riverWeights[idx], 0.0f, 1.0f);
+            water.y = mesh.heights[idx] + 0.06f + w * 0.12f;
+            water.nx = 0.0f;
+            water.ny = 1.0f;
+            water.nz = 0.0f;
+            water.riverWeight = w;
+            mesh.waterVertices[idx] = water;
+        }
+    }
+
+    mesh.waterIndices = mesh.indices;
 
     return mesh;
 }

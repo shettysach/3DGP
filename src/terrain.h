@@ -18,6 +18,19 @@ struct NoiseSettings
     float warpAmplitude = 45.0f;
 };
 
+struct RiverSettings
+{
+    float sourceDensity = 0.00015f;
+    float minSourceHeight = 0.50f;
+    float sourceAccumulation = 100.0f;
+    float mainAccumulation = 220.0f;
+    int minSourceSeparation = 18;
+    int maxHalfWidth = 2;
+    float baseCarveFraction = 0.02f;
+    float maxCarveFraction = 0.07f;
+    float bankFalloff = 1.8f;
+};
+
 struct TerrainSettings
 {
     int width = 257;
@@ -29,6 +42,7 @@ struct TerrainSettings
     float falloffPower = 2.2f;
     uint32_t seed = 1234u;
     NoiseSettings noise;
+    RiverSettings rivers;
 };
 
 struct TerrainVertex
@@ -41,6 +55,7 @@ struct TerrainVertex
     float nz = 0.0f;
     float mountainWeight = 0.0f;
     float plainsWeight = 1.0f;
+    float riverWeight = 0.0f;
 };
 
 struct TerrainMesh
@@ -53,6 +68,8 @@ struct TerrainMesh
     std::vector<float> heights;
     std::vector<TerrainVertex> vertices;
     std::vector<uint32_t> indices;
+    std::vector<TerrainVertex> waterVertices;
+    std::vector<uint32_t> waterIndices;
 };
 
 class TerrainGenerator

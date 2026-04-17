@@ -1,4 +1,5 @@
 #include "renderer.h"
+#include "terrain/util.h"
 
 #include <algorithm>
 #include <chrono>
@@ -39,11 +40,24 @@ void emitColoredVertex(const terrain::TerrainVertex& v, float minH, float maxH)
     const float mountain = std::max(v.mountainWeight, slope * 1.15f);
     const float plains = 1.0f - std::min(1.0f, mountain);
     const float rockBoost = std::min(1.0f, slope * 3.8f + h * 0.25f);
-    glColor3f(
-        plains * (0.20f + 0.22f * h) + mountain * (0.33f + 0.25f * h) + rockBoost * 0.12f,
-        plains * (0.33f + 0.36f * h) + mountain * (0.29f + 0.18f * h) - rockBoost * 0.08f,
-        plains * (0.15f + 0.14f * h) + mountain * (0.25f + 0.20f * h) + rockBoost * 0.05f);
+
+    float r = plains * (0.20f + 0.22f * h) + mountain * (0.33f + 0.25f * h) + rockBoost * 0.12f;
+    float g = plains * (0.33f + 0.36f * h) + mountain * (0.29f + 0.18f * h) - rockBoost * 0.08f;
+    float b = plains * (0.15f + 0.14f * h) + mountain * (0.25f + 0.20f * h) + rockBoost * 0.05f;
+
+    glColor3f(r, g, b);
     glNormal3f(v.nx, v.ny, v.nz);
+    glVertex3f(v.x, v.y, v.z);
+}
+
+void emitWaterVertex(const terrain::TerrainVertex& v)
+{
+    const float t = terrain::smoothstep(0.02f, 0.85f, std::clamp(v.riverWeight, 0.0f, 1.0f));
+    const float r = terrain::lerp(0.03f, 0.09f, t);
+    const float g = terrain::lerp(0.28f, 0.55f, t);
+    const float b = terrain::lerp(0.58f, 0.92f, t);
+    const float a = terrain::lerp(0.0f, 0.76f, t);
+    glColor4f(r, g, b, a);
     glVertex3f(v.x, v.y, v.z);
 }
 
@@ -290,6 +304,32 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
         emitColoredVertex(mesh.vertices[mesh.indices[i + 2]], mesh.minHeight, mesh.maxHeight);
     }
     glEnd();
+
+    if (!mesh.waterVertices.empty() && !mesh.waterIndices.empty())
+    {
+        glDisable(GL_LIGHTING);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_CULL_FACE);
+        glDepthMask(GL_FALSE);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-1.0f, -1.0f);
+
+        glBegin(GL_TRIANGLES);
+        for (size_t i = 0; i < mesh.waterIndices.size(); i += 3)
+        {
+            emitWaterVertex(mesh.waterVertices[mesh.waterIndices[i + 0]]);
+            emitWaterVertex(mesh.waterVertices[mesh.waterIndices[i + 1]]);
+            emitWaterVertex(mesh.waterVertices[mesh.waterIndices[i + 2]]);
+        }
+        glEnd();
+
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        glDepthMask(GL_TRUE);
+        glEnable(GL_CULL_FACE);
+        glDisable(GL_BLEND);
+        glEnable(GL_LIGHTING);
+    }
 }
 
 void runDemo()
