@@ -3,6 +3,8 @@
 
 #include "terrain.h"
 
+#include <string>
+
 #ifdef _WIN32
 #include <SDL.h>
 #elif defined(__linux__)
@@ -35,6 +37,7 @@ class Renderer
     void moveForward(float amount);
     void moveRight(float amount);
     void setTarget(float x, float y, float z);
+    bool captureScreenshot(const std::string& filepath) const;
 
   private:
     int width_;

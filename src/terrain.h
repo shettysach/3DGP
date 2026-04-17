@@ -40,6 +40,8 @@ struct TerrainVertex
     float nx = 0.0f;
     float ny = 1.0f;
     float nz = 0.0f;
+    float mountainWeight = 0.0f;
+    float plainsWeight = 1.0f;
 };
 
 struct TerrainMesh

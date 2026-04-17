@@ -2,8 +2,12 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstring>
+#include <ctime>
 #include <iostream>
+#include <string>
 #include <thread>
+#include <vector>
 
 namespace renderer
 {
@@ -219,6 +223,58 @@ void Renderer::setTarget(float x, float y, float z)
     targetZ_ = z;
 }
 
+bool Renderer::captureScreenshot(const std::string& filepath) const
+{
+    if (!window_)
+    {
+        return false;
+    }
+
+    int drawableWidth = 0;
+    int drawableHeight = 0;
+    SDL_GL_GetDrawableSize(window_, &drawableWidth, &drawableHeight);
+    if (drawableWidth <= 0 || drawableHeight <= 0)
+    {
+        return false;
+    }
+
+    std::vector<unsigned char> pixels(
+        static_cast<size_t>(drawableWidth) * static_cast<size_t>(drawableHeight) * 3u,
+        0u);
+
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, drawableWidth, drawableHeight, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    if (glGetError() != GL_NO_ERROR)
+    {
+        return false;
+    }
+
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(
+        0,
+        drawableWidth,
+        drawableHeight,
+        24,
+        SDL_PIXELFORMAT_RGB24);
+    if (!surface)
+    {
+        return false;
+    }
+
+    const size_t rowBytes = static_cast<size_t>(drawableWidth) * 3u;
+    for (int y = 0; y < drawableHeight; ++y)
+    {
+        unsigned char* dst = static_cast<unsigned char*>(surface->pixels) +
+                             static_cast<size_t>(y) * static_cast<size_t>(surface->pitch);
+        const unsigned char* src = pixels.data() +
+                                   static_cast<size_t>(drawableHeight - 1 - y) * rowBytes;
+        std::memcpy(dst, src, rowBytes);
+    }
+
+    const int saveResult = SDL_SaveBMP(surface, filepath.c_str());
+    SDL_FreeSurface(surface);
+    return saveResult == 0;
+}
+
 void Renderer::render(const terrain::TerrainMesh& mesh)
 {
     glViewport(0, 0, width_, height_);
@@ -253,15 +309,49 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
         const float hB = (b.y - mesh.minHeight) / std::max(0.001f, mesh.maxHeight - mesh.minHeight);
         const float hC = (c.y - mesh.minHeight) / std::max(0.001f, mesh.maxHeight - mesh.minHeight);
 
-        glColor3f(0.18f + 0.45f * hA, 0.26f + 0.43f * hA, 0.14f + 0.18f * hA);
+        const float slopeA = std::max(0.0f, 1.0f - a.ny);
+        const float slopeB = std::max(0.0f, 1.0f - b.ny);
+        const float slopeC = std::max(0.0f, 1.0f - c.ny);
+
+        const float mountainA = std::max(a.mountainWeight, slopeA * 1.15f);
+        const float mountainB = std::max(b.mountainWeight, slopeB * 1.15f);
+        const float mountainC = std::max(c.mountainWeight, slopeC * 1.15f);
+
+        const float plainsA = 1.0f - std::min(1.0f, mountainA);
+        const float plainsB = 1.0f - std::min(1.0f, mountainB);
+        const float plainsC = 1.0f - std::min(1.0f, mountainC);
+
+        const float rockBoostA = std::min(1.0f, slopeA * 3.8f + hA * 0.25f);
+        const float rockBoostB = std::min(1.0f, slopeB * 3.8f + hB * 0.25f);
+        const float rockBoostC = std::min(1.0f, slopeC * 3.8f + hC * 0.25f);
+
+        const float rA = plainsA * (0.20f + 0.22f * hA) + mountainA * (0.33f + 0.25f * hA) +
+                         rockBoostA * 0.12f;
+        const float gA = plainsA * (0.33f + 0.36f * hA) + mountainA * (0.29f + 0.18f * hA) -
+                         rockBoostA * 0.08f;
+        const float bA = plainsA * (0.15f + 0.14f * hA) + mountainA * (0.25f + 0.20f * hA) +
+                         rockBoostA * 0.05f;
+        glColor3f(rA, gA, bA);
         glNormal3f(a.nx, a.ny, a.nz);
         glVertex3f(a.x, a.y, a.z);
 
-        glColor3f(0.18f + 0.45f * hB, 0.26f + 0.43f * hB, 0.14f + 0.18f * hB);
+        const float rB = plainsB * (0.20f + 0.22f * hB) + mountainB * (0.33f + 0.25f * hB) +
+                         rockBoostB * 0.12f;
+        const float gB = plainsB * (0.33f + 0.36f * hB) + mountainB * (0.29f + 0.18f * hB) -
+                         rockBoostB * 0.08f;
+        const float bB = plainsB * (0.15f + 0.14f * hB) + mountainB * (0.25f + 0.20f * hB) +
+                         rockBoostB * 0.05f;
+        glColor3f(rB, gB, bB);
         glNormal3f(b.nx, b.ny, b.nz);
         glVertex3f(b.x, b.y, b.z);
 
-        glColor3f(0.18f + 0.45f * hC, 0.26f + 0.43f * hC, 0.14f + 0.18f * hC);
+        const float rC = plainsC * (0.20f + 0.22f * hC) + mountainC * (0.33f + 0.25f * hC) +
+                         rockBoostC * 0.12f;
+        const float gC = plainsC * (0.33f + 0.36f * hC) + mountainC * (0.29f + 0.18f * hC) -
+                         rockBoostC * 0.08f;
+        const float bC = plainsC * (0.15f + 0.14f * hC) + mountainC * (0.25f + 0.20f * hC) +
+                         rockBoostC * 0.05f;
+        glColor3f(rC, gC, bC);
         glNormal3f(c.nx, c.ny, c.nz);
         glVertex3f(c.x, c.y, c.z);
     }
@@ -274,16 +364,16 @@ void runDemo()
     settings.width = 257;
     settings.depth = 257;
     settings.horizontalScale = 2.0f;
-    settings.verticalScale = 95.0f;
+    settings.verticalScale = 102.0f;
     settings.islandFalloff = false;
     settings.seed = 2026u;
-    settings.noise.frequency = 0.0065f;
+    settings.noise.frequency = 0.0052f;
     settings.noise.octaves = 6;
     settings.noise.lacunarity = 2.0f;
     settings.noise.gain = 0.5f;
-    settings.noise.ridgeSharpness = 2.7f;
-    settings.noise.warpFrequency = 0.004f;
-    settings.noise.warpAmplitude = 16.0f;
+    settings.noise.ridgeSharpness = 2.5f;
+    settings.noise.warpFrequency = 0.0038f;
+    settings.noise.warpAmplitude = 20.0f;
 
     terrain::TerrainGenerator generator(settings);
     terrain::TerrainMesh mesh = generator.generateMesh();
@@ -307,6 +397,7 @@ void runDemo()
     std::cout << "  WASD: move\n";
     std::cout << "  Q/E: move down/up\n";
     std::cout << "  R: regenerate terrain\n";
+    std::cout << "  P: save screenshot\n";
     std::cout << "  ESC: quit\n";
 
     SDL_Event event;
@@ -336,6 +427,20 @@ void runDemo()
                     generator.setSettings(settings);
                     mesh = generator.generateMesh();
                     std::cout << "Regenerated terrain with seed " << settings.seed << '\n';
+                }
+                if (event.key.keysym.sym == SDLK_p)
+                {
+                    const std::time_t now = std::time(nullptr);
+                    const std::string screenshotPath =
+                        "screenshot_" + std::to_string(static_cast<long long>(now)) + ".bmp";
+                    if (renderer.captureScreenshot(screenshotPath))
+                    {
+                        std::cout << "Saved screenshot to " << screenshotPath << '\n';
+                    }
+                    else
+                    {
+                        std::cout << "Failed to save screenshot\n";
+                    }
                 }
             }
 
