@@ -27,7 +27,8 @@ void smoothHeights(
     int width,
     int depth)
 {
-    const auto idxOf = [width](int x, int z) -> size_t {
+    const auto idxOf = [width](int x, int z) -> size_t
+    {
         return static_cast<size_t>(z) * static_cast<size_t>(width) + static_cast<size_t>(x);
     };
 

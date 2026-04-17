@@ -6,6 +6,30 @@
 namespace terrain
 {
 
+float computeMountainWeight(const MountainNoiseInput& in)
+{
+    const float continental = 0.5f * (in.fbm(in.sampleX, in.sampleZ, in.octaves, in.lacunarity, in.gain) + 1.0f);
+    const float ridges = in.ridgedFbm(in.sampleX + 101.3f, in.sampleZ - 77.9f, in.octaves, in.lacunarity, in.gain, in.ridgeSharpness);
+    const float detail = 0.5f * (in.fbm(in.sampleX * 2.7f, in.sampleZ * 2.7f, 4, 2.0f, 0.5f) + 1.0f);
+    const float rangeMask = smoothstep(0.42f, 0.72f, 0.5f * (in.fbm(in.sampleX * 0.3f + 400.0f, in.sampleZ * 0.3f - 250.0f, 3, in.lacunarity, 0.45f) + 1.0f));
+    const float slopeHint = clamp01((ridges - 0.35f) * 1.55f + detail * 0.2f);
+
+    const MountainInput mountainIn{continental, ridges, detail, slopeHint, rangeMask, in.verticalScale};
+    return computeMountain(mountainIn).weight;
+}
+
+float computeMountainHeight(const MountainNoiseInput& in)
+{
+    const float continental = 0.5f * (in.fbm(in.sampleX, in.sampleZ, in.octaves, in.lacunarity, in.gain) + 1.0f);
+    const float ridges = in.ridgedFbm(in.sampleX + 101.3f, in.sampleZ - 77.9f, in.octaves, in.lacunarity, in.gain, in.ridgeSharpness);
+    const float detail = 0.5f * (in.fbm(in.sampleX * 2.7f, in.sampleZ * 2.7f, 4, 2.0f, 0.5f) + 1.0f);
+    const float rangeMask = smoothstep(0.42f, 0.72f, 0.5f * (in.fbm(in.sampleX * 0.3f + 400.0f, in.sampleZ * 0.3f - 250.0f, 3, in.lacunarity, 0.45f) + 1.0f));
+    const float slopeHint = clamp01((ridges - 0.35f) * 1.55f + detail * 0.2f);
+
+    const MountainInput mountainIn{continental, ridges, detail, slopeHint, rangeMask, in.verticalScale};
+    return computeMountain(mountainIn).height;
+}
+
 MountainResult computeMountain(const MountainInput& in)
 {
     const float mountainSignal = clamp01(in.continental * 0.55f + in.slopeHint * 0.35f + in.rangeMask * 0.45f);

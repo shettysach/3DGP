@@ -131,11 +131,14 @@ float TerrainGenerator::simplexNoise2D(float x, float y) const
     return 70.0f * (n0 + n1 + n2);
 }
 
-float TerrainGenerator::fbm(float x, float y, int octaves, float lacunarity, float gain) const
+// Layers multiple noise, adds detail
+float TerrainGenerator::fractalBrownianMotion(float x, float y, int octaves, float lacunarity, float gain) const
 {
-    return octaveNoise(x, y, octaves, lacunarity, gain, [](float n) { return n; });
+    return octaveNoise(x, y, octaves, lacunarity, gain, [](float n)
+                       { return n; });
 }
 
+// Creates mountain ridges
 float TerrainGenerator::ridgedFbm(
     float x,
     float y,
@@ -144,9 +147,8 @@ float TerrainGenerator::ridgedFbm(
     float gain,
     float sharpness) const
 {
-    return octaveNoise(x, y, octaves, lacunarity, gain, [sharpness](float n) {
-        return std::pow(clamp01(1.0f - std::fabs(n)), sharpness);
-    });
+    return octaveNoise(x, y, octaves, lacunarity, gain, [sharpness](float n)
+                       { return std::pow(clamp01(1.0f - std::fabs(n)), sharpness); });
 }
 
 TerrainMesh TerrainGenerator::generateMesh() const
@@ -167,8 +169,8 @@ TerrainMesh TerrainGenerator::generateMesh() const
     const float maxRadius = std::min(centerX, centerZ) * settings_.horizontalScale;
     const float baseFrequency = std::max(0.00001f, settings_.noise.frequency);
     const float warpScale = settings_.noise.warpFrequency / baseFrequency;
-    const int plainsOctaves = std::max(3, settings_.noise.octaves - 2);
-    const auto idxOf = [this](int x, int z) -> size_t {
+    const auto idxOf = [this](int x, int z) -> size_t
+    {
         return static_cast<size_t>(z) * static_cast<size_t>(settings_.width) + static_cast<size_t>(x);
     };
 
@@ -181,45 +183,47 @@ TerrainMesh TerrainGenerator::generateMesh() const
             const float wx = static_cast<float>(x) * settings_.horizontalScale;
             const float wz = static_cast<float>(z) * settings_.horizontalScale;
 
-            const float warpX = fbm(wx * warpScale + 31.7f,
-                                    wz * warpScale - 18.2f,
-                                    3,
-                                    settings_.noise.lacunarity,
-                                    0.5f) *
+            const float warpX = fractalBrownianMotion(wx * warpScale + 31.7f,
+                                                      wz * warpScale - 18.2f,
+                                                      3,
+                                                      settings_.noise.lacunarity,
+                                                      0.5f) *
                                 settings_.noise.warpAmplitude;
-            const float warpZ = fbm(wx * warpScale - 47.1f,
-                                    wz * warpScale + 22.8f,
-                                    3,
-                                    settings_.noise.lacunarity,
-                                    0.5f) *
+            const float warpZ = fractalBrownianMotion(wx * warpScale - 47.1f,
+                                                      wz * warpScale + 22.8f,
+                                                      3,
+                                                      settings_.noise.lacunarity,
+                                                      0.5f) *
                                 settings_.noise.warpAmplitude;
 
             const float sampleX = wx + warpX;
             const float sampleZ = wz + warpZ;
 
-            const float continental = 0.5f * (fbm(sampleX, sampleZ, settings_.noise.octaves,
-                                                  settings_.noise.lacunarity, settings_.noise.gain) +
-                                              1.0f);
-            const float ridges = ridgedFbm(sampleX + 101.3f, sampleZ - 77.9f, settings_.noise.octaves,
-                                           settings_.noise.lacunarity, settings_.noise.gain,
-                                           settings_.noise.ridgeSharpness);
-            const float detail = 0.5f * (fbm(sampleX * 2.7f, sampleZ * 2.7f, 4, 2.0f, 0.5f) + 1.0f);
+            MountainNoiseInput mtnNoiseIn{
+                sampleX,
+                sampleZ,
+                settings_.noise.octaves,
+                settings_.noise.lacunarity,
+                settings_.noise.gain,
+                settings_.noise.ridgeSharpness,
+                settings_.verticalScale,
+                [this](float x, float y, int o, float l, float g)
+                { return this->fractalBrownianMotion(x, y, o, l, g); },
+                [this](float x, float y, int o, float l, float g, float s)
+                { return this->ridgedFbm(x, y, o, l, g, s); }};
+            const float mtnHeight = computeMountainHeight(mtnNoiseIn);
+            const float mtnWeight = computeMountainWeight(mtnNoiseIn);
 
-            const float plainsBase = 0.5f *
-                                     (fbm(sampleX - 63.2f,
-                                          sampleZ + 41.8f,
-                                          plainsOctaves,
-                                          settings_.noise.lacunarity,
-                                          settings_.noise.gain) +
-                                      1.0f);
-            const float slopeHint = clamp01((ridges - 0.35f) * 1.55f + detail * 0.2f);
-
-            const float rangeMask = smoothstep(0.42f, 0.72f,
-                0.5f * (fbm(sampleX * 0.3f + 400.0f, sampleZ * 0.3f - 250.0f, 3,
-                            settings_.noise.lacunarity, 0.45f) + 1.0f));
-
-            const MountainResult mtn = computeMountain({continental, ridges, detail, slopeHint, rangeMask, settings_.verticalScale});
-            const float plainsHeight = computePlainsHeight({continental, plainsBase, detail, settings_.verticalScale});
+            PlainsNoiseInput plainsNoiseIn{
+                sampleX,
+                sampleZ,
+                settings_.noise.octaves,
+                settings_.noise.lacunarity,
+                settings_.noise.gain,
+                settings_.verticalScale,
+                [this](float x, float y, int o, float l, float g)
+                { return this->fractalBrownianMotion(x, y, o, l, g); }};
+            const float plainsHeight = computePlainsHeightFromNoise(plainsNoiseIn);
 
             float falloff = 1.0f;
 
@@ -233,7 +237,8 @@ TerrainMesh TerrainGenerator::generateMesh() const
                 falloff = std::pow(t, settings_.falloffPower);
             }
 
-            const BlendResult blend = blendTerrain({mtn.height, mtn.weight, plainsHeight, detail, falloff, settings_.verticalScale});
+            const float detail = 0.5f * (fractalBrownianMotion(sampleX * 2.7f, sampleZ * 2.7f, 4, 2.0f, 0.5f) + 1.0f);
+            const BlendResult blend = blendTerrain({mtnHeight, mtnWeight, plainsHeight, detail, falloff, settings_.verticalScale});
 
             mesh.heights[idx] = blend.height;
             mountainWeights[idx] = blend.mountainWeight;

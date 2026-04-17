@@ -72,7 +72,7 @@ class TerrainGenerator
 
     void reseed(uint32_t seed);
     float simplexNoise2D(float x, float y) const;
-    float fbm(float x, float y, int octaves, float lacunarity, float gain) const;
+    float fractalBrownianMotion(float x, float y, int octaves, float lacunarity, float gain) const;
     float ridgedFbm(
         float x,
         float y,
