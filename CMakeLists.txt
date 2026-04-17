@@ -3,6 +3,7 @@ project(TerrainDemo)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 if(WIN32)
   find_package(SDL2 REQUIRED)
@@ -39,9 +40,11 @@ add_executable(terrain_demo
     src/terrain/blending.cpp
     src/terrain/blending.h
     src/terrain/util.h
+    src/terrain/terrain_noise.cpp
+    src/terrain/terrain_noise.h
     src/renderer.cpp
     src/renderer.h
-)
+ )
 
 target_link_libraries(terrain_demo
     ${SDL2_LIBRARIES}

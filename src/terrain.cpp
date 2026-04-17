@@ -2,7 +2,7 @@
 #include "terrain/blending.h"
 #include "terrain/mountains.h"
 #include "terrain/plains.h"
-#include "terrain/util.h"
+#include "terrain/terrain_noise.h"
 
 #include <algorithm>
 #include <cmath>
@@ -148,7 +148,7 @@ float TerrainGenerator::ridgedFbm(
     float sharpness) const
 {
     return octaveNoise(x, y, octaves, lacunarity, gain, [sharpness](float n)
-                       { return std::pow(clamp01(1.0f - std::fabs(n)), sharpness); });
+                       { return std::pow(std::clamp(1.0f - std::fabs(n), 0.0f, 1.0f), sharpness); });
 }
 
 TerrainMesh TerrainGenerator::generateMesh() const
@@ -199,6 +199,19 @@ TerrainMesh TerrainGenerator::generateMesh() const
             const float sampleX = wx + warpX;
             const float sampleZ = wz + warpZ;
 
+            TerrainNoiseInput terrainNoiseIn{
+                sampleX,
+                sampleZ,
+                settings_.noise.octaves,
+                settings_.noise.lacunarity,
+                settings_.noise.gain,
+                settings_.noise.ridgeSharpness,
+                [this](float x, float y, int o, float l, float g)
+                { return this->fractalBrownianMotion(x, y, o, l, g); },
+                [this](float x, float y, int o, float l, float g, float s)
+                { return this->ridgedFbm(x, y, o, l, g, s); }};
+            const auto terrainNoise = computeTerrainNoiseComputation(terrainNoiseIn);
+
             MountainNoiseInput mtnNoiseIn{
                 sampleX,
                 sampleZ,
@@ -211,8 +224,9 @@ TerrainMesh TerrainGenerator::generateMesh() const
                 { return this->fractalBrownianMotion(x, y, o, l, g); },
                 [this](float x, float y, int o, float l, float g, float s)
                 { return this->ridgedFbm(x, y, o, l, g, s); }};
-            const float mtnHeight = computeMountainHeight(mtnNoiseIn);
-            const float mtnWeight = computeMountainWeight(mtnNoiseIn);
+            const auto mtnResult = computeMountainResult(mtnNoiseIn, terrainNoise.detail);
+            const float mtnHeight = mtnResult.height;
+            const float mtnWeight = mtnResult.weight;
 
             PlainsNoiseInput plainsNoiseIn{
                 sampleX,
@@ -223,7 +237,7 @@ TerrainMesh TerrainGenerator::generateMesh() const
                 settings_.verticalScale,
                 [this](float x, float y, int o, float l, float g)
                 { return this->fractalBrownianMotion(x, y, o, l, g); }};
-            const float plainsHeight = computePlainsHeightFromNoise(plainsNoiseIn);
+            const float plainsHeight = computePlainsHeightFromNoise(plainsNoiseIn, terrainNoise.detail);
 
             float falloff = 1.0f;
 
@@ -233,12 +247,11 @@ TerrainMesh TerrainGenerator::generateMesh() const
                 const float dz = wz - centerZ * settings_.horizontalScale;
                 const float radius = std::sqrt(dx * dx + dz * dz);
                 float t = 1.0f - radius / (maxRadius * settings_.falloffRadius);
-                t = clamp01(t);
+                t = std::clamp(t, 0.0f, 1.0f);
                 falloff = std::pow(t, settings_.falloffPower);
             }
 
-            const float detail = 0.5f * (fractalBrownianMotion(sampleX * 2.7f, sampleZ * 2.7f, 4, 2.0f, 0.5f) + 1.0f);
-            const BlendResult blend = blendTerrain({mtnHeight, mtnWeight, plainsHeight, detail, falloff, settings_.verticalScale});
+            const BlendResult blend = blendTerrain({mtnHeight, mtnWeight, plainsHeight, terrainNoise.detail, falloff, settings_.verticalScale});
 
             mesh.heights[idx] = blend.height;
             mountainWeights[idx] = blend.mountainWeight;

@@ -2,14 +2,13 @@
 #define TERRAIN_UTIL_H
 
 #include <algorithm>
-#include <cmath>
 
 namespace terrain
 {
 
-inline float clamp01(float x)
+inline float lerp(float a, float b, float t)
 {
-    return std::max(0.0f, std::min(1.0f, x));
+    return a + (b - a) * t;
 }
 
 inline float smoothstep(float edge0, float edge1, float x)
@@ -18,13 +17,8 @@ inline float smoothstep(float edge0, float edge1, float x)
     {
         return x < edge0 ? 0.0f : 1.0f;
     }
-    x = clamp01((x - edge0) / (edge1 - edge0));
+    x = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
     return x * x * (3.0f - 2.0f * x);
-}
-
-inline float lerp(float a, float b, float t)
-{
-    return a + (b - a) * t;
 }
 
 } // namespace terrain

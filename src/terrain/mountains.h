@@ -22,6 +22,15 @@ struct MountainResult
     float weight = 0.0f;
 };
 
+struct MountainNoiseComputation
+{
+    float continental = 0.0f;
+    float ridges = 0.0f;
+    float detail = 0.0f;
+    float rangeMask = 0.0f;
+    float slopeHint = 0.0f;
+};
+
 struct MountainNoiseInput
 {
     float sampleX = 0.0f;
@@ -35,9 +44,9 @@ struct MountainNoiseInput
     std::function<float(float, float, int, float, float, float)> ridgedFbm;
 };
 
+MountainNoiseComputation computeMountainNoiseComputation(const MountainNoiseInput& in, float detail);
 MountainResult computeMountain(const MountainInput& in);
-float computeMountainHeight(const MountainNoiseInput& in);
-float computeMountainWeight(const MountainNoiseInput& in);
+MountainResult computeMountainResult(const MountainNoiseInput& in, float detail);
 
 } // namespace terrain
 

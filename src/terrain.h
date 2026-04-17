@@ -1,7 +1,6 @@
 #ifndef TERRAIN_H
 #define TERRAIN_H
 
-#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -28,7 +27,7 @@ struct TerrainSettings
     bool islandFalloff = true;
     float falloffRadius = 0.9f;
     float falloffPower = 2.2f;
-    uint32_t seed = 2026u;
+    uint32_t seed = 1234u;
     NoiseSettings noise;
 };
 

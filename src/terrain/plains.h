@@ -26,7 +26,7 @@ struct PlainsNoiseInput
 };
 
 float computePlainsHeight(const PlainsInput& in);
-float computePlainsHeightFromNoise(const PlainsNoiseInput& in);
+float computePlainsHeightFromNoise(const PlainsNoiseInput& in, float detail);
 
 } // namespace terrain
 
