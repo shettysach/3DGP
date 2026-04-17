@@ -2,21 +2,22 @@
 #define RENDERER_H
 
 #include "terrain.h"
+#include <string>
 
 #ifdef _WIN32
-#include <SDL.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
+#include <SDL.h>
 
 #elif defined(__APPLE__)
-#include <SDL2/SDL.h>
 #include <OpenGL/gl.h>
 #include <OpenGL/glu.h>
+#include <SDL2/SDL.h>
 
 #elif defined(__linux__)
-#include <SDL2/SDL.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
+#include <SDL2/SDL.h>
 
 #else
 #error "Unknown platform"

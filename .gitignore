@@ -2,6 +2,7 @@
 /result
 /result-dev
 /.direnv/
+/.cache/
 
 # CMake / tooling extras
 /CMakeUserPresets.json
