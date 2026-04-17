@@ -149,24 +149,7 @@ float TerrainGenerator::simplexNoise2D(float x, float y) const
 
 float TerrainGenerator::fbm(float x, float y, int octaves, float lacunarity, float gain) const
 {
-    float value = 0.0f;
-    float amplitude = 1.0f;
-    float frequency = settings_.noise.frequency;
-    float amplitudeSum = 0.0f;
-
-    for (int octave = 0; octave < octaves; ++octave)
-    {
-        value += amplitude * simplexNoise2D(x * frequency, y * frequency);
-        amplitudeSum += amplitude;
-        amplitude *= gain;
-        frequency *= lacunarity;
-    }
-
-    if (amplitudeSum <= 0.0f)
-    {
-        return 0.0f;
-    }
-    return value / amplitudeSum;
+    return octaveNoise(x, y, octaves, lacunarity, gain, [](float n) { return n; });
 }
 
 float TerrainGenerator::ridgedFbm(
@@ -177,28 +160,9 @@ float TerrainGenerator::ridgedFbm(
     float gain,
     float sharpness) const
 {
-    float value = 0.0f;
-    float amplitude = 1.0f;
-    float frequency = settings_.noise.frequency;
-    float amplitudeSum = 0.0f;
-
-    for (int octave = 0; octave < octaves; ++octave)
-    {
-        const float n = simplexNoise2D(x * frequency, y * frequency);
-        float ridge = 1.0f - std::fabs(n);
-        ridge = std::pow(clamp01(ridge), sharpness);
-
-        value += ridge * amplitude;
-        amplitudeSum += amplitude;
-        amplitude *= gain;
-        frequency *= lacunarity;
-    }
-
-    if (amplitudeSum <= 0.0f)
-    {
-        return 0.0f;
-    }
-    return value / amplitudeSum;
+    return octaveNoise(x, y, octaves, lacunarity, gain, [sharpness](float n) {
+        return std::pow(clamp01(1.0f - std::fabs(n)), sharpness);
+    });
 }
 
 TerrainMesh TerrainGenerator::generateMesh() const
@@ -267,9 +231,9 @@ TerrainMesh TerrainGenerator::generateMesh() const
             const float slopeHint = clamp01((ridges - 0.35f) * 1.55f + detail * 0.2f);
 
             const float mountainSignal = clamp01(continental * 0.75f + slopeHint * 0.52f);
-            const float mountainCore = smoothstep(0.58f, 0.86f, mountainSignal);
-            const float mountainFoot = smoothstep(0.40f, 0.74f, mountainSignal);
-            float mountainWeight = clamp01(0.55f * mountainCore + 0.45f * mountainFoot);
+            const float mountainCore = smoothstep(0.45f, 0.80f, mountainSignal);
+            const float mountainFoot = smoothstep(0.25f, 0.60f, mountainSignal);
+            float mountainWeight = clamp01(0.45f * mountainCore + 0.55f * mountainFoot);
             float plainsWeight = 1.0f - mountainWeight;
 
             const float plainsHeight =
@@ -362,8 +326,7 @@ TerrainMesh TerrainGenerator::generateMesh() const
     {
         for (int x = 0; x < settings_.width; ++x)
         {
-            const size_t idx = static_cast<size_t>(z) * static_cast<size_t>(settings_.width) +
-                               static_cast<size_t>(x);
+            const size_t idx = idxOf(x, z);
 
             TerrainVertex v;
             v.x = static_cast<float>(x) * settings_.horizontalScale;
@@ -384,20 +347,15 @@ TerrainMesh TerrainGenerator::generateMesh() const
             const int zD = std::max(0, z - 1);
             const int zU = std::min(settings_.depth - 1, z + 1);
 
-            const float hL = mesh.heights[static_cast<size_t>(z) * static_cast<size_t>(settings_.width) +
-                                          static_cast<size_t>(xL)];
-            const float hR = mesh.heights[static_cast<size_t>(z) * static_cast<size_t>(settings_.width) +
-                                          static_cast<size_t>(xR)];
-            const float hD = mesh.heights[static_cast<size_t>(zD) * static_cast<size_t>(settings_.width) +
-                                          static_cast<size_t>(x)];
-            const float hU = mesh.heights[static_cast<size_t>(zU) * static_cast<size_t>(settings_.width) +
-                                          static_cast<size_t>(x)];
+            const float hL = mesh.heights[idxOf(xL, z)];
+            const float hR = mesh.heights[idxOf(xR, z)];
+            const float hD = mesh.heights[idxOf(x, zD)];
+            const float hU = mesh.heights[idxOf(x, zU)];
 
             const float dx = (hR - hL) / (static_cast<float>(xR - xL) * settings_.horizontalScale);
             const float dz = (hU - hD) / (static_cast<float>(zU - zD) * settings_.horizontalScale);
 
-            const size_t idx = static_cast<size_t>(z) * static_cast<size_t>(settings_.width) +
-                               static_cast<size_t>(x);
+            const size_t idx = idxOf(x, z);
             TerrainVertex& v = mesh.vertices[idx];
             const float nx = -dx;
             const float ny = 1.0f;

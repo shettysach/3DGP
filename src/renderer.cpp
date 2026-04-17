@@ -1,5 +1,6 @@
 #include "renderer.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -22,15 +23,28 @@ float degToRad(float deg)
     return deg * kPi / 180.0f;
 }
 
-void normalize3(float& x, float& y, float& z)
+void yawDirections(float yawDeg, float& forwardX, float& forwardZ, float& rightX, float& rightZ)
 {
-    const float len = std::sqrt(x * x + y * y + z * z);
-    if (len > 0.000001f)
-    {
-        x /= len;
-        y /= len;
-        z /= len;
-    }
+    const float yawRad = degToRad(yawDeg);
+    forwardX = std::cos(yawRad);
+    forwardZ = std::sin(yawRad);
+    rightX = std::cos(yawRad + kPi * 0.5f);
+    rightZ = std::sin(yawRad + kPi * 0.5f);
+}
+
+void emitColoredVertex(const terrain::TerrainVertex& v, float minH, float maxH)
+{
+    const float h = (v.y - minH) / std::max(0.001f, maxH - minH);
+    const float slope = std::max(0.0f, 1.0f - v.ny);
+    const float mountain = std::max(v.mountainWeight, slope * 1.15f);
+    const float plains = 1.0f - std::min(1.0f, mountain);
+    const float rockBoost = std::min(1.0f, slope * 3.8f + h * 0.25f);
+    glColor3f(
+        plains * (0.20f + 0.22f * h) + mountain * (0.33f + 0.25f * h) + rockBoost * 0.12f,
+        plains * (0.33f + 0.36f * h) + mountain * (0.29f + 0.18f * h) - rockBoost * 0.08f,
+        plains * (0.15f + 0.14f * h) + mountain * (0.25f + 0.20f * h) + rockBoost * 0.05f);
+    glNormal3f(v.nx, v.ny, v.nz);
+    glVertex3f(v.x, v.y, v.z);
 }
 
 } // namespace
@@ -152,68 +166,38 @@ void Renderer::orbit(float deltaYaw, float deltaPitch)
 {
     yawDeg_ += deltaYaw;
     pitchDeg_ += deltaPitch;
-    if (pitchDeg_ > 88.0f)
-    {
-        pitchDeg_ = 88.0f;
-    }
-    if (pitchDeg_ < -30.0f)
-    {
-        pitchDeg_ = -30.0f;
-    }
+    pitchDeg_ = std::clamp(pitchDeg_, -30.0f, 88.0f);
 }
 
 void Renderer::zoom(float deltaDistance)
 {
     distance_ += deltaDistance;
-    if (distance_ < 18.0f)
-    {
-        distance_ = 18.0f;
-    }
-    if (distance_ > 1600.0f)
-    {
-        distance_ = 1600.0f;
-    }
+    distance_ = std::clamp(distance_, 18.0f, 1600.0f);
 }
 
 void Renderer::pan(float deltaX, float deltaY)
 {
-    const float yawRad = degToRad(yawDeg_);
-    float rightX = std::cos(yawRad + kPi * 0.5f);
-    float rightY = 0.0f;
-    float rightZ = std::sin(yawRad + kPi * 0.5f);
-    normalize3(rightX, rightY, rightZ);
-
-    const float upX = 0.0f;
-    const float upY = 1.0f;
-    const float upZ = 0.0f;
-
-    targetX_ += rightX * deltaX + upX * deltaY;
-    targetY_ += rightY * deltaX + upY * deltaY;
-    targetZ_ += rightZ * deltaX + upZ * deltaY;
+    float fX, fZ, rX, rZ;
+    yawDirections(yawDeg_, fX, fZ, rX, rZ);
+    targetX_ += rX * deltaX;
+    targetZ_ += rZ * deltaX;
+    targetY_ += deltaY;
 }
 
 void Renderer::moveForward(float amount)
 {
-    const float yawRad = degToRad(yawDeg_);
-    float forwardX = std::cos(yawRad);
-    float forwardY = 0.0f;
-    float forwardZ = std::sin(yawRad);
-    normalize3(forwardX, forwardY, forwardZ);
-    targetX_ += forwardX * amount;
-    targetY_ += forwardY * amount;
-    targetZ_ += forwardZ * amount;
+    float fX, fZ, rX, rZ;
+    yawDirections(yawDeg_, fX, fZ, rX, rZ);
+    targetX_ += fX * amount;
+    targetZ_ += fZ * amount;
 }
 
 void Renderer::moveRight(float amount)
 {
-    const float yawRad = degToRad(yawDeg_);
-    float rightX = std::cos(yawRad + kPi * 0.5f);
-    float rightY = 0.0f;
-    float rightZ = std::sin(yawRad + kPi * 0.5f);
-    normalize3(rightX, rightY, rightZ);
-    targetX_ += rightX * amount;
-    targetY_ += rightY * amount;
-    targetZ_ += rightZ * amount;
+    float fX, fZ, rX, rZ;
+    yawDirections(yawDeg_, fX, fZ, rX, rZ);
+    targetX_ += rX * amount;
+    targetZ_ += rZ * amount;
 }
 
 void Renderer::setTarget(float x, float y, float z)
@@ -301,59 +285,9 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
     glBegin(GL_TRIANGLES);
     for (size_t i = 0; i < mesh.indices.size(); i += 3)
     {
-        const terrain::TerrainVertex& a = mesh.vertices[mesh.indices[i + 0]];
-        const terrain::TerrainVertex& b = mesh.vertices[mesh.indices[i + 1]];
-        const terrain::TerrainVertex& c = mesh.vertices[mesh.indices[i + 2]];
-
-        const float hA = (a.y - mesh.minHeight) / std::max(0.001f, mesh.maxHeight - mesh.minHeight);
-        const float hB = (b.y - mesh.minHeight) / std::max(0.001f, mesh.maxHeight - mesh.minHeight);
-        const float hC = (c.y - mesh.minHeight) / std::max(0.001f, mesh.maxHeight - mesh.minHeight);
-
-        const float slopeA = std::max(0.0f, 1.0f - a.ny);
-        const float slopeB = std::max(0.0f, 1.0f - b.ny);
-        const float slopeC = std::max(0.0f, 1.0f - c.ny);
-
-        const float mountainA = std::max(a.mountainWeight, slopeA * 1.15f);
-        const float mountainB = std::max(b.mountainWeight, slopeB * 1.15f);
-        const float mountainC = std::max(c.mountainWeight, slopeC * 1.15f);
-
-        const float plainsA = 1.0f - std::min(1.0f, mountainA);
-        const float plainsB = 1.0f - std::min(1.0f, mountainB);
-        const float plainsC = 1.0f - std::min(1.0f, mountainC);
-
-        const float rockBoostA = std::min(1.0f, slopeA * 3.8f + hA * 0.25f);
-        const float rockBoostB = std::min(1.0f, slopeB * 3.8f + hB * 0.25f);
-        const float rockBoostC = std::min(1.0f, slopeC * 3.8f + hC * 0.25f);
-
-        const float rA = plainsA * (0.20f + 0.22f * hA) + mountainA * (0.33f + 0.25f * hA) +
-                         rockBoostA * 0.12f;
-        const float gA = plainsA * (0.33f + 0.36f * hA) + mountainA * (0.29f + 0.18f * hA) -
-                         rockBoostA * 0.08f;
-        const float bA = plainsA * (0.15f + 0.14f * hA) + mountainA * (0.25f + 0.20f * hA) +
-                         rockBoostA * 0.05f;
-        glColor3f(rA, gA, bA);
-        glNormal3f(a.nx, a.ny, a.nz);
-        glVertex3f(a.x, a.y, a.z);
-
-        const float rB = plainsB * (0.20f + 0.22f * hB) + mountainB * (0.33f + 0.25f * hB) +
-                         rockBoostB * 0.12f;
-        const float gB = plainsB * (0.33f + 0.36f * hB) + mountainB * (0.29f + 0.18f * hB) -
-                         rockBoostB * 0.08f;
-        const float bB = plainsB * (0.15f + 0.14f * hB) + mountainB * (0.25f + 0.20f * hB) +
-                         rockBoostB * 0.05f;
-        glColor3f(rB, gB, bB);
-        glNormal3f(b.nx, b.ny, b.nz);
-        glVertex3f(b.x, b.y, b.z);
-
-        const float rC = plainsC * (0.20f + 0.22f * hC) + mountainC * (0.33f + 0.25f * hC) +
-                         rockBoostC * 0.12f;
-        const float gC = plainsC * (0.33f + 0.36f * hC) + mountainC * (0.29f + 0.18f * hC) -
-                         rockBoostC * 0.08f;
-        const float bC = plainsC * (0.15f + 0.14f * hC) + mountainC * (0.25f + 0.20f * hC) +
-                         rockBoostC * 0.05f;
-        glColor3f(rC, gC, bC);
-        glNormal3f(c.nx, c.ny, c.nz);
-        glVertex3f(c.x, c.y, c.z);
+        emitColoredVertex(mesh.vertices[mesh.indices[i + 0]], mesh.minHeight, mesh.maxHeight);
+        emitColoredVertex(mesh.vertices[mesh.indices[i + 1]], mesh.minHeight, mesh.maxHeight);
+        emitColoredVertex(mesh.vertices[mesh.indices[i + 2]], mesh.minHeight, mesh.maxHeight);
     }
     glEnd();
 }

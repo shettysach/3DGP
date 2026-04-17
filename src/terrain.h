@@ -10,13 +10,13 @@ namespace terrain
 
 struct NoiseSettings
 {
-    float frequency = 0.015f;
+    float frequency = 0.007f;
     int octaves = 6;
     float lacunarity = 2.0f;
     float gain = 0.5f;
-    float ridgeSharpness = 2.4f;
-    float warpFrequency = 0.006f;
-    float warpAmplitude = 28.0f;
+    float ridgeSharpness = 2.0f;
+    float warpFrequency = 0.003f;
+    float warpAmplitude = 45.0f;
 };
 
 struct TerrainSettings
@@ -80,6 +80,24 @@ class TerrainGenerator
         float lacunarity,
         float gain,
         float sharpness) const;
+
+    template <typename F>
+    float octaveNoise(float x, float y, int octaves, float lacunarity, float gain, F transform) const
+    {
+        float value = 0.0f;
+        float amplitude = 1.0f;
+        float frequency = settings_.noise.frequency;
+        float amplitudeSum = 0.0f;
+        for (int octave = 0; octave < octaves; ++octave)
+        {
+            const float n = simplexNoise2D(x * frequency, y * frequency);
+            value += amplitude * transform(n);
+            amplitudeSum += amplitude;
+            amplitude *= gain;
+            frequency *= lacunarity;
+        }
+        return amplitudeSum > 0.0f ? value / amplitudeSum : 0.0f;
+    }
 };
 
 } // namespace terrain
