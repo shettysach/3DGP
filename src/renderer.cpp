@@ -34,6 +34,12 @@ void yawDirections(float yawDeg, float& forwardX, float& forwardZ, float& rightX
 
 void emitColoredVertex(const terrain::TerrainVertex& v, float minH, float maxH)
 {
+    if (v.regionType == terrain::RegionType::River) {
+    glColor3f(0.0f, 0.3f, 1.0f); // blue
+    glNormal3f(v.nx, v.ny, v.nz);
+    glVertex3f(v.x, v.y, v.z);
+    return;
+}
     const float h = (v.y - minH) / std::max(0.001f, maxH - minH);
     const float slope = std::max(0.0f, 1.0f - v.ny);
     const float mountain = std::max(v.mountainWeight, slope * 1.15f);

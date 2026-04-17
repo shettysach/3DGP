@@ -63,6 +63,12 @@ void TerrainGenerator::reseed(uint32_t seed)
     {
         permutation_[i] = p[i & 255];
     }
+    layout_.generate(
+        settings_.width,
+        settings_.depth,
+        settings_.horizontalScale,
+        seed
+    );
 }
 
 float TerrainGenerator::simplexNoise2D(float x, float y) const
@@ -151,8 +157,12 @@ float TerrainGenerator::ridgedFbm(
                        { return std::pow(std::clamp(1.0f - std::fabs(n), 0.0f, 1.0f), sharpness); });
 }
 
+
 TerrainMesh TerrainGenerator::generateMesh() const
 {
+    std::vector<terrain::RegionType> regionTypes(
+    settings_.width * settings_.depth
+);
     TerrainMesh mesh;
     mesh.width = settings_.width;
     mesh.depth = settings_.depth;
@@ -198,6 +208,8 @@ TerrainMesh TerrainGenerator::generateMesh() const
 
             const float sampleX = wx + warpX;
             const float sampleZ = wz + warpZ;
+            const Region& region = layout_.getRegionForPoint(sampleX, sampleZ);
+            regionTypes[idx] = region.type;
 
             TerrainNoiseInput terrainNoiseIn{
                 sampleX,
@@ -238,6 +250,52 @@ TerrainMesh TerrainGenerator::generateMesh() const
                 [this](float x, float y, int o, float l, float g)
                 { return this->fractalBrownianMotion(x, y, o, l, g); }};
             const float plainsHeight = computePlainsHeightFromNoise(plainsNoiseIn, terrainNoise.detail);
+            float finalHeight = 0.0f;
+            float finalMountainWeight = 0.0f;
+
+            switch (region.type)
+            {
+                case RegionType::Mountain:
+                {
+                    finalHeight = mtnHeight;
+                    finalMountainWeight = 1.0f;
+                    break;
+                }
+
+                case RegionType::Plains:
+                {
+                    finalHeight = plainsHeight;
+                    finalMountainWeight = 0.0f;
+                    break;
+                }
+
+                case RegionType::River:
+                {
+                    finalHeight = plainsHeight - settings_.verticalScale *  0.6f;
+                    finalMountainWeight = 0.0f;
+                    break;
+                }
+
+                case RegionType::Desert:
+                {
+                    finalHeight = plainsHeight * 0.6f;
+                    finalMountainWeight = 0.0f;
+                    break;
+                }
+
+                case RegionType::Snow:
+                {
+                    finalHeight = mtnHeight * 0.8f + settings_.verticalScale * 0.2f;
+                    finalMountainWeight = 0.7f;
+                    break;
+                }
+            }
+
+            if (region.type == RegionType::River)
+            {
+                float riverNoise = simplexNoise2D(sampleX * 0.05f, sampleZ * 0.05f);
+                finalHeight -= std::abs(riverNoise) * settings_.verticalScale * 0.2f;
+            }
 
             float falloff = 1.0f;
 
@@ -251,7 +309,8 @@ TerrainMesh TerrainGenerator::generateMesh() const
                 falloff = std::pow(t, settings_.falloffPower);
             }
 
-            const BlendResult blend = blendTerrain({mtnHeight, mtnWeight, plainsHeight, terrainNoise.detail, falloff, settings_.verticalScale});
+            // const BlendResult blend = blendTerrain({mtnHeight, mtnWeight, plainsHeight, terrainNoise.detail, falloff, settings_.verticalScale});
+            const BlendResult blend = blendTerrain({finalHeight,finalMountainWeight,plainsHeight,terrainNoise.detail,falloff,settings_.verticalScale});
 
             mesh.heights[idx] = blend.height;
             mountainWeights[idx] = blend.mountainWeight;
@@ -282,6 +341,7 @@ TerrainMesh TerrainGenerator::generateMesh() const
             v.z = static_cast<float>(z) * settings_.horizontalScale;
             v.mountainWeight = mountainWeights[idx];
             v.plainsWeight = 1.0f - mountainWeights[idx];
+            v.regionType = regionTypes[idx];
             mesh.vertices[idx] = v;
         }
     }

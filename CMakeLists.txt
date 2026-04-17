@@ -42,6 +42,7 @@ add_executable(terrain_demo
     src/terrain/util.h
     src/terrain/terrain_noise.cpp
     src/terrain/terrain_noise.h
+    src/terrain/layout.cpp
     src/renderer.cpp
     src/renderer.h
  )

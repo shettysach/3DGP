@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <vector>
+#include "terrain/layout.h"
 
 namespace terrain
 {
@@ -41,6 +42,7 @@ struct TerrainVertex
     float nz = 0.0f;
     float mountainWeight = 0.0f;
     float plainsWeight = 1.0f;
+    terrain::RegionType regionType;
 };
 
 struct TerrainMesh
@@ -68,6 +70,7 @@ class TerrainGenerator
   private:
     TerrainSettings settings_;
     std::vector<int> permutation_;
+    TerrainLayout layout_;
 
     void reseed(uint32_t seed);
     float simplexNoise2D(float x, float y) const;
