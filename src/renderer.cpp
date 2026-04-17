@@ -42,8 +42,8 @@ void emitColoredVertex(const terrain::TerrainVertex& v, float minH, float maxH)
     const float rockBoost = std::min(1.0f, slope * 3.8f + h * 0.25f);
 
     float r = plains * (0.20f + 0.22f * h) + mountain * (0.33f + 0.25f * h) + rockBoost * 0.12f;
-    float g = plains * (0.33f + 0.36f * h) + mountain * (0.29f + 0.18f * h) - rockBoost * 0.08f;
-    float b = plains * (0.15f + 0.14f * h) + mountain * (0.25f + 0.20f * h) + rockBoost * 0.05f;
+    float g = plains * (0.33f + 0.36f * h) + mountain * (0.29f + 0.30f * h) - rockBoost * 0.08f;
+    float b = plains * (0.15f + 0.14f * h) + mountain * (0.15f + 0.20f * h) + rockBoost * 0.05f;
 
     glColor3f(r, g, b);
     glNormal3f(v.nx, v.ny, v.nz);
@@ -55,7 +55,7 @@ void emitWaterVertex(const terrain::TerrainVertex& v)
     const float t = terrain::smoothstep(0.02f, 0.85f, std::clamp(v.riverWeight, 0.0f, 1.0f));
     const float r = terrain::lerp(0.03f, 0.09f, t);
     const float g = terrain::lerp(0.28f, 0.55f, t);
-    const float b = terrain::lerp(0.58f, 0.92f, t);
+    const float b = terrain::lerp(0.58f, 0.72f, t);
     const float a = terrain::lerp(0.0f, 0.76f, t);
     glColor4f(r, g, b, a);
     glVertex3f(v.x, v.y, v.z);
