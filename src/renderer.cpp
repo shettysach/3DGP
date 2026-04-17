@@ -364,7 +364,7 @@ void runDemo()
     settings.width = 257;
     settings.depth = 257;
     settings.horizontalScale = 2.0f;
-    settings.verticalScale = 102.0f;
+    settings.verticalScale = 96.0f;
     settings.islandFalloff = false;
     settings.seed = 2026u;
     settings.noise.frequency = 0.0052f;
@@ -387,7 +387,7 @@ void runDemo()
 
     const float centerX = (static_cast<float>(settings.width - 1) * settings.horizontalScale) * 0.5f;
     const float centerZ = (static_cast<float>(settings.depth - 1) * settings.horizontalScale) * 0.5f;
-    renderer.setTarget(centerX, (mesh.minHeight + mesh.maxHeight) * 0.35f, centerZ);
+    renderer.setTarget(centerX, (mesh.minHeight + mesh.maxHeight) * 0.30f, centerZ);
     renderer.zoom(60.0f);
 
     std::cout << "Controls:\n";

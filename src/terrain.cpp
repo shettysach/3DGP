@@ -211,12 +211,8 @@ TerrainMesh TerrainGenerator::generateMesh() const
     std::vector<float> mountainWeights(
         static_cast<size_t>(settings_.width) * static_cast<size_t>(settings_.depth),
         0.0f);
-    std::vector<float> plainsWeights(
-        static_cast<size_t>(settings_.width) * static_cast<size_t>(settings_.depth),
-        1.0f);
-
-    mesh.minHeight = std::numeric_limits<float>::max();
-    mesh.maxHeight = std::numeric_limits<float>::lowest();
+    mesh.minHeight = 0.0f;
+    mesh.maxHeight = 0.0f;
 
     const float centerX = static_cast<float>(settings_.width - 1) * 0.5f;
     const float centerZ = static_cast<float>(settings_.depth - 1) * 0.5f;
@@ -224,13 +220,15 @@ TerrainMesh TerrainGenerator::generateMesh() const
     const float baseFrequency = std::max(0.00001f, settings_.noise.frequency);
     const float warpScale = settings_.noise.warpFrequency / baseFrequency;
     const int plainsOctaves = std::max(3, settings_.noise.octaves - 2);
+    const auto idxOf = [this](int x, int z) -> size_t {
+        return static_cast<size_t>(z) * static_cast<size_t>(settings_.width) + static_cast<size_t>(x);
+    };
 
     for (int z = 0; z < settings_.depth; ++z)
     {
         for (int x = 0; x < settings_.width; ++x)
         {
-            const size_t idx = static_cast<size_t>(z) * static_cast<size_t>(settings_.width) +
-                               static_cast<size_t>(x);
+            const size_t idx = idxOf(x, z);
 
             const float wx = static_cast<float>(x) * settings_.horizontalScale;
             const float wz = static_cast<float>(z) * settings_.horizontalScale;
@@ -268,23 +266,25 @@ TerrainMesh TerrainGenerator::generateMesh() const
                                       1.0f);
             const float slopeHint = clamp01((ridges - 0.35f) * 1.55f + detail * 0.2f);
 
-            float mountainWeight = smoothstep(0.56f,
-                                              0.84f,
-                                              clamp01(continental * 0.75f + slopeHint * 0.52f));
+            const float mountainSignal = clamp01(continental * 0.75f + slopeHint * 0.52f);
+            const float mountainCore = smoothstep(0.58f, 0.86f, mountainSignal);
+            const float mountainFoot = smoothstep(0.40f, 0.74f, mountainSignal);
+            float mountainWeight = clamp01(0.55f * mountainCore + 0.45f * mountainFoot);
             float plainsWeight = 1.0f - mountainWeight;
 
             const float plainsHeight =
                 (0.62f * continental + 0.28f * plainsBase + 0.10f * detail) * settings_.verticalScale * 0.56f;
-            const float mountainBase = 0.45f * continental + 0.45f * ridges + 0.10f * detail;
-            const float mountainShape = smoothstep(0.18f, 0.92f, clamp01(mountainBase));
+            const float mountainBase = 0.52f * continental + 0.38f * ridges + 0.10f * detail;
+            const float mountainShape = smoothstep(0.12f, 0.90f, clamp01(mountainBase));
+            const float mountainRidgeDetail = smoothstep(0.44f, 0.92f, ridges);
             float mountainHeight =
-                (0.65f * mountainShape + 0.35f * std::pow(mountainShape, 1.8f)) * settings_.verticalScale * 0.95f +
-                ridges * settings_.verticalScale * 0.08f;
+                (0.78f * mountainShape + 0.22f * std::pow(mountainShape, 1.45f)) * settings_.verticalScale * 0.86f +
+                mountainRidgeDetail * settings_.verticalScale * 0.06f;
 
-            const float peakKnee = settings_.verticalScale * 0.80f;
+            const float peakKnee = settings_.verticalScale * 0.74f;
             if (mountainHeight > peakKnee)
             {
-                mountainHeight = peakKnee + (mountainHeight - peakKnee) * 0.42f;
+                mountainHeight = peakKnee + (mountainHeight - peakKnee) * 0.32f;
             }
 
             float falloff = 1.0f;
@@ -309,9 +309,6 @@ TerrainMesh TerrainGenerator::generateMesh() const
 
             mesh.heights[idx] = height;
             mountainWeights[idx] = mountainWeight;
-            plainsWeights[idx] = plainsWeight;
-            mesh.minHeight = std::min(mesh.minHeight, height);
-            mesh.maxHeight = std::max(mesh.maxHeight, height);
         }
     }
 
@@ -327,25 +324,15 @@ TerrainMesh TerrainGenerator::generateMesh() const
                 const int x0 = std::max(0, x - 1);
                 const int x1 = std::min(settings_.width - 1, x + 1);
 
-                const size_t idx = static_cast<size_t>(z) * static_cast<size_t>(settings_.width) +
-                                   static_cast<size_t>(x);
-
-                const size_t i00 = static_cast<size_t>(z0) * static_cast<size_t>(settings_.width) +
-                                   static_cast<size_t>(x0);
-                const size_t i10 = static_cast<size_t>(z0) * static_cast<size_t>(settings_.width) +
-                                   static_cast<size_t>(x);
-                const size_t i20 = static_cast<size_t>(z0) * static_cast<size_t>(settings_.width) +
-                                   static_cast<size_t>(x1);
-                const size_t i01 = static_cast<size_t>(z) * static_cast<size_t>(settings_.width) +
-                                   static_cast<size_t>(x0);
-                const size_t i21 = static_cast<size_t>(z) * static_cast<size_t>(settings_.width) +
-                                   static_cast<size_t>(x1);
-                const size_t i02 = static_cast<size_t>(z1) * static_cast<size_t>(settings_.width) +
-                                   static_cast<size_t>(x0);
-                const size_t i12 = static_cast<size_t>(z1) * static_cast<size_t>(settings_.width) +
-                                   static_cast<size_t>(x);
-                const size_t i22 = static_cast<size_t>(z1) * static_cast<size_t>(settings_.width) +
-                                   static_cast<size_t>(x1);
+                const size_t idx = idxOf(x, z);
+                const size_t i00 = idxOf(x0, z0);
+                const size_t i10 = idxOf(x, z0);
+                const size_t i20 = idxOf(x1, z0);
+                const size_t i01 = idxOf(x0, z);
+                const size_t i21 = idxOf(x1, z);
+                const size_t i02 = idxOf(x0, z1);
+                const size_t i12 = idxOf(x, z1);
+                const size_t i22 = idxOf(x1, z1);
 
                 const float filtered = (mesh.heights[i00] + 2.0f * mesh.heights[i10] + mesh.heights[i20] +
                                         2.0f * mesh.heights[i01] + 4.0f * mesh.heights[idx] +
@@ -353,7 +340,7 @@ TerrainMesh TerrainGenerator::generateMesh() const
                                         2.0f * mesh.heights[i12] + mesh.heights[i22]) /
                                        16.0f;
 
-                const float smoothAmount = smoothstep(0.38f, 0.88f, mountainWeights[idx]) * 0.62f;
+                const float smoothAmount = smoothstep(0.28f, 0.88f, mountainWeights[idx]) * 0.62f;
                 smoothedHeights[idx] = lerp(mesh.heights[idx], filtered, smoothAmount);
             }
         }
@@ -383,7 +370,7 @@ TerrainMesh TerrainGenerator::generateMesh() const
             v.y = mesh.heights[idx];
             v.z = static_cast<float>(z) * settings_.horizontalScale;
             v.mountainWeight = mountainWeights[idx];
-            v.plainsWeight = plainsWeights[idx];
+            v.plainsWeight = 1.0f - mountainWeights[idx];
             mesh.vertices[idx] = v;
         }
     }
