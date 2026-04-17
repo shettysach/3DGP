@@ -24,6 +24,13 @@ add_executable(terrain_demo
     src/main.cpp
     src/terrain.cpp
     src/terrain.h
+    src/terrain/plains.cpp
+    src/terrain/plains.h
+    src/terrain/mountains.cpp
+    src/terrain/mountains.h
+    src/terrain/blending.cpp
+    src/terrain/blending.h
+    src/terrain/util.h
     src/renderer.cpp
     src/renderer.h
 )

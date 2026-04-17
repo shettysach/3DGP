@@ -1,4 +1,8 @@
 #include "terrain.h"
+#include "terrain/blending.h"
+#include "terrain/mountains.h"
+#include "terrain/plains.h"
+#include "terrain/util.h"
 
 #include <algorithm>
 #include <cmath>
@@ -20,26 +24,6 @@ constexpr float kG2 = (3.0f - kSqrt3) / 6.0f;
 int fastFloor(float x)
 {
     return (x >= 0.0f) ? static_cast<int>(x) : static_cast<int>(x) - 1;
-}
-
-float clamp01(float x)
-{
-    return std::max(0.0f, std::min(1.0f, x));
-}
-
-float smoothstep(float edge0, float edge1, float x)
-{
-    if (edge0 == edge1)
-    {
-        return x < edge0 ? 0.0f : 1.0f;
-    }
-    x = clamp01((x - edge0) / (edge1 - edge0));
-    return x * x * (3.0f - 2.0f * x);
-}
-
-float lerp(float a, float b, float t)
-{
-    return a + (b - a) * t;
 }
 
 } // namespace
@@ -230,26 +214,12 @@ TerrainMesh TerrainGenerator::generateMesh() const
                                       1.0f);
             const float slopeHint = clamp01((ridges - 0.35f) * 1.55f + detail * 0.2f);
 
-            const float mountainSignal = clamp01(continental * 0.75f + slopeHint * 0.52f);
-            const float mountainCore = smoothstep(0.45f, 0.80f, mountainSignal);
-            const float mountainFoot = smoothstep(0.25f, 0.60f, mountainSignal);
-            float mountainWeight = clamp01(0.45f * mountainCore + 0.55f * mountainFoot);
-            float plainsWeight = 1.0f - mountainWeight;
+            const float rangeMask = smoothstep(0.42f, 0.72f,
+                0.5f * (fbm(sampleX * 0.3f + 400.0f, sampleZ * 0.3f - 250.0f, 3,
+                            settings_.noise.lacunarity, 0.45f) + 1.0f));
 
-            const float plainsHeight =
-                (0.62f * continental + 0.28f * plainsBase + 0.10f * detail) * settings_.verticalScale * 0.56f;
-            const float mountainBase = 0.52f * continental + 0.38f * ridges + 0.10f * detail;
-            const float mountainShape = smoothstep(0.12f, 0.90f, clamp01(mountainBase));
-            const float mountainRidgeDetail = smoothstep(0.44f, 0.92f, ridges);
-            float mountainHeight =
-                (0.78f * mountainShape + 0.22f * std::pow(mountainShape, 1.45f)) * settings_.verticalScale * 0.86f +
-                mountainRidgeDetail * settings_.verticalScale * 0.06f;
-
-            const float peakKnee = settings_.verticalScale * 0.74f;
-            if (mountainHeight > peakKnee)
-            {
-                mountainHeight = peakKnee + (mountainHeight - peakKnee) * 0.32f;
-            }
+            const MountainResult mtn = computeMountain({continental, ridges, detail, slopeHint, rangeMask, settings_.verticalScale});
+            const float plainsHeight = computePlainsHeight({continental, plainsBase, detail, settings_.verticalScale});
 
             float falloff = 1.0f;
 
@@ -263,61 +233,21 @@ TerrainMesh TerrainGenerator::generateMesh() const
                 falloff = std::pow(t, settings_.falloffPower);
             }
 
-            const float weightSum = std::max(0.0001f, mountainWeight + plainsWeight);
-            mountainWeight /= weightSum;
-            plainsWeight /= weightSum;
+            const BlendResult blend = blendTerrain({mtn.height, mtn.weight, plainsHeight, detail, falloff, settings_.verticalScale});
 
-            const float blendedHeight = mountainWeight * mountainHeight + plainsWeight * plainsHeight;
-            const float fineDetail = (detail - 0.5f) * settings_.verticalScale * 0.035f;
-            const float height = (blendedHeight + fineDetail) * falloff;
-
-            mesh.heights[idx] = height;
-            mountainWeights[idx] = mountainWeight;
+            mesh.heights[idx] = blend.height;
+            mountainWeights[idx] = blend.mountainWeight;
         }
     }
 
+    smoothHeights(mesh.heights, mountainWeights, settings_.width, settings_.depth);
+
+    mesh.minHeight = std::numeric_limits<float>::max();
+    mesh.maxHeight = std::numeric_limits<float>::lowest();
+    for (float height : mesh.heights)
     {
-        std::vector<float> smoothedHeights = mesh.heights;
-        for (int z = 0; z < settings_.depth; ++z)
-        {
-            const int z0 = std::max(0, z - 1);
-            const int z1 = std::min(settings_.depth - 1, z + 1);
-
-            for (int x = 0; x < settings_.width; ++x)
-            {
-                const int x0 = std::max(0, x - 1);
-                const int x1 = std::min(settings_.width - 1, x + 1);
-
-                const size_t idx = idxOf(x, z);
-                const size_t i00 = idxOf(x0, z0);
-                const size_t i10 = idxOf(x, z0);
-                const size_t i20 = idxOf(x1, z0);
-                const size_t i01 = idxOf(x0, z);
-                const size_t i21 = idxOf(x1, z);
-                const size_t i02 = idxOf(x0, z1);
-                const size_t i12 = idxOf(x, z1);
-                const size_t i22 = idxOf(x1, z1);
-
-                const float filtered = (mesh.heights[i00] + 2.0f * mesh.heights[i10] + mesh.heights[i20] +
-                                        2.0f * mesh.heights[i01] + 4.0f * mesh.heights[idx] +
-                                        2.0f * mesh.heights[i21] + mesh.heights[i02] +
-                                        2.0f * mesh.heights[i12] + mesh.heights[i22]) /
-                                       16.0f;
-
-                const float smoothAmount = smoothstep(0.28f, 0.88f, mountainWeights[idx]) * 0.62f;
-                smoothedHeights[idx] = lerp(mesh.heights[idx], filtered, smoothAmount);
-            }
-        }
-
-        mesh.heights.swap(smoothedHeights);
-
-        mesh.minHeight = std::numeric_limits<float>::max();
-        mesh.maxHeight = std::numeric_limits<float>::lowest();
-        for (float height : mesh.heights)
-        {
-            mesh.minHeight = std::min(mesh.minHeight, height);
-            mesh.maxHeight = std::max(mesh.maxHeight, height);
-        }
+        mesh.minHeight = std::min(mesh.minHeight, height);
+        mesh.maxHeight = std::max(mesh.maxHeight, height);
     }
 
     mesh.vertices.resize(static_cast<size_t>(settings_.width) * static_cast<size_t>(settings_.depth));
