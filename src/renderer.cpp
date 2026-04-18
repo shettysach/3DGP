@@ -330,6 +330,26 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
         glDisable(GL_BLEND);
         glEnable(GL_LIGHTING);
     }
+
+    if (!mesh.settlementVertices.empty())
+    {
+        glDisable(GL_LIGHTING);
+        glDisable(GL_CULL_FACE);
+        glEnable(GL_POINT_SMOOTH);
+        glPointSize(12.0f);
+
+        glBegin(GL_POINTS);
+        for (const terrain::TerrainVertex& p : mesh.settlementVertices)
+        {
+            glColor3f(0.95f, 0.76f, 0.18f);
+            glVertex3f(p.x, p.y, p.z);
+        }
+        glEnd();
+
+        glDisable(GL_POINT_SMOOTH);
+        glEnable(GL_CULL_FACE);
+        glEnable(GL_LIGHTING);
+    }
 }
 
 void runDemo()
@@ -348,9 +368,36 @@ void runDemo()
     settings.noise.ridgeSharpness = 2.5f;
     settings.noise.warpFrequency = 0.0038f;
     settings.noise.warpAmplitude = 20.0f;
+    settings.rivers.sourceDensity = 0.00018f;
+    settings.rivers.sourceAccumulation = 85.0f;
+    settings.rivers.mainAccumulation = 200.0f;
+    settings.rivers.maxHalfWidth = 3;
+    settings.rivers.baseCarveFraction = 0.025f;
+    settings.rivers.maxCarveFraction = 0.09f;
 
     terrain::TerrainGenerator generator(settings);
     terrain::TerrainMesh mesh = generator.generateMesh();
+
+    auto printRiverStats = [&mesh]()
+    {
+        size_t wetCount = 0;
+        float maxWeight = 0.0f;
+        for (const terrain::TerrainVertex& v : mesh.vertices)
+        {
+            if (v.riverWeight > 0.02f)
+            {
+                ++wetCount;
+            }
+            maxWeight = std::max(maxWeight, v.riverWeight);
+        }
+
+        const float coverage = mesh.vertices.empty()
+                                   ? 0.0f
+                                   : 100.0f * static_cast<float>(wetCount) /
+                                         static_cast<float>(mesh.vertices.size());
+        std::cout << "River coverage: " << coverage << "%, max weight: " << maxWeight
+                  << ", settlements: " << mesh.settlementVertices.size() << '\n';
+    };
 
     Renderer renderer(1280, 800);
     if (!renderer.init())
@@ -371,14 +418,52 @@ void runDemo()
     std::cout << "  WASD: move\n";
     std::cout << "  Q/E: move down/up\n";
     std::cout << "  R: regenerate terrain\n";
+    std::cout << "  1/2/3: river preset (light/medium/heavy)\n";
     std::cout << "  P: save screenshot\n";
     std::cout << "  ESC: quit\n";
+    printRiverStats();
 
     SDL_Event event;
     bool orbiting = false;
     bool panning = false;
     int prevMouseX = 0;
     int prevMouseY = 0;
+
+    const auto applyRiverPreset = [&](int preset)
+    {
+        if (preset == 1)
+        {
+            settings.rivers.sourceDensity = 0.00010f;
+            settings.rivers.sourceAccumulation = 110.0f;
+            settings.rivers.mainAccumulation = 240.0f;
+            settings.rivers.maxHalfWidth = 2;
+            settings.rivers.baseCarveFraction = 0.018f;
+            settings.rivers.maxCarveFraction = 0.065f;
+        }
+        else if (preset == 2)
+        {
+            settings.rivers.sourceDensity = 0.00018f;
+            settings.rivers.sourceAccumulation = 85.0f;
+            settings.rivers.mainAccumulation = 200.0f;
+            settings.rivers.maxHalfWidth = 3;
+            settings.rivers.baseCarveFraction = 0.025f;
+            settings.rivers.maxCarveFraction = 0.09f;
+        }
+        else
+        {
+            settings.rivers.sourceDensity = 0.00030f;
+            settings.rivers.sourceAccumulation = 60.0f;
+            settings.rivers.mainAccumulation = 150.0f;
+            settings.rivers.maxHalfWidth = 4;
+            settings.rivers.baseCarveFraction = 0.035f;
+            settings.rivers.maxCarveFraction = 0.12f;
+        }
+
+        generator.setSettings(settings);
+        mesh = generator.generateMesh();
+        std::cout << "Applied river preset " << preset << '\n';
+        printRiverStats();
+    };
 
     while (!renderer.shouldClose())
     {
@@ -401,6 +486,19 @@ void runDemo()
                     generator.setSettings(settings);
                     mesh = generator.generateMesh();
                     std::cout << "Regenerated terrain with seed " << settings.seed << '\n';
+                    printRiverStats();
+                }
+                if (event.key.keysym.sym == SDLK_1)
+                {
+                    applyRiverPreset(1);
+                }
+                if (event.key.keysym.sym == SDLK_2)
+                {
+                    applyRiverPreset(2);
+                }
+                if (event.key.keysym.sym == SDLK_3)
+                {
+                    applyRiverPreset(3);
                 }
                 if (event.key.keysym.sym == SDLK_p)
                 {

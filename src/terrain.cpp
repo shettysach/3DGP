@@ -9,6 +9,7 @@
 #include <cmath>
 #include <limits>
 #include <numeric>
+#include <queue>
 #include <random>
 #include <stdexcept>
 
@@ -25,6 +26,17 @@ constexpr float kG2 = (3.0f - kSqrt3) / 6.0f;
 int fastFloor(float x)
 {
     return (x >= 0.0f) ? static_cast<int>(x) : static_cast<int>(x) - 1;
+}
+
+float placementJitter(size_t idx, uint32_t seed)
+{
+    uint32_t h = static_cast<uint32_t>(idx) ^ (seed * 747796405u + 2891336453u);
+    h ^= (h >> 16);
+    h *= 2246822519u;
+    h ^= (h >> 13);
+    h *= 3266489917u;
+    h ^= (h >> 16);
+    return static_cast<float>(h & 1023u) / 1023.0f;
 }
 
 } // namespace
@@ -306,6 +318,7 @@ TerrainMesh TerrainGenerator::generateMesh() const
         }
     }
 
+    std::vector<float> slopeMap(mesh.vertices.size(), 0.0f);
     for (int z = 0; z < settings_.depth; ++z)
     {
         for (int x = 0; x < settings_.width; ++x)
@@ -322,6 +335,7 @@ TerrainMesh TerrainGenerator::generateMesh() const
 
             const float dx = (hR - hL) / (static_cast<float>(xR - xL) * settings_.horizontalScale);
             const float dz = (hU - hD) / (static_cast<float>(zU - zD) * settings_.horizontalScale);
+            const float slope = std::sqrt(dx * dx + dz * dz);
 
             const size_t idx = idxOf(x, z);
             TerrainVertex& v = mesh.vertices[idx];
@@ -332,7 +346,185 @@ TerrainMesh TerrainGenerator::generateMesh() const
             v.nx = nx * invLen;
             v.ny = ny * invLen;
             v.nz = nz * invLen;
+            slopeMap[idx] = slope;
         }
+    }
+
+    struct SettlementCandidate
+    {
+        size_t idx = 0;
+        float score = 0.0f;
+    };
+
+    std::vector<SettlementCandidate> settlementCandidates;
+    settlementCandidates.reserve(mesh.vertices.size() / 12u);
+    const float invHeightRange = 1.0f / std::max(0.0001f, mesh.maxHeight - mesh.minHeight);
+    const SettlementSettings& ss = settings_.settlements;
+
+    // Build a distance field from the river core so settlements sit near water,
+    // but not inside the carved river bed.
+    std::vector<int> riverDistance(mesh.vertices.size(), std::numeric_limits<int>::max());
+    std::vector<int> nearestCore(mesh.vertices.size(), -1);
+    std::queue<size_t> q;
+
+    for (size_t idx = 0; idx < mesh.vertices.size(); ++idx)
+    {
+        if (riverWeights[idx] >= 0.55f)
+        {
+            riverDistance[idx] = 0;
+            nearestCore[idx] = static_cast<int>(idx);
+            q.push(idx);
+        }
+    }
+
+    const int neighborDx[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
+    const int neighborDz[8] = {-1, -1, -1, 0, 0, 1, 1, 1};
+    while (!q.empty())
+    {
+        const size_t cur = q.front();
+        q.pop();
+
+        const int cx = static_cast<int>(cur % static_cast<size_t>(settings_.width));
+        const int cz = static_cast<int>(cur / static_cast<size_t>(settings_.width));
+        const int nextDist = riverDistance[cur] + 1;
+
+        for (int i = 0; i < 8; ++i)
+        {
+            const int nx = cx + neighborDx[i];
+            const int nz = cz + neighborDz[i];
+            if (nx < 0 || nx >= settings_.width || nz < 0 || nz >= settings_.depth)
+            {
+                continue;
+            }
+
+            const size_t nidx = idxOf(nx, nz);
+            if (nextDist >= riverDistance[nidx])
+            {
+                continue;
+            }
+
+            riverDistance[nidx] = nextDist;
+            nearestCore[nidx] = nearestCore[cur];
+            q.push(nidx);
+        }
+    }
+
+    auto gatherCandidates = [&](float riverMin,
+                                float riverMax,
+                                int distMin,
+                                int distMax,
+                                float minAboveRiver,
+                                float maxSlope)
+    {
+        settlementCandidates.clear();
+        for (size_t idx = 0; idx < mesh.vertices.size(); ++idx)
+        {
+            const float river = std::clamp(riverWeights[idx], 0.0f, 1.0f);
+            if (river < riverMin || river > riverMax)
+            {
+                continue;
+            }
+
+            if (riverDistance[idx] < distMin || riverDistance[idx] > distMax)
+            {
+                continue;
+            }
+
+            if (nearestCore[idx] >= 0)
+            {
+                const size_t coreIdx = static_cast<size_t>(nearestCore[idx]);
+                if (mesh.heights[idx] < mesh.heights[coreIdx] + minAboveRiver)
+                {
+                    continue;
+                }
+            }
+
+            const float slope = slopeMap[idx];
+            if (slope > maxSlope)
+            {
+                continue;
+            }
+
+            const float hNorm = (mesh.heights[idx] - mesh.minHeight) * invHeightRange;
+            if (hNorm < ss.minElevationNorm || hNorm > ss.maxElevationNorm)
+            {
+                continue;
+            }
+
+            const float flatness = 1.0f - std::clamp(slope / std::max(0.001f, maxSlope), 0.0f, 1.0f);
+            const float elevationBand = 1.0f - std::fabs(hNorm - 0.42f);
+            const float score =
+                river * 0.58f +
+                flatness * 0.34f +
+                elevationBand * 0.08f +
+                placementJitter(idx, settings_.seed) * 0.001f;
+            settlementCandidates.push_back({idx, score});
+        }
+    };
+
+    gatherCandidates(
+        ss.minRiverWeight,
+        ss.maxRiverWeight,
+        ss.minRiverDistanceCells,
+        ss.maxRiverDistanceCells,
+        ss.minHeightAboveRiver,
+        ss.maxSlope);
+
+    if (settlementCandidates.size() < 24u)
+    {
+        gatherCandidates(
+            std::max(0.0f, ss.minRiverWeight * 0.6f),
+            std::min(1.0f, ss.maxRiverWeight + 0.2f),
+            std::max(0, ss.minRiverDistanceCells - 1),
+            ss.maxRiverDistanceCells + 6,
+            std::max(0.0f, ss.minHeightAboveRiver * 0.35f),
+            ss.maxSlope + 0.08f);
+    }
+
+    std::sort(settlementCandidates.begin(), settlementCandidates.end(), [](const SettlementCandidate& a, const SettlementCandidate& b)
+              { return a.score > b.score; });
+
+    const int desiredSettlements = std::max(
+        1,
+        static_cast<int>(std::round(ss.targetDensity * static_cast<float>(mesh.vertices.size()))));
+    const int minSepSq = ss.minSeparation * ss.minSeparation;
+    std::vector<size_t> selectedSettlements;
+    selectedSettlements.reserve(static_cast<size_t>(desiredSettlements));
+
+    for (const SettlementCandidate& candidate : settlementCandidates)
+    {
+        if (static_cast<int>(selectedSettlements.size()) >= desiredSettlements)
+        {
+            break;
+        }
+
+        const int cx = static_cast<int>(candidate.idx % static_cast<size_t>(settings_.width));
+        const int cz = static_cast<int>(candidate.idx / static_cast<size_t>(settings_.width));
+        bool tooClose = false;
+
+        for (size_t sidx : selectedSettlements)
+        {
+            const int sx = static_cast<int>(sidx % static_cast<size_t>(settings_.width));
+            const int sz = static_cast<int>(sidx / static_cast<size_t>(settings_.width));
+            const int dx = cx - sx;
+            const int dz = cz - sz;
+            if (dx * dx + dz * dz < minSepSq)
+            {
+                tooClose = true;
+                break;
+            }
+        }
+
+        if (tooClose)
+        {
+            continue;
+        }
+        selectedSettlements.push_back(candidate.idx);
+    }
+
+    if (selectedSettlements.empty() && !settlementCandidates.empty())
+    {
+        selectedSettlements.push_back(settlementCandidates.front().idx);
     }
 
     mesh.indices.reserve(static_cast<size_t>(settings_.width - 1) *
@@ -375,6 +567,17 @@ TerrainMesh TerrainGenerator::generateMesh() const
     }
 
     mesh.waterIndices = mesh.indices;
+
+    mesh.settlementVertices.reserve(selectedSettlements.size());
+    for (size_t idx : selectedSettlements)
+    {
+        TerrainVertex marker = mesh.vertices[idx];
+        marker.y += 1.0f;
+        marker.nx = 0.0f;
+        marker.ny = 1.0f;
+        marker.nz = 0.0f;
+        mesh.settlementVertices.push_back(marker);
+    }
 
     return mesh;
 }

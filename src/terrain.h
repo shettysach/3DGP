@@ -31,6 +31,20 @@ struct RiverSettings
     float bankFalloff = 1.8f;
 };
 
+struct SettlementSettings
+{
+    float targetDensity = 0.00014f;
+    float minRiverWeight = 0.07f;
+    float maxRiverWeight = 0.65f;
+    float maxSlope = 0.26f;
+    float minElevationNorm = 0.06f;
+    float maxElevationNorm = 0.78f;
+    int minRiverDistanceCells = 1;
+    int maxRiverDistanceCells = 14;
+    float minHeightAboveRiver = 0.14f;
+    int minSeparation = 12;
+};
+
 struct TerrainSettings
 {
     int width = 257;
@@ -43,6 +57,7 @@ struct TerrainSettings
     uint32_t seed = 1234u;
     NoiseSettings noise;
     RiverSettings rivers;
+    SettlementSettings settlements;
 };
 
 struct TerrainVertex
@@ -70,6 +85,7 @@ struct TerrainMesh
     std::vector<uint32_t> indices;
     std::vector<TerrainVertex> waterVertices;
     std::vector<uint32_t> waterIndices;
+    std::vector<TerrainVertex> settlementVertices;
 };
 
 class TerrainGenerator
