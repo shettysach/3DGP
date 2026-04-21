@@ -1,4 +1,5 @@
 #include "rivers.h"
+#include "fields.h"
 #include "util.h"
 
 #include <algorithm>
@@ -11,11 +12,6 @@ namespace terrain
 
 namespace
 {
-
-size_t idxOf(int x, int z, int width)
-{
-    return static_cast<size_t>(z) * static_cast<size_t>(width) + static_cast<size_t>(x);
-}
 
 struct FloodNode
 {
@@ -37,17 +33,6 @@ struct SourceCandidate
     float score = 0.0f;
 };
 
-float sourceScoreJitter(size_t idx, uint32_t seed)
-{
-    uint32_t h = static_cast<uint32_t>(idx) ^ (seed * 747796405u + 2891336453u);
-    h ^= (h >> 16);
-    h *= 2246822519u;
-    h ^= (h >> 13);
-    h *= 3266489917u;
-    h ^= (h >> 16);
-    return static_cast<float>(h & 1023u) / 1023.0f;
-}
-
 void seedBoundaryCell(
     int x,
     int z,
@@ -57,7 +42,7 @@ void seedBoundaryCell(
     std::vector<float>& filledHeights,
     std::priority_queue<FloodNode, std::vector<FloodNode>, FloodNodeGreater>& flood)
 {
-    const size_t idx = idxOf(x, z, width);
+    const size_t idx = fieldIndex(x, z, width);
     if (visited[idx])
     {
         return;
@@ -130,7 +115,7 @@ RiverPassResult runRiverPass(
                     continue;
                 }
 
-                const size_t nidx = idxOf(nx, nz, width);
+                const size_t nidx = fieldIndex(nx, nz, width);
                 if (visited[nidx])
                 {
                     continue;
@@ -201,7 +186,7 @@ RiverPassResult runRiverPass(
         const float score =
             accumulationFactor * (0.35f + 0.65f * hNorm) +
             lengthFactor * 2.5f +
-            sourceScoreJitter(idx, seed) * 0.003f;
+            hashJitter(idx, seed) * 0.003f;
         sourceCandidates.push_back({idx, score});
     }
 
@@ -306,7 +291,7 @@ RiverPassResult runRiverPass(
     {
         for (int x = 0; x < width; ++x)
         {
-            const size_t idx = idxOf(x, z, width);
+            const size_t idx = fieldIndex(x, z, width);
             if (!activeRiver[idx])
             {
                 continue;
@@ -335,7 +320,7 @@ RiverPassResult runRiverPass(
 
                     const float t = std::clamp(1.0f - dist / std::max(0.001f, static_cast<float>(halfWidth)), 0.0f, 1.0f);
                     const float falloff = std::pow(t, settings.bankFalloff);
-                    const size_t nidx = idxOf(nx, nz, width);
+                    const size_t nidx = fieldIndex(nx, nz, width);
 
                     out.carvedHeights[nidx] -= carveDepth * falloff;
                     out.riverWeights[nidx] = std::max(out.riverWeights[nidx], falloff * (0.45f + 0.55f * strength));
@@ -353,16 +338,16 @@ RiverPassResult runRiverPass(
         {
             const int x0 = std::max(0, x - 1);
             const int x1 = std::min(width - 1, x + 1);
-            const size_t idx = idxOf(x, z, width);
+            const size_t idx = fieldIndex(x, z, width);
             if (out.riverWeights[idx] <= 0.001f)
             {
                 continue;
             }
 
-            const float filtered = (out.carvedHeights[idxOf(x0, z0, width)] + 2.0f * out.carvedHeights[idxOf(x, z0, width)] + out.carvedHeights[idxOf(x1, z0, width)] +
-                                    2.0f * out.carvedHeights[idxOf(x0, z, width)] + 4.0f * out.carvedHeights[idx] +
-                                    2.0f * out.carvedHeights[idxOf(x1, z, width)] + out.carvedHeights[idxOf(x0, z1, width)] +
-                                    2.0f * out.carvedHeights[idxOf(x, z1, width)] + out.carvedHeights[idxOf(x1, z1, width)]) /
+            const float filtered = (out.carvedHeights[fieldIndex(x0, z0, width)] + 2.0f * out.carvedHeights[fieldIndex(x, z0, width)] + out.carvedHeights[fieldIndex(x1, z0, width)] +
+                                    2.0f * out.carvedHeights[fieldIndex(x0, z, width)] + 4.0f * out.carvedHeights[idx] +
+                                    2.0f * out.carvedHeights[fieldIndex(x1, z, width)] + out.carvedHeights[fieldIndex(x0, z1, width)] +
+                                    2.0f * out.carvedHeights[fieldIndex(x, z1, width)] + out.carvedHeights[fieldIndex(x1, z1, width)]) /
                                    16.0f;
 
             const float blend = std::clamp(out.riverWeights[idx] * 0.45f, 0.0f, 0.45f);

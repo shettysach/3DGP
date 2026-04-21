@@ -169,21 +169,21 @@ float biomeNeighborCompatibility(const TerrainFields& fields, size_t idx, size_t
     float compatibility = 1.0f;
     if (landformDelta == 1)
     {
-        compatibility *= 0.78f;
+        compatibility *= 0.84f;
     }
     else if (landformDelta >= 2)
     {
-        compatibility *= 0.35f;
+        compatibility *= 0.48f;
     }
 
     if (fields.provinceIds[idx] != fields.provinceIds[nidx])
     {
-        compatibility *= 0.72f;
+        compatibility *= 0.82f;
     }
 
     if (fields.ecologyIds[idx] != fields.ecologyIds[nidx])
     {
-        compatibility *= 0.86f;
+        compatibility *= 0.90f;
     }
 
     return compatibility;
@@ -203,12 +203,12 @@ void smoothSurfaceBiomeWeights(TerrainFields& fields)
         current[idx] = vertexBiomeWeights(fields, idx);
     }
 
-    for (int pass = 0; pass < 2; ++pass)
+    for (int pass = 0; pass < 3; ++pass)
     {
         for (int z = 0; z < fields.depth; ++z)
         {
-            const int z0 = std::max(0, z - 1);
-            const int z1 = std::min(fields.depth - 1, z + 1);
+            const int z0 = std::max(0, z - 2);
+            const int z1 = std::min(fields.depth - 1, z + 2);
             for (int x = 0; x < fields.width; ++x)
             {
                 const size_t idx = fieldIndex(x, z, fields.width);
@@ -217,13 +217,13 @@ void smoothSurfaceBiomeWeights(TerrainFields& fields)
 
                 for (int nz = z0; nz <= z1; ++nz)
                 {
-                    const int x0 = std::max(0, x - 1);
-                    const int x1 = std::min(fields.width - 1, x + 1);
+                    const int x0 = std::max(0, x - 2);
+                    const int x1 = std::min(fields.width - 1, x + 2);
                     for (int nx = x0; nx <= x1; ++nx)
                     {
                         const size_t nidx = fieldIndex(nx, nz, fields.width);
-                        const float kernelWeight =
-                            (nx == x && nz == z) ? 4.0f : ((nx == x || nz == z) ? 2.0f : 1.0f);
+                        const int manhattan = std::abs(nx - x) + std::abs(nz - z);
+                        const float kernelWeight = std::max(1.0f, 6.0f - static_cast<float>(manhattan));
                         const float weight = kernelWeight * biomeNeighborCompatibility(fields, idx, nidx);
                         totalWeight += weight;
                         for (size_t biome = 0; biome < kBiomeCount; ++biome)
@@ -587,13 +587,11 @@ void computeBiomeFields(TerrainFields& fields)
         return;
     }
 
-    float minHeight = std::numeric_limits<float>::max();
-    float maxHeight = std::numeric_limits<float>::lowest();
+    float minHeight, maxHeight;
+    computeHeightExtents(fields.heights, minHeight, maxHeight);
     uint16_t maxProvinceId = 0u;
     for (size_t idx = 0; idx < fields.size(); ++idx)
     {
-        minHeight = std::min(minHeight, fields.heights[idx]);
-        maxHeight = std::max(maxHeight, fields.heights[idx]);
         maxProvinceId = std::max(maxProvinceId, fields.provinceIds[idx]);
     }
     const float invHeightRange = 1.0f / std::max(0.0001f, maxHeight - minHeight);
@@ -675,7 +673,7 @@ void computeBiomeFields(TerrainFields& fields)
             {
                 const EcologyId edgeEcology = neighboringProvinceEcology(fields, provinces, x, z);
                 const BiomeId edgeBiome = mapBiome(landform, edgeEcology);
-                const float edgeBlend = 0.40f * (1.0f - smoothstep(1.0f, 7.0f, static_cast<float>(fields.provinceEdgeDistance[idx])));
+                const float edgeBlend = 0.52f * (1.0f - smoothstep(2.0f, 15.0f, static_cast<float>(fields.provinceEdgeDistance[idx])));
                 if (edgeBiome != baseBiome && edgeBlend > secondaryWeight)
                 {
                     secondaryBiome = edgeBiome;

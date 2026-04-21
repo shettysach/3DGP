@@ -772,12 +772,11 @@ void runDemo()
 
             if (event.type == SDL_KEYDOWN)
             {
-                if (event.key.keysym.sym == SDLK_ESCAPE)
+                switch (event.key.keysym.sym)
                 {
+                case SDLK_ESCAPE:
                     return;
-                }
-                if (event.key.keysym.sym == SDLK_r)
-                {
+                case SDLK_r:
                     settings.seed += 1u;
                     generator.setSettings(settings);
                     mesh = generator.generateMesh();
@@ -785,52 +784,41 @@ void runDemo()
                     std::cout << "Regenerated terrain with seed " << settings.seed << '\n';
                     printRiverStats();
                     printBiomeStats();
-                }
-                if (event.key.keysym.sym == SDLK_1)
-                {
+                    break;
+                case SDLK_1:
                     applyRiverPreset(1);
-                }
-                if (event.key.keysym.sym == SDLK_2)
-                {
+                    break;
+                case SDLK_2:
                     applyRiverPreset(2);
-                }
-                if (event.key.keysym.sym == SDLK_3)
-                {
+                    break;
+                case SDLK_3:
                     applyRiverPreset(3);
-                }
-                if (event.key.keysym.sym == SDLK_f)
-                {
+                    break;
+                case SDLK_f:
                     setMode(RenderMode::SurfaceBiomes);
-                }
-                if (event.key.keysym.sym == SDLK_v)
-                {
+                    break;
+                case SDLK_v:
                     setMode(RenderMode::Provinces);
-                }
-                if (event.key.keysym.sym == SDLK_l)
-                {
+                    break;
+                case SDLK_l:
                     setMode(RenderMode::Landforms);
-                }
-                if (event.key.keysym.sym == SDLK_b)
-                {
+                    break;
+                case SDLK_b:
                     setMode(RenderMode::Ecology);
-                }
-                if (event.key.keysym.sym == SDLK_t)
-                {
+                    break;
+                case SDLK_t:
                     setMode(RenderMode::Temperature);
-                }
-                if (event.key.keysym.sym == SDLK_y)
-                {
+                    break;
+                case SDLK_y:
                     setMode(RenderMode::Precipitation);
-                }
-                if (event.key.keysym.sym == SDLK_m)
-                {
+                    break;
+                case SDLK_m:
                     setMode(RenderMode::Moisture);
-                }
-                if (event.key.keysym.sym == SDLK_k)
-                {
+                    break;
+                case SDLK_k:
                     setMode(RenderMode::Slope);
-                }
-                if (event.key.keysym.sym == SDLK_p)
+                    break;
+                case SDLK_p:
                 {
                     const std::time_t now = std::time(nullptr);
                     const std::string screenshotPath =
@@ -843,6 +831,10 @@ void runDemo()
                     {
                         std::cout << "Failed to save screenshot\n";
                     }
+                    break;
+                }
+                default:
+                    break;
                 }
             }
 

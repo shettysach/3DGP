@@ -140,13 +140,8 @@ void computeClimateFields(
         return;
     }
 
-    float minHeight = std::numeric_limits<float>::max();
-    float maxHeight = std::numeric_limits<float>::lowest();
-    for (float height : fields.heights)
-    {
-        minHeight = std::min(minHeight, height);
-        maxHeight = std::max(maxHeight, height);
-    }
+    float minHeight, maxHeight;
+    computeHeightExtents(fields.heights, minHeight, maxHeight);
 
     const float invHeightRange = 1.0f / std::max(0.0001f, maxHeight - minHeight);
     const std::vector<int> riverDistance = buildRiverDistanceField(fields, terrainSettings.climate.riverMoistureRadius);
