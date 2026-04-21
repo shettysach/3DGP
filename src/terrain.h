@@ -7,6 +7,49 @@
 namespace terrain
 {
 
+enum class LandformId : uint8_t
+{
+    Lowland = 0,
+    Plain,
+    Foothill,
+    Mountain,
+    Alpine,
+    Snowcap,
+    Count,
+};
+
+enum class EcologyId : uint8_t
+{
+    Desert = 0,
+    Steppe,
+    Grassland,
+    Forest,
+    Taiga,
+    Tundra,
+    Marsh,
+    Count,
+};
+
+enum class BiomeId : uint8_t
+{
+    MarshLowland = 0,
+    DesertPlain,
+    SteppePlain,
+    GrasslandPlain,
+    ForestPlain,
+    TaigaPlain,
+    TundraPlain,
+    SteppeFoothill,
+    GrasslandFoothill,
+    ForestFoothill,
+    TaigaFoothill,
+    RockyAlpine,
+    Alpine,
+    Snow,
+    River,
+    Count,
+};
+
 struct NoiseSettings
 {
     float frequency = 0.007f;
@@ -29,6 +72,7 @@ struct RiverSettings
     float baseCarveFraction = 0.02f;
     float maxCarveFraction = 0.07f;
     float bankFalloff = 1.8f;
+    float coreThreshold = 0.55f;
 };
 
 struct SettlementSettings
@@ -45,10 +89,27 @@ struct SettlementSettings
     int minSeparation = 12;
 };
 
+struct ClimateSettings
+{
+    float temperatureFrequency = 0.0014f;
+    int temperatureOctaves = 3;
+    float precipitationFrequency = 0.0009f;
+    int precipitationOctaves = 4;
+    float moistureFrequency = 0.0018f;
+    int moistureOctaves = 2;
+    float latitudeStrength = 0.20f;
+    float temperatureLapseRate = 0.55f;
+    float orographicPrecipitationStrength = 0.12f;
+    int riverMoistureRadius = 18;
+    float riverMoistureStrength = 0.24f;
+    float slopeDryingStrength = 0.16f;
+    float temperatureDryingStrength = 0.10f;
+};
+
 struct TerrainSettings
 {
-    int width = 257;
-    int depth = 257;
+    int width = 513;
+    int depth = 513;
     float horizontalScale = 2.0f;
     float verticalScale = 80.0f;
     bool islandFalloff = true;
@@ -58,6 +119,7 @@ struct TerrainSettings
     NoiseSettings noise;
     RiverSettings rivers;
     SettlementSettings settlements;
+    ClimateSettings climate;
 };
 
 struct TerrainVertex
@@ -68,9 +130,20 @@ struct TerrainVertex
     float nx = 0.0f;
     float ny = 1.0f;
     float nz = 0.0f;
+    float slope = 0.0f;
     float mountainWeight = 0.0f;
     float plainsWeight = 1.0f;
     float riverWeight = 0.0f;
+    float temperature = 0.5f;
+    float precipitation = 0.5f;
+    float moisture = 0.5f;
+    uint16_t provinceId = 0u;
+    uint8_t landform = static_cast<uint8_t>(LandformId::Plain);
+    uint8_t ecology = static_cast<uint8_t>(EcologyId::Grassland);
+    uint8_t primaryBiome = static_cast<uint8_t>(BiomeId::GrasslandPlain);
+    uint8_t secondaryBiome = static_cast<uint8_t>(BiomeId::GrasslandPlain);
+    float primaryBiomeWeight = 1.0f;
+    float secondaryBiomeWeight = 0.0f;
 };
 
 struct TerrainMesh
@@ -81,6 +154,9 @@ struct TerrainMesh
     float minHeight = 0.0f;
     float maxHeight = 0.0f;
     std::vector<float> heights;
+    std::vector<float> temperatureMap;
+    std::vector<float> precipitationMap;
+    std::vector<float> moistureMap;
     std::vector<TerrainVertex> vertices;
     std::vector<uint32_t> indices;
     std::vector<TerrainVertex> waterVertices;

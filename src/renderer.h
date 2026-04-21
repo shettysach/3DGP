@@ -2,7 +2,10 @@
 #define RENDERER_H
 
 #include "terrain.h"
+
+#include <cstddef>
 #include <string>
+#include <vector>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -36,6 +39,18 @@
 namespace renderer
 {
 
+enum class RenderMode
+{
+    SurfaceBiomes = 0,
+    Provinces,
+    Landforms,
+    Ecology,
+    Temperature,
+    Precipitation,
+    Moisture,
+    Slope,
+};
+
 class Renderer
 {
   public:
@@ -55,6 +70,9 @@ class Renderer
     void moveForward(float amount);
     void moveRight(float amount);
     void setTarget(float x, float y, float z);
+    void setRenderMode(RenderMode mode);
+    RenderMode renderMode() const;
+    void invalidateMeshCache();
     bool captureScreenshot(const std::string& filepath) const;
 
   private:
@@ -69,9 +87,17 @@ class Renderer
     float targetX_;
     float targetY_;
     float targetZ_;
+    RenderMode renderMode_;
+    bool terrainColorsValid_;
+    bool waterColorsValid_;
+    std::size_t cachedTerrainVertexCount_;
+    std::size_t cachedWaterVertexCount_;
+    std::vector<float> terrainColors_;
+    std::vector<float> waterColors_;
 };
 
 void runDemo();
+const char* renderModeName(RenderMode mode);
 
 } // namespace renderer
 

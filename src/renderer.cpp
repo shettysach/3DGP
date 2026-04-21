@@ -1,14 +1,16 @@
 #include "renderer.h"
+#include "terrain/biomes.h"
 #include "terrain/util.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 #include <ctime>
 #include <iostream>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace renderer
@@ -19,10 +21,32 @@ namespace
 
 constexpr float kPi = 3.14159265358979323846f;
 
+constexpr GLfloat kLightDir[] = {0.35f, 1.0f, 0.25f, 0.0f};
+
 float degToRad(float deg)
 {
     return deg * kPi / 180.0f;
 }
+
+bool usesLighting(RenderMode mode)
+{
+    return mode == RenderMode::SurfaceBiomes;
+}
+
+struct Color3
+{
+    float r = 0.0f;
+    float g = 0.0f;
+    float b = 0.0f;
+};
+
+struct Color4
+{
+    float r = 0.0f;
+    float g = 0.0f;
+    float b = 0.0f;
+    float a = 0.0f;
+};
 
 void yawDirections(float yawDeg, float& forwardX, float& forwardZ, float& rightX, float& rightZ)
 {
@@ -33,35 +57,193 @@ void yawDirections(float yawDeg, float& forwardX, float& forwardZ, float& rightX
     rightZ = std::sin(yawRad + kPi * 0.5f);
 }
 
-void emitColoredVertex(const terrain::TerrainVertex& v, float minH, float maxH)
+Color3 lerpColor(const Color3& a, const Color3& b, float t)
 {
-    const float h = (v.y - minH) / std::max(0.001f, maxH - minH);
-    const float slope = std::max(0.0f, 1.0f - v.ny);
-    const float mountain = std::max(v.mountainWeight, slope * 1.15f);
-    const float plains = 1.0f - std::min(1.0f, mountain);
-    const float rockBoost = std::min(1.0f, slope * 3.8f + h * 0.25f);
-
-    float r = plains * (0.20f + 0.22f * h) + mountain * (0.33f + 0.25f * h) + rockBoost * 0.12f;
-    float g = plains * (0.33f + 0.36f * h) + mountain * (0.29f + 0.30f * h) - rockBoost * 0.08f;
-    float b = plains * (0.15f + 0.14f * h) + mountain * (0.15f + 0.20f * h) + rockBoost * 0.05f;
-
-    glColor3f(r, g, b);
-    glNormal3f(v.nx, v.ny, v.nz);
-    glVertex3f(v.x, v.y, v.z);
+    return {
+        terrain::lerp(a.r, b.r, t),
+        terrain::lerp(a.g, b.g, t),
+        terrain::lerp(a.b, b.b, t),
+    };
 }
 
-void emitWaterVertex(const terrain::TerrainVertex& v)
+Color3 biomeVertexColor(const terrain::TerrainVertex& v, float minH, float maxH)
+{
+    const float h = (v.y - minH) / std::max(0.001f, maxH - minH);
+    const float slope = std::clamp(v.slope, 0.0f, 1.0f);
+    const float primaryWeight = std::clamp(v.primaryBiomeWeight, 0.0f, 1.0f);
+    const float secondaryWeight = std::clamp(v.secondaryBiomeWeight, 0.0f, 1.0f);
+    const float blendDenom = std::max(0.0001f, primaryWeight + secondaryWeight);
+
+    const terrain::BiomeColor primaryBiomeColor =
+        terrain::biomeColor(static_cast<terrain::BiomeId>(v.primaryBiome));
+    const terrain::BiomeColor secondaryBiomeColor =
+        terrain::biomeColor(static_cast<terrain::BiomeId>(v.secondaryBiome));
+    Color3 color{
+        (primaryBiomeColor.r * primaryWeight + secondaryBiomeColor.r * secondaryWeight) / blendDenom,
+        (primaryBiomeColor.g * primaryWeight + secondaryBiomeColor.g * secondaryWeight) / blendDenom,
+        (primaryBiomeColor.b * primaryWeight + secondaryBiomeColor.b * secondaryWeight) / blendDenom,
+    };
+
+    const Color3 rockTint{0.50f, 0.48f, 0.46f};
+    const float rockBoost = terrain::smoothstep(0.18f, 0.62f, slope + v.mountainWeight * 0.18f + h * 0.10f);
+    color = lerpColor(color, rockTint, rockBoost * 0.24f);
+
+    const float shade = 0.90f + h * 0.20f;
+    color.r = std::clamp(color.r * shade, 0.0f, 1.0f);
+    color.g = std::clamp(color.g * shade, 0.0f, 1.0f);
+    color.b = std::clamp(color.b * shade, 0.0f, 1.0f);
+    return color;
+}
+
+Color3 heatmapColor(float value)
+{
+    const float t = std::clamp(value, 0.0f, 1.0f);
+    if (t < 0.33f)
+    {
+        return lerpColor({0.06f, 0.12f, 0.42f}, {0.17f, 0.62f, 0.86f}, t / 0.33f);
+    }
+    if (t < 0.66f)
+    {
+        return lerpColor({0.17f, 0.62f, 0.86f}, {0.90f, 0.82f, 0.24f}, (t - 0.33f) / 0.33f);
+    }
+    return lerpColor({0.90f, 0.82f, 0.24f}, {0.82f, 0.22f, 0.14f}, (t - 0.66f) / 0.34f);
+}
+
+Color3 precipitationColor(float value)
+{
+    const float t = std::clamp(value, 0.0f, 1.0f);
+    if (t < 0.5f)
+    {
+        return lerpColor({0.74f, 0.61f, 0.38f}, {0.42f, 0.68f, 0.28f}, t / 0.5f);
+    }
+    return lerpColor({0.42f, 0.68f, 0.28f}, {0.12f, 0.38f, 0.63f}, (t - 0.5f) / 0.5f);
+}
+
+Color3 moistureColor(float value)
+{
+    const float t = std::clamp(value, 0.0f, 1.0f);
+    if (t < 0.5f)
+    {
+        return lerpColor({0.63f, 0.52f, 0.34f}, {0.31f, 0.55f, 0.20f}, t / 0.5f);
+    }
+    return lerpColor({0.31f, 0.55f, 0.20f}, {0.06f, 0.44f, 0.36f}, (t - 0.5f) / 0.5f);
+}
+
+Color3 slopeColor(float value)
+{
+    const float t = std::clamp(value, 0.0f, 1.0f);
+    if (t < 0.4f)
+    {
+        return lerpColor({0.15f, 0.38f, 0.12f}, {0.57f, 0.56f, 0.26f}, t / 0.4f);
+    }
+    if (t < 0.75f)
+    {
+        return lerpColor({0.57f, 0.56f, 0.26f}, {0.55f, 0.49f, 0.44f}, (t - 0.4f) / 0.35f);
+    }
+    return lerpColor({0.55f, 0.49f, 0.44f}, {0.95f, 0.95f, 0.95f}, (t - 0.75f) / 0.25f);
+}
+
+Color3 debugVertexColor(const terrain::TerrainVertex& v, float minH, float maxH, RenderMode mode)
+{
+    switch (mode)
+    {
+    case RenderMode::SurfaceBiomes:
+        return biomeVertexColor(v, minH, maxH);
+    case RenderMode::Provinces:
+    {
+        const terrain::BiomeColor c = terrain::provinceColor(v.provinceId);
+        return {c.r, c.g, c.b};
+    }
+    case RenderMode::Landforms:
+    {
+        const terrain::BiomeColor c = terrain::landformColor(static_cast<terrain::LandformId>(v.landform));
+        return {c.r, c.g, c.b};
+    }
+    case RenderMode::Ecology:
+    {
+        const terrain::BiomeColor c = terrain::ecologyColor(static_cast<terrain::EcologyId>(v.ecology));
+        return {c.r, c.g, c.b};
+    }
+    case RenderMode::Temperature:
+        return heatmapColor(v.temperature);
+    case RenderMode::Precipitation:
+        return precipitationColor(v.precipitation);
+    case RenderMode::Moisture:
+        return moistureColor(v.moisture);
+    case RenderMode::Slope:
+        return slopeColor(v.slope);
+    }
+
+    return biomeVertexColor(v, minH, maxH);
+}
+
+Color4 waterVertexColor(const terrain::TerrainVertex& v)
 {
     const float t = terrain::smoothstep(0.02f, 0.85f, std::clamp(v.riverWeight, 0.0f, 1.0f));
-    const float r = terrain::lerp(0.03f, 0.09f, t);
-    const float g = terrain::lerp(0.28f, 0.55f, t);
-    const float b = terrain::lerp(0.58f, 0.72f, t);
-    const float a = terrain::lerp(0.0f, 0.76f, t);
-    glColor4f(r, g, b, a);
-    glVertex3f(v.x, v.y, v.z);
+    return {
+        terrain::lerp(0.03f, 0.09f, t),
+        terrain::lerp(0.28f, 0.55f, t),
+        terrain::lerp(0.58f, 0.72f, t),
+        terrain::lerp(0.0f, 0.76f, t),
+    };
+}
+
+void rebuildTerrainColorBuffer(
+    const terrain::TerrainMesh& mesh,
+    RenderMode mode,
+    std::vector<float>& terrainColors)
+{
+    terrainColors.resize(mesh.vertices.size() * 3u);
+    for (size_t i = 0; i < mesh.vertices.size(); ++i)
+    {
+        const Color3 color = debugVertexColor(mesh.vertices[i], mesh.minHeight, mesh.maxHeight, mode);
+        const size_t base = i * 3u;
+        terrainColors[base + 0u] = color.r;
+        terrainColors[base + 1u] = color.g;
+        terrainColors[base + 2u] = color.b;
+    }
+}
+
+void rebuildWaterColorBuffer(const terrain::TerrainMesh& mesh, std::vector<float>& waterColors)
+{
+    waterColors.resize(mesh.waterVertices.size() * 4u);
+    for (size_t i = 0; i < mesh.waterVertices.size(); ++i)
+    {
+        const Color4 color = waterVertexColor(mesh.waterVertices[i]);
+        const size_t base = i * 4u;
+        waterColors[base + 0u] = color.r;
+        waterColors[base + 1u] = color.g;
+        waterColors[base + 2u] = color.b;
+        waterColors[base + 3u] = color.a;
+    }
 }
 
 } // namespace
+
+const char* renderModeName(RenderMode mode)
+{
+    switch (mode)
+    {
+    case RenderMode::SurfaceBiomes:
+        return "Surface biomes";
+    case RenderMode::Provinces:
+        return "Provinces";
+    case RenderMode::Landforms:
+        return "Landforms";
+    case RenderMode::Ecology:
+        return "Ecology";
+    case RenderMode::Temperature:
+        return "Temperature";
+    case RenderMode::Precipitation:
+        return "Precipitation";
+    case RenderMode::Moisture:
+        return "Moisture";
+    case RenderMode::Slope:
+        return "Slope";
+    }
+
+    return "Surface biomes";
+}
 
 Renderer::Renderer(int width, int height)
     : width_(width),
@@ -74,7 +256,12 @@ Renderer::Renderer(int width, int height)
       distance_(240.0f),
       targetX_(0.0f),
       targetY_(0.0f),
-      targetZ_(0.0f) {}
+      targetZ_(0.0f),
+      renderMode_(RenderMode::SurfaceBiomes),
+      terrainColorsValid_(false),
+      waterColorsValid_(false),
+      cachedTerrainVertexCount_(0u),
+      cachedWaterVertexCount_(0u) {}
 
 Renderer::~Renderer()
 {
@@ -124,7 +311,6 @@ bool Renderer::init()
     glEnable(GL_CULL_FACE);
     glFrontFace(GL_CW);
     glCullFace(GL_BACK);
-    glEnable(GL_NORMALIZE);
 
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
@@ -134,11 +320,10 @@ bool Renderer::init()
     const GLfloat ambient[] = {0.25f, 0.25f, 0.27f, 1.0f};
     const GLfloat diffuse[] = {0.95f, 0.90f, 0.85f, 1.0f};
     const GLfloat specular[] = {0.3f, 0.3f, 0.3f, 1.0f};
-    const GLfloat lightDir[] = {0.35f, 1.0f, 0.25f, 0.0f};
     glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
     glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
-    glLightfv(GL_LIGHT0, GL_POSITION, lightDir);
+    glLightfv(GL_LIGHT0, GL_POSITION, kLightDir);
 
     glClearColor(0.67f, 0.78f, 0.92f, 1.0f);
 
@@ -221,6 +406,30 @@ void Renderer::setTarget(float x, float y, float z)
     targetZ_ = z;
 }
 
+void Renderer::setRenderMode(RenderMode mode)
+{
+    if (renderMode_ != mode)
+    {
+        terrainColorsValid_ = false;
+    }
+    renderMode_ = mode;
+}
+
+RenderMode Renderer::renderMode() const
+{
+    return renderMode_;
+}
+
+void Renderer::invalidateMeshCache()
+{
+    terrainColorsValid_ = false;
+    waterColorsValid_ = false;
+    cachedTerrainVertexCount_ = 0u;
+    cachedWaterVertexCount_ = 0u;
+    terrainColors_.clear();
+    waterColors_.clear();
+}
+
 bool Renderer::captureScreenshot(const std::string& filepath) const
 {
     if (!window_)
@@ -275,12 +484,23 @@ bool Renderer::captureScreenshot(const std::string& filepath) const
 
 void Renderer::render(const terrain::TerrainMesh& mesh)
 {
-    glViewport(0, 0, width_, height_);
+    int drawableWidth = 0;
+    int drawableHeight = 0;
+    SDL_GL_GetDrawableSize(window_, &drawableWidth, &drawableHeight);
+    if (drawableWidth <= 0 || drawableHeight <= 0)
+    {
+        return;
+    }
+
+    width_ = drawableWidth;
+    height_ = drawableHeight;
+
+    glViewport(0, 0, drawableWidth, drawableHeight);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluPerspective(60.0, static_cast<double>(width_) / static_cast<double>(height_), 0.5, 5000.0);
+    gluPerspective(60.0, static_cast<double>(drawableWidth) / static_cast<double>(drawableHeight), 0.5, 5000.0);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
@@ -293,20 +513,60 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
     const float eyeZ = targetZ_ + distance_ * std::cos(pitchRad) * std::sin(yawRad);
 
     gluLookAt(eyeX, eyeY, eyeZ, targetX_, targetY_, targetZ_, 0.0, 1.0, 0.0);
+    glLightfv(GL_LIGHT0, GL_POSITION, kLightDir);
 
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-    glBegin(GL_TRIANGLES);
-    for (size_t i = 0; i < mesh.indices.size(); i += 3)
+    const bool terrainUsesLighting = usesLighting(renderMode_);
+    if (terrainUsesLighting)
     {
-        emitColoredVertex(mesh.vertices[mesh.indices[i + 0]], mesh.minHeight, mesh.maxHeight);
-        emitColoredVertex(mesh.vertices[mesh.indices[i + 1]], mesh.minHeight, mesh.maxHeight);
-        emitColoredVertex(mesh.vertices[mesh.indices[i + 2]], mesh.minHeight, mesh.maxHeight);
+        glEnable(GL_LIGHTING);
     }
-    glEnd();
-
-    if (!mesh.waterVertices.empty() && !mesh.waterIndices.empty())
+    else
     {
+        glDisable(GL_LIGHTING);
+    }
+
+    if (!terrainColorsValid_ || cachedTerrainVertexCount_ != mesh.vertices.size())
+    {
+        rebuildTerrainColorBuffer(mesh, renderMode_, terrainColors_);
+        cachedTerrainVertexCount_ = mesh.vertices.size();
+        terrainColorsValid_ = true;
+    }
+
+    if (!mesh.vertices.empty() && !mesh.indices.empty())
+    {
+        const GLsizei stride = static_cast<GLsizei>(sizeof(terrain::TerrainVertex));
+        const unsigned char* vertexBase = reinterpret_cast<const unsigned char*>(mesh.vertices.data());
+
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glEnableClientState(GL_NORMAL_ARRAY);
+        glEnableClientState(GL_COLOR_ARRAY);
+
+        glVertexPointer(3, GL_FLOAT, stride, vertexBase + offsetof(terrain::TerrainVertex, x));
+        glNormalPointer(GL_FLOAT, stride, vertexBase + offsetof(terrain::TerrainVertex, nx));
+        glColorPointer(3, GL_FLOAT, 0, terrainColors_.data());
+
+        glDrawElements(
+            GL_TRIANGLES,
+            static_cast<GLsizei>(mesh.indices.size()),
+            GL_UNSIGNED_INT,
+            mesh.indices.data());
+
+        glDisableClientState(GL_COLOR_ARRAY);
+        glDisableClientState(GL_NORMAL_ARRAY);
+        glDisableClientState(GL_VERTEX_ARRAY);
+    }
+
+    if (terrainUsesLighting && !mesh.waterVertices.empty() && !mesh.waterIndices.empty())
+    {
+        if (!waterColorsValid_ || cachedWaterVertexCount_ != mesh.waterVertices.size())
+        {
+            rebuildWaterColorBuffer(mesh, waterColors_);
+            cachedWaterVertexCount_ = mesh.waterVertices.size();
+            waterColorsValid_ = true;
+        }
+
         glDisable(GL_LIGHTING);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -315,14 +575,23 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(-1.0f, -1.0f);
 
-        glBegin(GL_TRIANGLES);
-        for (size_t i = 0; i < mesh.waterIndices.size(); i += 3)
-        {
-            emitWaterVertex(mesh.waterVertices[mesh.waterIndices[i + 0]]);
-            emitWaterVertex(mesh.waterVertices[mesh.waterIndices[i + 1]]);
-            emitWaterVertex(mesh.waterVertices[mesh.waterIndices[i + 2]]);
-        }
-        glEnd();
+        const GLsizei stride = static_cast<GLsizei>(sizeof(terrain::TerrainVertex));
+        const unsigned char* waterBase = reinterpret_cast<const unsigned char*>(mesh.waterVertices.data());
+
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glEnableClientState(GL_COLOR_ARRAY);
+
+        glVertexPointer(3, GL_FLOAT, stride, waterBase + offsetof(terrain::TerrainVertex, x));
+        glColorPointer(4, GL_FLOAT, 0, waterColors_.data());
+
+        glDrawElements(
+            GL_TRIANGLES,
+            static_cast<GLsizei>(mesh.waterIndices.size()),
+            GL_UNSIGNED_INT,
+            mesh.waterIndices.data());
+
+        glDisableClientState(GL_COLOR_ARRAY);
+        glDisableClientState(GL_VERTEX_ARRAY);
 
         glDisable(GL_POLYGON_OFFSET_FILL);
         glDepthMask(GL_TRUE);
@@ -330,24 +599,8 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
         glDisable(GL_BLEND);
         glEnable(GL_LIGHTING);
     }
-
-    if (!mesh.settlementVertices.empty())
+    else if (!terrainUsesLighting)
     {
-        glDisable(GL_LIGHTING);
-        glDisable(GL_CULL_FACE);
-        glEnable(GL_POINT_SMOOTH);
-        glPointSize(12.0f);
-
-        glBegin(GL_POINTS);
-        for (const terrain::TerrainVertex& p : mesh.settlementVertices)
-        {
-            glColor3f(0.95f, 0.76f, 0.18f);
-            glVertex3f(p.x, p.y, p.z);
-        }
-        glEnd();
-
-        glDisable(GL_POINT_SMOOTH);
-        glEnable(GL_CULL_FACE);
         glEnable(GL_LIGHTING);
     }
 }
@@ -355,8 +608,8 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
 void runDemo()
 {
     terrain::TerrainSettings settings;
-    settings.width = 257;
-    settings.depth = 257;
+    settings.width = 513;
+    settings.depth = 513;
     settings.horizontalScale = 2.0f;
     settings.verticalScale = 96.0f;
     settings.islandFalloff = false;
@@ -399,6 +652,30 @@ void runDemo()
                   << ", settlements: " << mesh.settlementVertices.size() << '\n';
     };
 
+    auto printBiomeStats = [&mesh]()
+    {
+        std::array<size_t, static_cast<size_t>(terrain::BiomeId::Count)> counts{};
+        uint16_t maxProvinceId = 0u;
+        for (const terrain::TerrainVertex& v : mesh.vertices)
+        {
+            ++counts[static_cast<size_t>(v.primaryBiome)];
+            maxProvinceId = std::max(maxProvinceId, v.provinceId);
+        }
+
+        std::cout << "Surface coverage across " << (mesh.vertices.empty() ? 0u : static_cast<unsigned>(maxProvinceId + 1u)) << " provinces:";
+        const float invTotal = mesh.vertices.empty() ? 0.0f : 100.0f / static_cast<float>(mesh.vertices.size());
+        for (size_t idx = 0; idx < counts.size(); ++idx)
+        {
+            if (counts[idx] == 0)
+            {
+                continue;
+            }
+            std::cout << ' ' << terrain::biomeName(static_cast<terrain::BiomeId>(idx)) << ' '
+                      << counts[idx] * invTotal << '%';
+        }
+        std::cout << '\n';
+    };
+
     Renderer renderer(1280, 800);
     if (!renderer.init())
     {
@@ -406,10 +683,16 @@ void runDemo()
         return;
     }
 
+    auto setMode = [&renderer](RenderMode mode)
+    {
+        renderer.setRenderMode(mode);
+        std::cout << "Render mode: " << renderModeName(mode) << '\n';
+    };
+
     const float centerX = (static_cast<float>(settings.width - 1) * settings.horizontalScale) * 0.5f;
     const float centerZ = (static_cast<float>(settings.depth - 1) * settings.horizontalScale) * 0.5f;
     renderer.setTarget(centerX, (mesh.minHeight + mesh.maxHeight) * 0.30f, centerZ);
-    renderer.zoom(60.0f);
+    renderer.zoom(220.0f);
 
     std::cout << "Controls:\n";
     std::cout << "  Left mouse drag: orbit\n";
@@ -419,15 +702,19 @@ void runDemo()
     std::cout << "  Q/E: move down/up\n";
     std::cout << "  R: regenerate terrain\n";
     std::cout << "  1/2/3: river preset (light/medium/heavy)\n";
+    std::cout << "  F/V/L/B/T/Y/M/K: surface / provinces / landforms / ecology / temperature / precipitation / moisture / slope\n";
     std::cout << "  P: save screenshot\n";
     std::cout << "  ESC: quit\n";
     printRiverStats();
+    printBiomeStats();
 
     SDL_Event event;
     bool orbiting = false;
     bool panning = false;
     int prevMouseX = 0;
     int prevMouseY = 0;
+    using Clock = std::chrono::steady_clock;
+    auto lastFrameTime = Clock::now();
 
     const auto applyRiverPreset = [&](int preset)
     {
@@ -461,12 +748,21 @@ void runDemo()
 
         generator.setSettings(settings);
         mesh = generator.generateMesh();
+        renderer.invalidateMeshCache();
         std::cout << "Applied river preset " << preset << '\n';
         printRiverStats();
+        printBiomeStats();
     };
 
     while (!renderer.shouldClose())
     {
+        const auto frameTime = Clock::now();
+        const float deltaSeconds = std::clamp(
+            std::chrono::duration<float>(frameTime - lastFrameTime).count(),
+            0.0f,
+            0.1f);
+        lastFrameTime = frameTime;
+
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_QUIT)
@@ -485,8 +781,10 @@ void runDemo()
                     settings.seed += 1u;
                     generator.setSettings(settings);
                     mesh = generator.generateMesh();
+                    renderer.invalidateMeshCache();
                     std::cout << "Regenerated terrain with seed " << settings.seed << '\n';
                     printRiverStats();
+                    printBiomeStats();
                 }
                 if (event.key.keysym.sym == SDLK_1)
                 {
@@ -499,6 +797,38 @@ void runDemo()
                 if (event.key.keysym.sym == SDLK_3)
                 {
                     applyRiverPreset(3);
+                }
+                if (event.key.keysym.sym == SDLK_f)
+                {
+                    setMode(RenderMode::SurfaceBiomes);
+                }
+                if (event.key.keysym.sym == SDLK_v)
+                {
+                    setMode(RenderMode::Provinces);
+                }
+                if (event.key.keysym.sym == SDLK_l)
+                {
+                    setMode(RenderMode::Landforms);
+                }
+                if (event.key.keysym.sym == SDLK_b)
+                {
+                    setMode(RenderMode::Ecology);
+                }
+                if (event.key.keysym.sym == SDLK_t)
+                {
+                    setMode(RenderMode::Temperature);
+                }
+                if (event.key.keysym.sym == SDLK_y)
+                {
+                    setMode(RenderMode::Precipitation);
+                }
+                if (event.key.keysym.sym == SDLK_m)
+                {
+                    setMode(RenderMode::Moisture);
+                }
+                if (event.key.keysym.sym == SDLK_k)
+                {
+                    setMode(RenderMode::Slope);
                 }
                 if (event.key.keysym.sym == SDLK_p)
                 {
@@ -564,7 +894,7 @@ void runDemo()
         }
 
         const Uint8* keys = SDL_GetKeyboardState(nullptr);
-        const float moveSpeed = 2.8f;
+        const float moveSpeed = 170.0f * deltaSeconds;
         if (keys[SDL_SCANCODE_W])
         {
             renderer.moveForward(-moveSpeed);
@@ -592,7 +922,6 @@ void runDemo()
 
         renderer.render(mesh);
         renderer.swapBuffers();
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 }
 
