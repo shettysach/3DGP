@@ -1,12 +1,11 @@
 #include "terrain.h"
-#include "terrain/blending.h"
 #include "terrain/biomes.h"
+#include "terrain/blending.h"
 #include "terrain/climate.h"
 #include "terrain/fields.h"
 #include "terrain/landforms.h"
 #include "terrain/mountains.h"
 #include "terrain/plains.h"
-#include "terrain/provinces.h"
 #include "terrain/rivers.h"
 #include "terrain/terrain_noise.h"
 #include "terrain/util.h"
@@ -19,30 +18,25 @@
 #include <random>
 #include <stdexcept>
 
-namespace terrain
-{
+namespace terrain {
 
-namespace
-{
+namespace {
 
 constexpr float kSqrt3 = 1.7320508075688772f;
 constexpr float kF2 = 0.5f * (kSqrt3 - 1.0f);
 constexpr float kG2 = (3.0f - kSqrt3) / 6.0f;
 
-int fastFloor(float x)
-{
+int fastFloor(float x) {
     return (x >= 0.0f) ? static_cast<int>(x) : static_cast<int>(x) - 1;
 }
 
-struct HeightGradient
-{
+struct HeightGradient {
     float dx = 0.0f;
     float dz = 0.0f;
     float slope = 0.0f;
 };
 
-struct HeightStageInput
-{
+struct HeightStageInput {
     const TerrainSettings& settings;
     std::function<float(float, float, int, float, float)> fbm;
     std::function<float(float, float, int, float, float, float)> ridgedFbm;
@@ -54,10 +48,8 @@ float computeIslandFalloff(
     float worldZ,
     float centerX,
     float centerZ,
-    float maxRadius)
-{
-    if (!settings.islandFalloff)
-    {
+    float maxRadius) {
+    if (!settings.islandFalloff) {
         return 1.0f;
     }
 
@@ -70,8 +62,7 @@ float computeIslandFalloff(
     return std::pow(t, settings.falloffPower);
 }
 
-TerrainFields buildBaseTerrainFields(const HeightStageInput& in)
-{
+TerrainFields buildBaseTerrainFields(const HeightStageInput& in) {
     TerrainFields fields(in.settings.width, in.settings.depth);
     const float centerX = static_cast<float>(in.settings.width - 1) * 0.5f * in.settings.horizontalScale;
     const float centerZ = static_cast<float>(in.settings.depth - 1) * 0.5f * in.settings.horizontalScale;
@@ -81,10 +72,8 @@ TerrainFields buildBaseTerrainFields(const HeightStageInput& in)
     const float baseFrequency = std::max(0.00001f, in.settings.noise.frequency);
     const float warpScale = in.settings.noise.warpFrequency / baseFrequency;
 
-    for (int z = 0; z < in.settings.depth; ++z)
-    {
-        for (int x = 0; x < in.settings.width; ++x)
-        {
+    for (int z = 0; z < in.settings.depth; ++z) {
+        for (int x = 0; x < in.settings.width; ++x) {
             const size_t idx = fieldIndex(x, z, in.settings.width);
             const float worldX = static_cast<float>(x) * in.settings.horizontalScale;
             const float worldZ = static_cast<float>(z) * in.settings.horizontalScale;
@@ -153,8 +142,7 @@ TerrainFields buildBaseTerrainFields(const HeightStageInput& in)
     return fields;
 }
 
-void applyRiverPass(TerrainFields& fields, const TerrainSettings& settings)
-{
+void applyRiverPass(TerrainFields& fields, const TerrainSettings& settings) {
     const RiverPassResult riverPass = runRiverPass(
         fields.heights,
         settings.width,
@@ -172,8 +160,7 @@ HeightGradient sampleHeightGradient(
     int depth,
     float horizontalScale,
     int x,
-    int z)
-{
+    int z) {
     const int xL = std::max(0, x - 1);
     const int xR = std::min(width - 1, x + 1);
     const int zD = std::max(0, z - 1);
@@ -189,12 +176,9 @@ HeightGradient sampleHeightGradient(
     return {dx, dz, std::sqrt(dx * dx + dz * dz)};
 }
 
-void computeSlopeField(TerrainFields& fields, float horizontalScale)
-{
-    for (int z = 0; z < fields.depth; ++z)
-    {
-        for (int x = 0; x < fields.width; ++x)
-        {
+void computeSlopeField(TerrainFields& fields, float horizontalScale) {
+    for (int z = 0; z < fields.depth; ++z) {
+        for (int x = 0; x < fields.width; ++x) {
             const size_t idx = fieldIndex(x, z, fields.width);
             fields.slopes[idx] =
                 sampleHeightGradient(fields.heights, fields.width, fields.depth, horizontalScale, x, z).slope;
@@ -205,14 +189,11 @@ void computeSlopeField(TerrainFields& fields, float horizontalScale)
 void buildVertices(
     TerrainMesh& mesh,
     const TerrainFields& fields,
-    const TerrainSettings& settings)
-{
+    const TerrainSettings& settings) {
     mesh.vertices.resize(static_cast<size_t>(settings.width) * static_cast<size_t>(settings.depth));
 
-    for (int z = 0; z < settings.depth; ++z)
-    {
-        for (int x = 0; x < settings.width; ++x)
-        {
+    for (int z = 0; z < settings.depth; ++z) {
+        for (int x = 0; x < settings.width; ++x) {
             const size_t idx = fieldIndex(x, z, settings.width);
 
             TerrainVertex v;
@@ -237,10 +218,8 @@ void buildVertices(
         }
     }
 
-    for (int z = 0; z < settings.depth; ++z)
-    {
-        for (int x = 0; x < settings.width; ++x)
-        {
+    for (int z = 0; z < settings.depth; ++z) {
+        for (int x = 0; x < settings.width; ++x) {
             const HeightGradient gradient =
                 sampleHeightGradient(mesh.heights, settings.width, settings.depth, settings.horizontalScale, x, z);
             const size_t idx = fieldIndex(x, z, settings.width);
@@ -256,15 +235,12 @@ void buildVertices(
     }
 }
 
-void buildGridIndices(TerrainMesh& mesh, int width, int depth)
-{
+void buildGridIndices(TerrainMesh& mesh, int width, int depth) {
     mesh.indices.reserve(static_cast<size_t>(width - 1) *
                          static_cast<size_t>(depth - 1) * 6);
 
-    for (int z = 0; z < depth - 1; ++z)
-    {
-        for (int x = 0; x < width - 1; ++x)
-        {
+    for (int z = 0; z < depth - 1; ++z) {
+        for (int x = 0; x < width - 1; ++x) {
             const uint32_t i00 = static_cast<uint32_t>(z * width + x);
             const uint32_t i10 = static_cast<uint32_t>(z * width + (x + 1));
             const uint32_t i01 = static_cast<uint32_t>((z + 1) * width + x);
@@ -284,13 +260,10 @@ void buildGridIndices(TerrainMesh& mesh, int width, int depth)
 void buildWaterMesh(
     TerrainMesh& mesh,
     const TerrainFields& fields,
-    const TerrainSettings& settings)
-{
+    const TerrainSettings& settings) {
     mesh.waterVertices.resize(mesh.vertices.size());
-    for (int z = 0; z < settings.depth; ++z)
-    {
-        for (int x = 0; x < settings.width; ++x)
-        {
+    for (int z = 0; z < settings.depth; ++z) {
+        for (int x = 0; x < settings.width; ++x) {
             const size_t idx = fieldIndex(x, z, settings.width);
             TerrainVertex water = mesh.vertices[idx];
             const float w = std::clamp(fields.riverWeights[idx], 0.0f, 1.0f);
@@ -305,22 +278,18 @@ void buildWaterMesh(
 
     constexpr float kWaterSurfaceThreshold = 0.02f;
     mesh.waterIndices.reserve(mesh.indices.size() / 8u);
-    const auto hasWater = [&mesh](uint32_t idx)
-    {
+    const auto hasWater = [&mesh](uint32_t idx) {
         return mesh.waterVertices[idx].riverWeight > kWaterSurfaceThreshold;
     };
 
-    for (int z = 0; z < settings.depth - 1; ++z)
-    {
-        for (int x = 0; x < settings.width - 1; ++x)
-        {
+    for (int z = 0; z < settings.depth - 1; ++z) {
+        for (int x = 0; x < settings.width - 1; ++x) {
             const uint32_t i00 = static_cast<uint32_t>(z * settings.width + x);
             const uint32_t i10 = static_cast<uint32_t>(z * settings.width + (x + 1));
             const uint32_t i01 = static_cast<uint32_t>((z + 1) * settings.width + x);
             const uint32_t i11 = static_cast<uint32_t>((z + 1) * settings.width + (x + 1));
 
-            if (!(hasWater(i00) || hasWater(i10) || hasWater(i01) || hasWater(i11)))
-            {
+            if (!(hasWater(i00) || hasWater(i10) || hasWater(i01) || hasWater(i11))) {
                 continue;
             }
 
@@ -335,8 +304,7 @@ void buildWaterMesh(
     }
 }
 
-struct SettlementCandidate
-{
+struct SettlementCandidate {
     size_t idx = 0;
     float score = 0.0f;
 };
@@ -344,8 +312,7 @@ struct SettlementCandidate
 std::vector<size_t> placeSettlements(
     const TerrainMesh& mesh,
     const TerrainFields& fields,
-    const TerrainSettings& settings)
-{
+    const TerrainSettings& settings) {
     const SettlementSettings& ss = settings.settlements;
     const float invHeightRange = 1.0f / std::max(0.0001f, mesh.maxHeight - mesh.minHeight);
 
@@ -353,10 +320,8 @@ std::vector<size_t> placeSettlements(
     std::vector<int> nearestCore(mesh.vertices.size(), -1);
     std::queue<size_t> q;
 
-    for (size_t idx = 0; idx < mesh.vertices.size(); ++idx)
-    {
-        if (fields.riverWeights[idx] >= settings.rivers.coreThreshold)
-        {
+    for (size_t idx = 0; idx < mesh.vertices.size(); ++idx) {
+        if (fields.riverWeights[idx] >= settings.rivers.coreThreshold) {
             riverDistance[idx] = 0;
             nearestCore[idx] = static_cast<int>(idx);
             q.push(idx);
@@ -365,8 +330,7 @@ std::vector<size_t> placeSettlements(
 
     const int neighborDx[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
     const int neighborDz[8] = {-1, -1, -1, 0, 0, 1, 1, 1};
-    while (!q.empty())
-    {
+    while (!q.empty()) {
         const size_t cur = q.front();
         q.pop();
 
@@ -374,18 +338,15 @@ std::vector<size_t> placeSettlements(
         const int cz = static_cast<int>(cur / static_cast<size_t>(settings.width));
         const int nextDist = riverDistance[cur] + 1;
 
-        for (int i = 0; i < 8; ++i)
-        {
+        for (int i = 0; i < 8; ++i) {
             const int nx = cx + neighborDx[i];
             const int nz = cz + neighborDz[i];
-            if (nx < 0 || nx >= settings.width || nz < 0 || nz >= settings.depth)
-            {
+            if (nx < 0 || nx >= settings.width || nz < 0 || nz >= settings.depth) {
                 continue;
             }
 
             const size_t nidx = fieldIndex(nx, nz, settings.width);
-            if (nextDist >= riverDistance[nidx])
-            {
+            if (nextDist >= riverDistance[nidx]) {
                 continue;
             }
 
@@ -403,40 +364,32 @@ std::vector<size_t> placeSettlements(
                                 int distMin,
                                 int distMax,
                                 float minAboveRiver,
-                                float maxSlope)
-    {
+                                float maxSlope) {
         candidates.clear();
-        for (size_t idx = 0; idx < mesh.vertices.size(); ++idx)
-        {
+        for (size_t idx = 0; idx < mesh.vertices.size(); ++idx) {
             const float river = std::clamp(fields.riverWeights[idx], 0.0f, 1.0f);
-            if (river < riverMin || river > riverMax)
-            {
+            if (river < riverMin || river > riverMax) {
                 continue;
             }
 
-            if (riverDistance[idx] < distMin || riverDistance[idx] > distMax)
-            {
+            if (riverDistance[idx] < distMin || riverDistance[idx] > distMax) {
                 continue;
             }
 
-            if (nearestCore[idx] >= 0)
-            {
+            if (nearestCore[idx] >= 0) {
                 const size_t coreIdx = static_cast<size_t>(nearestCore[idx]);
-                if (mesh.heights[idx] < mesh.heights[coreIdx] + minAboveRiver)
-                {
+                if (mesh.heights[idx] < mesh.heights[coreIdx] + minAboveRiver) {
                     continue;
                 }
             }
 
             const float slope = fields.slopes[idx];
-            if (slope > maxSlope)
-            {
+            if (slope > maxSlope) {
                 continue;
             }
 
             const float hNorm = (mesh.heights[idx] - mesh.minHeight) * invHeightRange;
-            if (hNorm < ss.minElevationNorm || hNorm > ss.maxElevationNorm)
-            {
+            if (hNorm < ss.minElevationNorm || hNorm > ss.maxElevationNorm) {
                 continue;
             }
 
@@ -459,8 +412,7 @@ std::vector<size_t> placeSettlements(
         ss.minHeightAboveRiver,
         ss.maxSlope);
 
-    if (candidates.size() < 24u)
-    {
+    if (candidates.size() < 24u) {
         gatherCandidates(
             std::max(0.0f, ss.minRiverWeight * 0.6f),
             std::min(1.0f, ss.maxRiverWeight + 0.2f),
@@ -470,8 +422,7 @@ std::vector<size_t> placeSettlements(
             ss.maxSlope + 0.08f);
     }
 
-    std::sort(candidates.begin(), candidates.end(), [](const SettlementCandidate& a, const SettlementCandidate& b)
-              { return a.score > b.score; });
+    std::sort(candidates.begin(), candidates.end(), [](const SettlementCandidate& a, const SettlementCandidate& b) { return a.score > b.score; });
 
     const int desiredSettlements = std::max(
         1,
@@ -485,10 +436,8 @@ std::vector<size_t> placeSettlements(
     const int gridDepth = (settings.depth + cellSize - 1) / cellSize;
     std::vector<std::vector<size_t>> grid(static_cast<size_t>(gridWidth * gridDepth));
 
-    for (const SettlementCandidate& candidate : candidates)
-    {
-        if (static_cast<int>(selected.size()) >= desiredSettlements)
-        {
+    for (const SettlementCandidate& candidate : candidates) {
+        if (static_cast<int>(selected.size()) >= desiredSettlements) {
             break;
         }
 
@@ -498,25 +447,20 @@ std::vector<size_t> placeSettlements(
 
         const int cellX = cx / cellSize;
         const int cellZ = cz / cellSize;
-        for (int dz = -1; dz <= 1 && !tooClose; ++dz)
-        {
-            for (int dx = -1; dx <= 1 && !tooClose; ++dx)
-            {
+        for (int dz = -1; dz <= 1 && !tooClose; ++dz) {
+            for (int dx = -1; dx <= 1 && !tooClose; ++dx) {
                 const int gnx = cellX + dx;
                 const int gnz = cellZ + dz;
-                if (gnx < 0 || gnx >= gridWidth || gnz < 0 || gnz >= gridDepth)
-                {
+                if (gnx < 0 || gnx >= gridWidth || gnz < 0 || gnz >= gridDepth) {
                     continue;
                 }
 
-                for (size_t sidx : grid[gnz * gridWidth + gnx])
-                {
+                for (size_t sidx : grid[gnz * gridWidth + gnx]) {
                     const int sx = static_cast<int>(sidx % static_cast<size_t>(settings.width));
                     const int sz = static_cast<int>(sidx / static_cast<size_t>(settings.width));
                     const int ddx = cx - sx;
                     const int ddz = cz - sz;
-                    if (ddx * ddx + ddz * ddz < minSepSq)
-                    {
+                    if (ddx * ddx + ddz * ddz < minSepSq) {
                         tooClose = true;
                         break;
                     }
@@ -524,16 +468,14 @@ std::vector<size_t> placeSettlements(
             }
         }
 
-        if (tooClose)
-        {
+        if (tooClose) {
             continue;
         }
         selected.push_back(candidate.idx);
         grid[(cz / cellSize) * gridWidth + (cx / cellSize)].push_back(candidate.idx);
     }
 
-    if (selected.empty() && !candidates.empty())
-    {
+    if (selected.empty() && !candidates.empty()) {
         selected.push_back(candidates.front().idx);
     }
 
@@ -543,44 +485,36 @@ std::vector<size_t> placeSettlements(
 } // namespace
 
 TerrainGenerator::TerrainGenerator(TerrainSettings settings)
-    : settings_(settings), permutation_(512, 0)
-{
-    if (settings_.width < 2 || settings_.depth < 2)
-    {
+    : settings_(settings), permutation_(512, 0) {
+    if (settings_.width < 2 || settings_.depth < 2) {
         throw std::invalid_argument("Terrain dimensions must be at least 2x2");
     }
     reseed(settings_.seed);
 }
 
-void TerrainGenerator::setSettings(const TerrainSettings& settings)
-{
-    if (settings.width < 2 || settings.depth < 2)
-    {
+void TerrainGenerator::setSettings(const TerrainSettings& settings) {
+    if (settings.width < 2 || settings.depth < 2) {
         throw std::invalid_argument("Terrain dimensions must be at least 2x2");
     }
     settings_ = settings;
     reseed(settings_.seed);
 }
 
-const TerrainSettings& TerrainGenerator::settings() const
-{
+const TerrainSettings& TerrainGenerator::settings() const {
     return settings_;
 }
 
-void TerrainGenerator::reseed(uint32_t seed)
-{
+void TerrainGenerator::reseed(uint32_t seed) {
     std::vector<int> p(256);
     std::iota(p.begin(), p.end(), 0);
     std::mt19937 rng(seed);
     std::shuffle(p.begin(), p.end(), rng);
-    for (int i = 0; i < 512; ++i)
-    {
+    for (int i = 0; i < 512; ++i) {
         permutation_[i] = p[i & 255];
     }
 }
 
-float TerrainGenerator::simplexNoise2D(float x, float y) const
-{
+float TerrainGenerator::simplexNoise2D(float x, float y) const {
     static constexpr float grads[8][2] = {
         {1.0f, 0.0f}, {-1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, -1.0f}, {0.7071f, 0.7071f}, {-0.7071f, 0.7071f}, {0.7071f, -0.7071f}, {-0.7071f, -0.7071f}};
 
@@ -594,13 +528,10 @@ float TerrainGenerator::simplexNoise2D(float x, float y) const
 
     int i1 = 0;
     int j1 = 0;
-    if (x0 > y0)
-    {
+    if (x0 > y0) {
         i1 = 1;
         j1 = 0;
-    }
-    else
-    {
+    } else {
         i1 = 0;
         j1 = 1;
     }
@@ -622,22 +553,19 @@ float TerrainGenerator::simplexNoise2D(float x, float y) const
     float n2 = 0.0f;
 
     float t0 = 0.5f - x0 * x0 - y0 * y0;
-    if (t0 > 0.0f)
-    {
+    if (t0 > 0.0f) {
         t0 *= t0;
         n0 = t0 * t0 * (grads[gi0][0] * x0 + grads[gi0][1] * y0);
     }
 
     float t1 = 0.5f - x1 * x1 - y1 * y1;
-    if (t1 > 0.0f)
-    {
+    if (t1 > 0.0f) {
         t1 *= t1;
         n1 = t1 * t1 * (grads[gi1][0] * x1 + grads[gi1][1] * y1);
     }
 
     float t2 = 0.5f - x2 * x2 - y2 * y2;
-    if (t2 > 0.0f)
-    {
+    if (t2 > 0.0f) {
         t2 *= t2;
         n2 = t2 * t2 * (grads[gi2][0] * x2 + grads[gi2][1] * y2);
     }
@@ -646,10 +574,8 @@ float TerrainGenerator::simplexNoise2D(float x, float y) const
 }
 
 // Layers multiple noise, adds detail
-float TerrainGenerator::fractalBrownianMotion(float x, float y, int octaves, float lacunarity, float gain) const
-{
-    return octaveNoise(x, y, octaves, lacunarity, gain, [](float n)
-                       { return n; });
+float TerrainGenerator::fractalBrownianMotion(float x, float y, int octaves, float lacunarity, float gain) const {
+    return octaveNoise(x, y, octaves, lacunarity, gain, [](float n) { return n; });
 }
 
 // Creates mountain ridges
@@ -659,24 +585,19 @@ float TerrainGenerator::ridgedFbm(
     int octaves,
     float lacunarity,
     float gain,
-    float sharpness) const
-{
-    return octaveNoise(x, y, octaves, lacunarity, gain, [sharpness](float n)
-                       { return std::pow(std::clamp(1.0f - std::fabs(n), 0.0f, 1.0f), sharpness); });
+    float sharpness) const {
+    return octaveNoise(x, y, octaves, lacunarity, gain, [sharpness](float n) { return std::pow(std::clamp(1.0f - std::fabs(n), 0.0f, 1.0f), sharpness); });
 }
 
 // Main generation function
 // 1. Builds the scalar terrain fields (height, mountain mask, warped sample positions)
 // 2. Applies post-processing stages (smoothing, rivers, slopes, climate, provinces, landforms, biomes)
 // 3. Packs those fields into the renderable mesh
-TerrainMesh TerrainGenerator::generateMesh() const
-{
-    const auto fbm = [this](float x, float y, int octaves, float lacunarity, float gain)
-    {
+TerrainMesh TerrainGenerator::generateMesh() const {
+    const auto fbm = [this](float x, float y, int octaves, float lacunarity, float gain) {
         return this->fractalBrownianMotion(x, y, octaves, lacunarity, gain);
     };
-    const auto ridged = [this](float x, float y, int octaves, float lacunarity, float gain, float sharpness)
-    {
+    const auto ridged = [this](float x, float y, int octaves, float lacunarity, float gain, float sharpness) {
         return this->ridgedFbm(x, y, octaves, lacunarity, gain, sharpness);
     };
 
@@ -685,7 +606,6 @@ TerrainMesh TerrainGenerator::generateMesh() const
     applyRiverPass(fields, settings_);
     computeSlopeField(fields, settings_.horizontalScale);
     computeClimateFields(fields, settings_, fbm);
-    computeProvinceFields(fields, settings_);
     computeLandformFields(fields);
     computeBiomeFields(fields);
 
@@ -706,8 +626,7 @@ TerrainMesh TerrainGenerator::generateMesh() const
     const std::vector<size_t> selectedSettlements = placeSettlements(mesh, fields, settings_);
     mesh.settlementVertices.reserve(selectedSettlements.size());
     const float settlementHeightOffset = 0.015f * settings_.verticalScale;
-    for (size_t idx : selectedSettlements)
-    {
+    for (size_t idx : selectedSettlements) {
         TerrainVertex marker = mesh.vertices[idx];
         marker.y += settlementHeightOffset;
         marker.riverWeight = 0.0f;

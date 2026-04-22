@@ -1,7 +1,6 @@
 #include "renderer.h"
 
-int main()
-{
+int main() {
     renderer::runDemo();
     return 0;
 }

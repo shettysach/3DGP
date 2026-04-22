@@ -5,11 +5,9 @@
 
 #include <vector>
 
-namespace terrain
-{
+namespace terrain {
 
-struct RiverPassResult
-{
+struct RiverPassResult {
     std::vector<float> carvedHeights;
     std::vector<float> riverWeights;
 };

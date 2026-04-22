@@ -1,11 +1,10 @@
 #ifndef TERRAIN_PROVINCES_H
 #define TERRAIN_PROVINCES_H
 
-#include "fields.h"
 #include "../terrain.h"
+#include "fields.h"
 
-namespace terrain
-{
+namespace terrain {
 
 void computeProvinceFields(TerrainFields& fields, const TerrainSettings& settings);
 

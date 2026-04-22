@@ -6,11 +6,9 @@
 
 #include <cstdint>
 
-namespace terrain
-{
+namespace terrain {
 
-struct BiomeColor
-{
+struct BiomeColor {
     float r = 0.0f;
     float g = 0.0f;
     float b = 0.0f;

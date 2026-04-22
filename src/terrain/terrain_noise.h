@@ -3,11 +3,9 @@
 
 #include <functional>
 
-namespace terrain
-{
+namespace terrain {
 
-struct TerrainNoiseInput
-{
+struct TerrainNoiseInput {
     float sampleX = 0.0f;
     float sampleZ = 0.0f;
     int octaves = 6;
@@ -18,8 +16,7 @@ struct TerrainNoiseInput
     std::function<float(float, float, int, float, float, float)> ridgedFbm;
 };
 
-struct TerrainNoiseComputation
-{
+struct TerrainNoiseComputation {
     float continental = 0.0f;
     float detail = 0.0f;
 };

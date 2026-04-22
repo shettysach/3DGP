@@ -14,9 +14,9 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <windows.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
+#include <windows.h>
 #ifndef SDL_MAIN_HANDLED
 #define SDL_MAIN_HANDLED
 #endif
@@ -36,11 +36,9 @@
 #error "Unknown platform"
 #endif
 
-namespace renderer
-{
+namespace renderer {
 
-enum class RenderMode
-{
+enum class RenderMode {
     SurfaceBiomes = 0,
     Provinces,
     Landforms,
@@ -51,8 +49,7 @@ enum class RenderMode
     Slope,
 };
 
-class Renderer
-{
+class Renderer {
   public:
     Renderer(int width, int height);
     ~Renderer();

@@ -13,43 +13,36 @@
 #include <string>
 #include <vector>
 
-namespace renderer
-{
+namespace renderer {
 
-namespace
-{
+namespace {
 
 constexpr float kPi = 3.14159265358979323846f;
 
 constexpr GLfloat kLightDir[] = {0.35f, 1.0f, 0.25f, 0.0f};
 
-float degToRad(float deg)
-{
+float degToRad(float deg) {
     return deg * kPi / 180.0f;
 }
 
-bool usesLighting(RenderMode mode)
-{
+bool usesLighting(RenderMode mode) {
     return mode == RenderMode::SurfaceBiomes;
 }
 
-struct Color3
-{
+struct Color3 {
     float r = 0.0f;
     float g = 0.0f;
     float b = 0.0f;
 };
 
-struct Color4
-{
+struct Color4 {
     float r = 0.0f;
     float g = 0.0f;
     float b = 0.0f;
     float a = 0.0f;
 };
 
-void yawDirections(float yawDeg, float& forwardX, float& forwardZ, float& rightX, float& rightZ)
-{
+void yawDirections(float yawDeg, float& forwardX, float& forwardZ, float& rightX, float& rightZ) {
     const float yawRad = degToRad(yawDeg);
     forwardX = std::cos(yawRad);
     forwardZ = std::sin(yawRad);
@@ -57,8 +50,7 @@ void yawDirections(float yawDeg, float& forwardX, float& forwardZ, float& rightX
     rightZ = std::sin(yawRad + kPi * 0.5f);
 }
 
-Color3 lerpColor(const Color3& a, const Color3& b, float t)
-{
+Color3 lerpColor(const Color3& a, const Color3& b, float t) {
     return {
         terrain::lerp(a.r, b.r, t),
         terrain::lerp(a.g, b.g, t),
@@ -66,8 +58,7 @@ Color3 lerpColor(const Color3& a, const Color3& b, float t)
     };
 }
 
-Color3 biomeVertexColor(const terrain::TerrainVertex& v, float minH, float maxH)
-{
+Color3 biomeVertexColor(const terrain::TerrainVertex& v, float minH, float maxH) {
     const float h = (v.y - minH) / std::max(0.001f, maxH - minH);
     const float slope = std::clamp(v.slope, 0.0f, 1.0f);
     const float primaryWeight = std::clamp(v.primaryBiomeWeight, 0.0f, 1.0f);
@@ -95,72 +86,57 @@ Color3 biomeVertexColor(const terrain::TerrainVertex& v, float minH, float maxH)
     return color;
 }
 
-Color3 heatmapColor(float value)
-{
+Color3 heatmapColor(float value) {
     const float t = std::clamp(value, 0.0f, 1.0f);
-    if (t < 0.33f)
-    {
+    if (t < 0.33f) {
         return lerpColor({0.06f, 0.12f, 0.42f}, {0.17f, 0.62f, 0.86f}, t / 0.33f);
     }
-    if (t < 0.66f)
-    {
+    if (t < 0.66f) {
         return lerpColor({0.17f, 0.62f, 0.86f}, {0.90f, 0.82f, 0.24f}, (t - 0.33f) / 0.33f);
     }
     return lerpColor({0.90f, 0.82f, 0.24f}, {0.82f, 0.22f, 0.14f}, (t - 0.66f) / 0.34f);
 }
 
-Color3 precipitationColor(float value)
-{
+Color3 precipitationColor(float value) {
     const float t = std::clamp(value, 0.0f, 1.0f);
-    if (t < 0.5f)
-    {
+    if (t < 0.5f) {
         return lerpColor({0.74f, 0.61f, 0.38f}, {0.42f, 0.68f, 0.28f}, t / 0.5f);
     }
     return lerpColor({0.42f, 0.68f, 0.28f}, {0.12f, 0.38f, 0.63f}, (t - 0.5f) / 0.5f);
 }
 
-Color3 moistureColor(float value)
-{
+Color3 moistureColor(float value) {
     const float t = std::clamp(value, 0.0f, 1.0f);
-    if (t < 0.5f)
-    {
+    if (t < 0.5f) {
         return lerpColor({0.63f, 0.52f, 0.34f}, {0.31f, 0.55f, 0.20f}, t / 0.5f);
     }
     return lerpColor({0.31f, 0.55f, 0.20f}, {0.06f, 0.44f, 0.36f}, (t - 0.5f) / 0.5f);
 }
 
-Color3 slopeColor(float value)
-{
+Color3 slopeColor(float value) {
     const float t = std::clamp(value, 0.0f, 1.0f);
-    if (t < 0.4f)
-    {
+    if (t < 0.4f) {
         return lerpColor({0.15f, 0.38f, 0.12f}, {0.57f, 0.56f, 0.26f}, t / 0.4f);
     }
-    if (t < 0.75f)
-    {
+    if (t < 0.75f) {
         return lerpColor({0.57f, 0.56f, 0.26f}, {0.55f, 0.49f, 0.44f}, (t - 0.4f) / 0.35f);
     }
     return lerpColor({0.55f, 0.49f, 0.44f}, {0.95f, 0.95f, 0.95f}, (t - 0.75f) / 0.25f);
 }
 
-Color3 debugVertexColor(const terrain::TerrainVertex& v, float minH, float maxH, RenderMode mode)
-{
-    switch (mode)
-    {
+Color3 debugVertexColor(const terrain::TerrainVertex& v, float minH, float maxH, RenderMode mode) {
+    switch (mode) {
     case RenderMode::SurfaceBiomes:
         return biomeVertexColor(v, minH, maxH);
-    case RenderMode::Provinces:
-    {
+    case RenderMode::Provinces: {
         const terrain::BiomeColor c = terrain::provinceColor(v.provinceId);
         return {c.r, c.g, c.b};
     }
-    case RenderMode::Landforms:
-    {
+    case RenderMode::Landforms: {
         const terrain::BiomeColor c = terrain::landformColor(static_cast<terrain::LandformId>(v.landform));
         return {c.r, c.g, c.b};
     }
-    case RenderMode::Ecology:
-    {
+    case RenderMode::Ecology: {
         const terrain::BiomeColor c = terrain::ecologyColor(static_cast<terrain::EcologyId>(v.ecology));
         return {c.r, c.g, c.b};
     }
@@ -177,8 +153,7 @@ Color3 debugVertexColor(const terrain::TerrainVertex& v, float minH, float maxH,
     return biomeVertexColor(v, minH, maxH);
 }
 
-Color4 waterVertexColor(const terrain::TerrainVertex& v)
-{
+Color4 waterVertexColor(const terrain::TerrainVertex& v) {
     const float t = terrain::smoothstep(0.02f, 0.85f, std::clamp(v.riverWeight, 0.0f, 1.0f));
     return {
         terrain::lerp(0.03f, 0.09f, t),
@@ -191,11 +166,9 @@ Color4 waterVertexColor(const terrain::TerrainVertex& v)
 void rebuildTerrainColorBuffer(
     const terrain::TerrainMesh& mesh,
     RenderMode mode,
-    std::vector<float>& terrainColors)
-{
+    std::vector<float>& terrainColors) {
     terrainColors.resize(mesh.vertices.size() * 3u);
-    for (size_t i = 0; i < mesh.vertices.size(); ++i)
-    {
+    for (size_t i = 0; i < mesh.vertices.size(); ++i) {
         const Color3 color = debugVertexColor(mesh.vertices[i], mesh.minHeight, mesh.maxHeight, mode);
         const size_t base = i * 3u;
         terrainColors[base + 0u] = color.r;
@@ -204,11 +177,9 @@ void rebuildTerrainColorBuffer(
     }
 }
 
-void rebuildWaterColorBuffer(const terrain::TerrainMesh& mesh, std::vector<float>& waterColors)
-{
+void rebuildWaterColorBuffer(const terrain::TerrainMesh& mesh, std::vector<float>& waterColors) {
     waterColors.resize(mesh.waterVertices.size() * 4u);
-    for (size_t i = 0; i < mesh.waterVertices.size(); ++i)
-    {
+    for (size_t i = 0; i < mesh.waterVertices.size(); ++i) {
         const Color4 color = waterVertexColor(mesh.waterVertices[i]);
         const size_t base = i * 4u;
         waterColors[base + 0u] = color.r;
@@ -220,10 +191,8 @@ void rebuildWaterColorBuffer(const terrain::TerrainMesh& mesh, std::vector<float
 
 } // namespace
 
-const char* renderModeName(RenderMode mode)
-{
-    switch (mode)
-    {
+const char* renderModeName(RenderMode mode) {
+    switch (mode) {
     case RenderMode::SurfaceBiomes:
         return "Surface biomes";
     case RenderMode::Provinces:
@@ -263,15 +232,12 @@ Renderer::Renderer(int width, int height)
       cachedTerrainVertexCount_(0u),
       cachedWaterVertexCount_(0u) {}
 
-Renderer::~Renderer()
-{
+Renderer::~Renderer() {
     shutdown();
 }
 
-bool Renderer::init()
-{
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
-    {
+bool Renderer::init() {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         std::cerr << "SDL_Init failed: " << SDL_GetError() << '\n';
         return false;
     }
@@ -292,15 +258,13 @@ bool Renderer::init()
                                height_,
                                SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED);
 
-    if (!window_)
-    {
+    if (!window_) {
         std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << '\n';
         return false;
     }
 
     glContext_ = SDL_GL_CreateContext(window_);
-    if (!glContext_)
-    {
+    if (!glContext_) {
         std::cerr << "SDL_GL_CreateContext failed: " << SDL_GetError() << '\n';
         return false;
     }
@@ -333,49 +297,40 @@ bool Renderer::init()
     return true;
 }
 
-void Renderer::shutdown()
-{
-    if (glContext_)
-    {
+void Renderer::shutdown() {
+    if (glContext_) {
         SDL_GL_DeleteContext(glContext_);
         glContext_ = nullptr;
     }
-    if (window_)
-    {
+    if (window_) {
         SDL_DestroyWindow(window_);
         window_ = nullptr;
     }
     SDL_Quit();
 }
 
-bool Renderer::shouldClose() const
-{
+bool Renderer::shouldClose() const {
     return shouldClose_;
 }
 
-void Renderer::swapBuffers()
-{
-    if (window_)
-    {
+void Renderer::swapBuffers() {
+    if (window_) {
         SDL_GL_SwapWindow(window_);
     }
 }
 
-void Renderer::orbit(float deltaYaw, float deltaPitch)
-{
+void Renderer::orbit(float deltaYaw, float deltaPitch) {
     yawDeg_ += deltaYaw;
     pitchDeg_ += deltaPitch;
     pitchDeg_ = std::clamp(pitchDeg_, -30.0f, 88.0f);
 }
 
-void Renderer::zoom(float deltaDistance)
-{
+void Renderer::zoom(float deltaDistance) {
     distance_ += deltaDistance;
     distance_ = std::clamp(distance_, 18.0f, 1600.0f);
 }
 
-void Renderer::pan(float deltaX, float deltaY)
-{
+void Renderer::pan(float deltaX, float deltaY) {
     float fX, fZ, rX, rZ;
     yawDirections(yawDeg_, fX, fZ, rX, rZ);
     targetX_ += rX * deltaX;
@@ -383,45 +338,38 @@ void Renderer::pan(float deltaX, float deltaY)
     targetY_ += deltaY;
 }
 
-void Renderer::moveForward(float amount)
-{
+void Renderer::moveForward(float amount) {
     float fX, fZ, rX, rZ;
     yawDirections(yawDeg_, fX, fZ, rX, rZ);
     targetX_ += fX * amount;
     targetZ_ += fZ * amount;
 }
 
-void Renderer::moveRight(float amount)
-{
+void Renderer::moveRight(float amount) {
     float fX, fZ, rX, rZ;
     yawDirections(yawDeg_, fX, fZ, rX, rZ);
     targetX_ += rX * amount;
     targetZ_ += rZ * amount;
 }
 
-void Renderer::setTarget(float x, float y, float z)
-{
+void Renderer::setTarget(float x, float y, float z) {
     targetX_ = x;
     targetY_ = y;
     targetZ_ = z;
 }
 
-void Renderer::setRenderMode(RenderMode mode)
-{
-    if (renderMode_ != mode)
-    {
+void Renderer::setRenderMode(RenderMode mode) {
+    if (renderMode_ != mode) {
         terrainColorsValid_ = false;
     }
     renderMode_ = mode;
 }
 
-RenderMode Renderer::renderMode() const
-{
+RenderMode Renderer::renderMode() const {
     return renderMode_;
 }
 
-void Renderer::invalidateMeshCache()
-{
+void Renderer::invalidateMeshCache() {
     terrainColorsValid_ = false;
     waterColorsValid_ = false;
     cachedTerrainVertexCount_ = 0u;
@@ -430,18 +378,15 @@ void Renderer::invalidateMeshCache()
     waterColors_.clear();
 }
 
-bool Renderer::captureScreenshot(const std::string& filepath) const
-{
-    if (!window_)
-    {
+bool Renderer::captureScreenshot(const std::string& filepath) const {
+    if (!window_) {
         return false;
     }
 
     int drawableWidth = 0;
     int drawableHeight = 0;
     SDL_GL_GetDrawableSize(window_, &drawableWidth, &drawableHeight);
-    if (drawableWidth <= 0 || drawableHeight <= 0)
-    {
+    if (drawableWidth <= 0 || drawableHeight <= 0) {
         return false;
     }
 
@@ -451,8 +396,7 @@ bool Renderer::captureScreenshot(const std::string& filepath) const
 
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glReadPixels(0, 0, drawableWidth, drawableHeight, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
-    if (glGetError() != GL_NO_ERROR)
-    {
+    if (glGetError() != GL_NO_ERROR) {
         return false;
     }
 
@@ -462,14 +406,12 @@ bool Renderer::captureScreenshot(const std::string& filepath) const
         drawableHeight,
         24,
         SDL_PIXELFORMAT_RGB24);
-    if (!surface)
-    {
+    if (!surface) {
         return false;
     }
 
     const size_t rowBytes = static_cast<size_t>(drawableWidth) * 3u;
-    for (int y = 0; y < drawableHeight; ++y)
-    {
+    for (int y = 0; y < drawableHeight; ++y) {
         unsigned char* dst = static_cast<unsigned char*>(surface->pixels) +
                              static_cast<size_t>(y) * static_cast<size_t>(surface->pitch);
         const unsigned char* src = pixels.data() +
@@ -482,13 +424,11 @@ bool Renderer::captureScreenshot(const std::string& filepath) const
     return saveResult == 0;
 }
 
-void Renderer::render(const terrain::TerrainMesh& mesh)
-{
+void Renderer::render(const terrain::TerrainMesh& mesh) {
     int drawableWidth = 0;
     int drawableHeight = 0;
     SDL_GL_GetDrawableSize(window_, &drawableWidth, &drawableHeight);
-    if (drawableWidth <= 0 || drawableHeight <= 0)
-    {
+    if (drawableWidth <= 0 || drawableHeight <= 0) {
         return;
     }
 
@@ -518,24 +458,19 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
     const bool terrainUsesLighting = usesLighting(renderMode_);
-    if (terrainUsesLighting)
-    {
+    if (terrainUsesLighting) {
         glEnable(GL_LIGHTING);
-    }
-    else
-    {
+    } else {
         glDisable(GL_LIGHTING);
     }
 
-    if (!terrainColorsValid_ || cachedTerrainVertexCount_ != mesh.vertices.size())
-    {
+    if (!terrainColorsValid_ || cachedTerrainVertexCount_ != mesh.vertices.size()) {
         rebuildTerrainColorBuffer(mesh, renderMode_, terrainColors_);
         cachedTerrainVertexCount_ = mesh.vertices.size();
         terrainColorsValid_ = true;
     }
 
-    if (!mesh.vertices.empty() && !mesh.indices.empty())
-    {
+    if (!mesh.vertices.empty() && !mesh.indices.empty()) {
         const GLsizei stride = static_cast<GLsizei>(sizeof(terrain::TerrainVertex));
         const unsigned char* vertexBase = reinterpret_cast<const unsigned char*>(mesh.vertices.data());
 
@@ -558,10 +493,8 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
         glDisableClientState(GL_VERTEX_ARRAY);
     }
 
-    if (terrainUsesLighting && !mesh.waterVertices.empty() && !mesh.waterIndices.empty())
-    {
-        if (!waterColorsValid_ || cachedWaterVertexCount_ != mesh.waterVertices.size())
-        {
+    if (terrainUsesLighting && !mesh.waterVertices.empty() && !mesh.waterIndices.empty()) {
+        if (!waterColorsValid_ || cachedWaterVertexCount_ != mesh.waterVertices.size()) {
             rebuildWaterColorBuffer(mesh, waterColors_);
             cachedWaterVertexCount_ = mesh.waterVertices.size();
             waterColorsValid_ = true;
@@ -598,15 +531,12 @@ void Renderer::render(const terrain::TerrainMesh& mesh)
         glEnable(GL_CULL_FACE);
         glDisable(GL_BLEND);
         glEnable(GL_LIGHTING);
-    }
-    else if (!terrainUsesLighting)
-    {
+    } else if (!terrainUsesLighting) {
         glEnable(GL_LIGHTING);
     }
 }
 
-void runDemo()
-{
+void runDemo() {
     terrain::TerrainSettings settings;
     settings.width = 513;
     settings.depth = 513;
@@ -631,14 +561,11 @@ void runDemo()
     terrain::TerrainGenerator generator(settings);
     terrain::TerrainMesh mesh = generator.generateMesh();
 
-    auto printRiverStats = [&mesh]()
-    {
+    auto printRiverStats = [&mesh]() {
         size_t wetCount = 0;
         float maxWeight = 0.0f;
-        for (const terrain::TerrainVertex& v : mesh.vertices)
-        {
-            if (v.riverWeight > 0.02f)
-            {
+        for (const terrain::TerrainVertex& v : mesh.vertices) {
+            if (v.riverWeight > 0.02f) {
                 ++wetCount;
             }
             maxWeight = std::max(maxWeight, v.riverWeight);
@@ -652,22 +579,18 @@ void runDemo()
                   << ", settlements: " << mesh.settlementVertices.size() << '\n';
     };
 
-    auto printBiomeStats = [&mesh]()
-    {
+    auto printBiomeStats = [&mesh]() {
         std::array<size_t, static_cast<size_t>(terrain::BiomeId::Count)> counts{};
         uint16_t maxProvinceId = 0u;
-        for (const terrain::TerrainVertex& v : mesh.vertices)
-        {
+        for (const terrain::TerrainVertex& v : mesh.vertices) {
             ++counts[static_cast<size_t>(v.primaryBiome)];
             maxProvinceId = std::max(maxProvinceId, v.provinceId);
         }
 
         std::cout << "Surface coverage across " << (mesh.vertices.empty() ? 0u : static_cast<unsigned>(maxProvinceId + 1u)) << " provinces:";
         const float invTotal = mesh.vertices.empty() ? 0.0f : 100.0f / static_cast<float>(mesh.vertices.size());
-        for (size_t idx = 0; idx < counts.size(); ++idx)
-        {
-            if (counts[idx] == 0)
-            {
+        for (size_t idx = 0; idx < counts.size(); ++idx) {
+            if (counts[idx] == 0) {
                 continue;
             }
             std::cout << ' ' << terrain::biomeName(static_cast<terrain::BiomeId>(idx)) << ' '
@@ -677,14 +600,12 @@ void runDemo()
     };
 
     Renderer renderer(1280, 800);
-    if (!renderer.init())
-    {
+    if (!renderer.init()) {
         std::cerr << "Renderer init failed\n";
         return;
     }
 
-    auto setMode = [&renderer](RenderMode mode)
-    {
+    auto setMode = [&renderer](RenderMode mode) {
         renderer.setRenderMode(mode);
         std::cout << "Render mode: " << renderModeName(mode) << '\n';
     };
@@ -716,28 +637,22 @@ void runDemo()
     using Clock = std::chrono::steady_clock;
     auto lastFrameTime = Clock::now();
 
-    const auto applyRiverPreset = [&](int preset)
-    {
-        if (preset == 1)
-        {
+    const auto applyRiverPreset = [&](int preset) {
+        if (preset == 1) {
             settings.rivers.sourceDensity = 0.00010f;
             settings.rivers.sourceAccumulation = 110.0f;
             settings.rivers.mainAccumulation = 240.0f;
             settings.rivers.maxHalfWidth = 2;
             settings.rivers.baseCarveFraction = 0.018f;
             settings.rivers.maxCarveFraction = 0.065f;
-        }
-        else if (preset == 2)
-        {
+        } else if (preset == 2) {
             settings.rivers.sourceDensity = 0.00018f;
             settings.rivers.sourceAccumulation = 85.0f;
             settings.rivers.mainAccumulation = 200.0f;
             settings.rivers.maxHalfWidth = 3;
             settings.rivers.baseCarveFraction = 0.025f;
             settings.rivers.maxCarveFraction = 0.09f;
-        }
-        else
-        {
+        } else {
             settings.rivers.sourceDensity = 0.00030f;
             settings.rivers.sourceAccumulation = 60.0f;
             settings.rivers.mainAccumulation = 150.0f;
@@ -754,8 +669,7 @@ void runDemo()
         printBiomeStats();
     };
 
-    while (!renderer.shouldClose())
-    {
+    while (!renderer.shouldClose()) {
         const auto frameTime = Clock::now();
         const float deltaSeconds = std::clamp(
             std::chrono::duration<float>(frameTime - lastFrameTime).count(),
@@ -763,17 +677,13 @@ void runDemo()
             0.1f);
         lastFrameTime = frameTime;
 
-        while (SDL_PollEvent(&event))
-        {
-            if (event.type == SDL_QUIT)
-            {
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
                 return;
             }
 
-            if (event.type == SDL_KEYDOWN)
-            {
-                switch (event.key.keysym.sym)
-                {
+            if (event.type == SDL_KEYDOWN) {
+                switch (event.key.keysym.sym) {
                 case SDLK_ESCAPE:
                     return;
                 case SDLK_r:
@@ -818,17 +728,13 @@ void runDemo()
                 case SDLK_k:
                     setMode(RenderMode::Slope);
                     break;
-                case SDLK_p:
-                {
+                case SDLK_p: {
                     const std::time_t now = std::time(nullptr);
                     const std::string screenshotPath =
                         "screenshot_" + std::to_string(static_cast<long long>(now)) + ".bmp";
-                    if (renderer.captureScreenshot(screenshotPath))
-                    {
+                    if (renderer.captureScreenshot(screenshotPath)) {
                         std::cout << "Saved screenshot to " << screenshotPath << '\n';
-                    }
-                    else
-                    {
+                    } else {
                         std::cout << "Failed to save screenshot\n";
                     }
                     break;
@@ -838,39 +744,32 @@ void runDemo()
                 }
             }
 
-            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
-            {
+            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
                 orbiting = true;
                 prevMouseX = event.button.x;
                 prevMouseY = event.button.y;
             }
-            if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT)
-            {
+            if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
                 orbiting = false;
             }
 
-            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT)
-            {
+            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT) {
                 panning = true;
                 prevMouseX = event.button.x;
                 prevMouseY = event.button.y;
             }
-            if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_RIGHT)
-            {
+            if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_RIGHT) {
                 panning = false;
             }
 
-            if (event.type == SDL_MOUSEMOTION)
-            {
+            if (event.type == SDL_MOUSEMOTION) {
                 const int dx = event.motion.x - prevMouseX;
                 const int dy = event.motion.y - prevMouseY;
 
-                if (orbiting)
-                {
+                if (orbiting) {
                     renderer.orbit(static_cast<float>(dx) * 0.28f, static_cast<float>(-dy) * 0.28f);
                 }
-                if (panning)
-                {
+                if (panning) {
                     const float panScale = std::max(0.3f, 0.005f * mesh.horizontalScale * 300.0f);
                     renderer.pan(static_cast<float>(-dx) * panScale, static_cast<float>(dy) * panScale);
                 }
@@ -879,36 +778,29 @@ void runDemo()
                 prevMouseY = event.motion.y;
             }
 
-            if (event.type == SDL_MOUSEWHEEL)
-            {
+            if (event.type == SDL_MOUSEWHEEL) {
                 renderer.zoom(static_cast<float>(-event.wheel.y) * 14.0f);
             }
         }
 
         const Uint8* keys = SDL_GetKeyboardState(nullptr);
         const float moveSpeed = 170.0f * deltaSeconds;
-        if (keys[SDL_SCANCODE_W])
-        {
+        if (keys[SDL_SCANCODE_W]) {
             renderer.moveForward(-moveSpeed);
         }
-        if (keys[SDL_SCANCODE_S])
-        {
+        if (keys[SDL_SCANCODE_S]) {
             renderer.moveForward(moveSpeed);
         }
-        if (keys[SDL_SCANCODE_A])
-        {
+        if (keys[SDL_SCANCODE_A]) {
             renderer.moveRight(moveSpeed);
         }
-        if (keys[SDL_SCANCODE_D])
-        {
+        if (keys[SDL_SCANCODE_D]) {
             renderer.moveRight(-moveSpeed);
         }
-        if (keys[SDL_SCANCODE_Q])
-        {
+        if (keys[SDL_SCANCODE_Q]) {
             renderer.pan(0.0f, -moveSpeed);
         }
-        if (keys[SDL_SCANCODE_E])
-        {
+        if (keys[SDL_SCANCODE_E]) {
             renderer.pan(0.0f, moveSpeed);
         }
 

@@ -3,11 +3,9 @@
 
 #include <functional>
 
-namespace terrain
-{
+namespace terrain {
 
-struct MountainInput
-{
+struct MountainInput {
     float continental = 0.0f;
     float ridges = 0.0f;
     float detail = 0.0f;
@@ -16,14 +14,12 @@ struct MountainInput
     float verticalScale = 1.0f;
 };
 
-struct MountainResult
-{
+struct MountainResult {
     float height = 0.0f;
     float weight = 0.0f;
 };
 
-struct MountainNoiseComputation
-{
+struct MountainNoiseComputation {
     float continental = 0.0f;
     float ridges = 0.0f;
     float detail = 0.0f;
@@ -31,8 +27,7 @@ struct MountainNoiseComputation
     float slopeHint = 0.0f;
 };
 
-struct MountainNoiseInput
-{
+struct MountainNoiseInput {
     float sampleX = 0.0f;
     float sampleZ = 0.0f;
     int octaves = 6;

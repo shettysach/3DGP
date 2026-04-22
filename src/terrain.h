@@ -4,11 +4,9 @@
 #include <cstdint>
 #include <vector>
 
-namespace terrain
-{
+namespace terrain {
 
-enum class LandformId : uint8_t
-{
+enum class LandformId : uint8_t {
     Lowland = 0,
     Plain,
     Foothill,
@@ -18,8 +16,7 @@ enum class LandformId : uint8_t
     Count,
 };
 
-enum class EcologyId : uint8_t
-{
+enum class EcologyId : uint8_t {
     Desert = 0,
     Steppe,
     Grassland,
@@ -30,8 +27,7 @@ enum class EcologyId : uint8_t
     Count,
 };
 
-enum class BiomeId : uint8_t
-{
+enum class BiomeId : uint8_t {
     MarshLowland = 0,
     DesertPlain,
     SteppePlain,
@@ -50,8 +46,7 @@ enum class BiomeId : uint8_t
     Count,
 };
 
-struct NoiseSettings
-{
+struct NoiseSettings {
     float frequency = 0.007f;
     int octaves = 6;
     float lacunarity = 2.0f;
@@ -61,8 +56,7 @@ struct NoiseSettings
     float warpAmplitude = 45.0f;
 };
 
-struct RiverSettings
-{
+struct RiverSettings {
     float sourceDensity = 0.00015f;
     float minSourceHeight = 0.50f;
     float sourceAccumulation = 100.0f;
@@ -75,8 +69,7 @@ struct RiverSettings
     float coreThreshold = 0.55f;
 };
 
-struct SettlementSettings
-{
+struct SettlementSettings {
     float targetDensity = 0.00014f;
     float minRiverWeight = 0.07f;
     float maxRiverWeight = 0.65f;
@@ -88,14 +81,13 @@ struct SettlementSettings
     float minHeightAboveRiver = 0.14f;
     int minSeparation = 12;
 };
-
 struct ClimateSettings
 {
-    float temperatureFrequency = 0.0014f;
+    float temperatureFrequency = 0.0007f;
     int temperatureOctaves = 3;
-    float precipitationFrequency = 0.0009f;
+    float precipitationFrequency = 0.0005f;
     int precipitationOctaves = 4;
-    float moistureFrequency = 0.0018f;
+    float moistureFrequency = 0.0009f;
     int moistureOctaves = 2;
     float latitudeStrength = 0.20f;
     float temperatureLapseRate = 0.55f;
@@ -106,8 +98,7 @@ struct ClimateSettings
     float temperatureDryingStrength = 0.10f;
 };
 
-struct TerrainSettings
-{
+struct TerrainSettings {
     int width = 513;
     int depth = 513;
     float horizontalScale = 2.0f;
@@ -122,8 +113,7 @@ struct TerrainSettings
     ClimateSettings climate;
 };
 
-struct TerrainVertex
-{
+struct TerrainVertex {
     float x = 0.0f;
     float y = 0.0f;
     float z = 0.0f;
@@ -146,8 +136,7 @@ struct TerrainVertex
     float secondaryBiomeWeight = 0.0f;
 };
 
-struct TerrainMesh
-{
+struct TerrainMesh {
     int width = 0;
     int depth = 0;
     float horizontalScale = 1.0f;
@@ -164,8 +153,7 @@ struct TerrainMesh
     std::vector<TerrainVertex> settlementVertices;
 };
 
-class TerrainGenerator
-{
+class TerrainGenerator {
   public:
     explicit TerrainGenerator(TerrainSettings settings = {});
 
@@ -190,14 +178,12 @@ class TerrainGenerator
         float sharpness) const;
 
     template <typename F>
-    float octaveNoise(float x, float y, int octaves, float lacunarity, float gain, F transform) const
-    {
+    float octaveNoise(float x, float y, int octaves, float lacunarity, float gain, F transform) const {
         float value = 0.0f;
         float amplitude = 1.0f;
         float frequency = settings_.noise.frequency;
         float amplitudeSum = 0.0f;
-        for (int octave = 0; octave < octaves; ++octave)
-        {
+        for (int octave = 0; octave < octaves; ++octave) {
             const float n = simplexNoise2D(x * frequency, y * frequency);
             value += amplitude * transform(n);
             amplitudeSum += amplitude;

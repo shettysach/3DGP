@@ -7,28 +7,22 @@
 #include <numeric>
 #include <queue>
 
-namespace terrain
-{
+namespace terrain {
 
-namespace
-{
+namespace {
 
-struct FloodNode
-{
+struct FloodNode {
     float elevation = 0.0f;
     int index = -1;
 };
 
-struct FloodNodeGreater
-{
-    bool operator()(const FloodNode& a, const FloodNode& b) const
-    {
+struct FloodNodeGreater {
+    bool operator()(const FloodNode& a, const FloodNode& b) const {
         return a.elevation > b.elevation;
     }
 };
 
-struct SourceCandidate
-{
+struct SourceCandidate {
     size_t index = 0;
     float score = 0.0f;
 };
@@ -40,11 +34,9 @@ void seedBoundaryCell(
     int width,
     std::vector<unsigned char>& visited,
     std::vector<float>& filledHeights,
-    std::priority_queue<FloodNode, std::vector<FloodNode>, FloodNodeGreater>& flood)
-{
+    std::priority_queue<FloodNode, std::vector<FloodNode>, FloodNodeGreater>& flood) {
     const size_t idx = fieldIndex(x, z, width);
-    if (visited[idx])
-    {
+    if (visited[idx]) {
         return;
     }
 
@@ -61,14 +53,12 @@ RiverPassResult runRiverPass(
     int depth,
     float verticalScale,
     const RiverSettings& settings,
-    uint32_t seed)
-{
+    uint32_t seed) {
     RiverPassResult out;
     out.carvedHeights = heights;
     out.riverWeights.assign(heights.size(), 0.0f);
 
-    if (width < 2 || depth < 2 || heights.empty())
-    {
+    if (width < 2 || depth < 2 || heights.empty()) {
         return out;
     }
 
@@ -82,19 +72,16 @@ RiverPassResult runRiverPass(
 
     std::priority_queue<FloodNode, std::vector<FloodNode>, FloodNodeGreater> flood;
 
-    for (int x = 0; x < width; ++x)
-    {
+    for (int x = 0; x < width; ++x) {
         seedBoundaryCell(x, 0, heights, width, visited, filledHeights, flood);
         seedBoundaryCell(x, depth - 1, heights, width, visited, filledHeights, flood);
     }
-    for (int z = 0; z < depth; ++z)
-    {
+    for (int z = 0; z < depth; ++z) {
         seedBoundaryCell(0, z, heights, width, visited, filledHeights, flood);
         seedBoundaryCell(width - 1, z, heights, width, visited, filledHeights, flood);
     }
 
-    while (!flood.empty())
-    {
+    while (!flood.empty()) {
         const FloodNode node = flood.top();
         flood.pop();
 
@@ -106,18 +93,14 @@ RiverPassResult runRiverPass(
         const int x0 = std::max(0, cx - 1);
         const int x1 = std::min(width - 1, cx + 1);
 
-        for (int nz = z0; nz <= z1; ++nz)
-        {
-            for (int nx = x0; nx <= x1; ++nx)
-            {
-                if (nx == cx && nz == cz)
-                {
+        for (int nz = z0; nz <= z1; ++nz) {
+            for (int nx = x0; nx <= x1; ++nx) {
+                if (nx == cx && nz == cz) {
                     continue;
                 }
 
                 const size_t nidx = fieldIndex(nx, nz, width);
-                if (visited[nidx])
-                {
+                if (visited[nidx]) {
                     continue;
                 }
 
@@ -136,24 +119,19 @@ RiverPassResult runRiverPass(
 
     std::vector<size_t> order(cellCount);
     std::iota(order.begin(), order.end(), static_cast<size_t>(0));
-    std::sort(order.begin(), order.end(), [&distanceToEdge](size_t a, size_t b)
-              { return distanceToEdge[a] > distanceToEdge[b]; });
+    std::sort(order.begin(), order.end(), [&distanceToEdge](size_t a, size_t b) { return distanceToEdge[a] > distanceToEdge[b]; });
 
-    for (size_t idx : order)
-    {
+    for (size_t idx : order) {
         const int down = downstream[idx];
-        if (down >= 0)
-        {
+        if (down >= 0) {
             accumulation[static_cast<size_t>(down)] += accumulation[idx];
         }
     }
 
     std::vector<float> maxUpstreamAccumulation(cellCount, 0.0f);
-    for (size_t idx = 0; idx < cellCount; ++idx)
-    {
+    for (size_t idx = 0; idx < cellCount; ++idx) {
         const int down = downstream[idx];
-        if (down >= 0)
-        {
+        if (down >= 0) {
             maxUpstreamAccumulation[static_cast<size_t>(down)] =
                 std::max(maxUpstreamAccumulation[static_cast<size_t>(down)], accumulation[idx]);
         }
@@ -163,18 +141,15 @@ RiverPassResult runRiverPass(
     std::vector<SourceCandidate> sourceCandidates;
     sourceCandidates.reserve(cellCount / 16u);
 
-    for (size_t idx : order)
-    {
+    for (size_t idx : order) {
         const float hNorm = (heights[idx] - minHeight) * invHeightRange;
         if (hNorm < settings.minSourceHeight ||
             accumulation[idx] < settings.sourceAccumulation ||
-            distanceToEdge[idx] < minRiverLength)
-        {
+            distanceToEdge[idx] < minRiverLength) {
             continue;
         }
 
-        if (maxUpstreamAccumulation[idx] >= settings.sourceAccumulation)
-        {
+        if (maxUpstreamAccumulation[idx] >= settings.sourceAccumulation) {
             continue;
         }
 
@@ -190,13 +165,11 @@ RiverPassResult runRiverPass(
         sourceCandidates.push_back({idx, score});
     }
 
-    if (sourceCandidates.empty())
-    {
+    if (sourceCandidates.empty()) {
         return out;
     }
 
-    std::sort(sourceCandidates.begin(), sourceCandidates.end(), [](const SourceCandidate& a, const SourceCandidate& b)
-              { return a.score > b.score; });
+    std::sort(sourceCandidates.begin(), sourceCandidates.end(), [](const SourceCandidate& a, const SourceCandidate& b) { return a.score > b.score; });
 
     const int desiredSources = std::max(
         1,
@@ -206,29 +179,22 @@ RiverPassResult runRiverPass(
     selectedSources.reserve(static_cast<size_t>(desiredSources));
     std::vector<unsigned char> selectedMask(cellCount, 0u);
 
-    for (int pass = 0; pass < 3 && static_cast<int>(selectedSources.size()) < desiredSources; ++pass)
-    {
+    for (int pass = 0; pass < 3 && static_cast<int>(selectedSources.size()) < desiredSources; ++pass) {
         int separation = baseSeparation;
-        if (pass == 1)
-        {
+        if (pass == 1) {
             separation = baseSeparation / 2;
-        }
-        else if (pass == 2)
-        {
+        } else if (pass == 2) {
             separation = 0;
         }
 
         const int separationSq = separation * separation;
 
-        for (const SourceCandidate& candidate : sourceCandidates)
-        {
-            if (static_cast<int>(selectedSources.size()) >= desiredSources)
-            {
+        for (const SourceCandidate& candidate : sourceCandidates) {
+            if (static_cast<int>(selectedSources.size()) >= desiredSources) {
                 break;
             }
 
-            if (selectedMask[candidate.index])
-            {
+            if (selectedMask[candidate.index]) {
                 continue;
             }
 
@@ -236,24 +202,20 @@ RiverPassResult runRiverPass(
             const int cz = static_cast<int>(candidate.index / static_cast<size_t>(width));
 
             bool tooClose = false;
-            if (separationSq > 0)
-            {
-                for (size_t selected : selectedSources)
-                {
+            if (separationSq > 0) {
+                for (size_t selected : selectedSources) {
                     const int sx = static_cast<int>(selected % static_cast<size_t>(width));
                     const int sz = static_cast<int>(selected / static_cast<size_t>(width));
                     const int dx = cx - sx;
                     const int dz = cz - sz;
-                    if (dx * dx + dz * dz < separationSq)
-                    {
+                    if (dx * dx + dz * dz < separationSq) {
                         tooClose = true;
                         break;
                     }
                 }
             }
 
-            if (tooClose)
-            {
+            if (tooClose) {
                 continue;
             }
 
@@ -262,23 +224,19 @@ RiverPassResult runRiverPass(
         }
     }
 
-    if (selectedSources.empty())
-    {
+    if (selectedSources.empty()) {
         selectedSources.push_back(sourceCandidates.front().index);
     }
 
-    for (size_t sourceIdx : selectedSources)
-    {
+    for (size_t sourceIdx : selectedSources) {
         int current = static_cast<int>(sourceIdx);
         int guard = 0;
-        while (current >= 0 && guard < width * depth)
-        {
+        while (current >= 0 && guard < width * depth) {
             const size_t cidx = static_cast<size_t>(current);
             activeRiver[cidx] = true;
 
             const int down = downstream[cidx];
-            if (down < 0 || down == current)
-            {
+            if (down < 0 || down == current) {
                 break;
             }
 
@@ -287,13 +245,10 @@ RiverPassResult runRiverPass(
         }
     }
 
-    for (int z = 0; z < depth; ++z)
-    {
-        for (int x = 0; x < width; ++x)
-        {
+    for (int z = 0; z < depth; ++z) {
+        for (int x = 0; x < width; ++x) {
             const size_t idx = fieldIndex(x, z, width);
-            if (!activeRiver[idx])
-            {
+            if (!activeRiver[idx]) {
                 continue;
             }
 
@@ -306,15 +261,12 @@ RiverPassResult runRiverPass(
             const int x0 = std::max(0, x - halfWidth);
             const int x1 = std::min(width - 1, x + halfWidth);
 
-            for (int nz = z0; nz <= z1; ++nz)
-            {
-                for (int nx = x0; nx <= x1; ++nx)
-                {
+            for (int nz = z0; nz <= z1; ++nz) {
+                for (int nx = x0; nx <= x1; ++nx) {
                     const float dx = static_cast<float>(nx - x);
                     const float dz = static_cast<float>(nz - z);
                     const float dist = std::sqrt(dx * dx + dz * dz);
-                    if (dist > static_cast<float>(halfWidth))
-                    {
+                    if (dist > static_cast<float>(halfWidth)) {
                         continue;
                     }
 
@@ -330,17 +282,14 @@ RiverPassResult runRiverPass(
     }
 
     std::vector<float> smoothed = out.carvedHeights;
-    for (int z = 0; z < depth; ++z)
-    {
+    for (int z = 0; z < depth; ++z) {
         const int z0 = std::max(0, z - 1);
         const int z1 = std::min(depth - 1, z + 1);
-        for (int x = 0; x < width; ++x)
-        {
+        for (int x = 0; x < width; ++x) {
             const int x0 = std::max(0, x - 1);
             const int x1 = std::min(width - 1, x + 1);
             const size_t idx = fieldIndex(x, z, width);
-            if (out.riverWeights[idx] <= 0.001f)
-            {
+            if (out.riverWeights[idx] <= 0.001f) {
                 continue;
             }
 

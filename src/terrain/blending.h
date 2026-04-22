@@ -4,11 +4,9 @@
 #include <cstddef>
 #include <vector>
 
-namespace terrain
-{
+namespace terrain {
 
-struct BlendInput
-{
+struct BlendInput {
     float mountainHeight = 0.0f;
     float mountainWeight = 0.0f;
     float plainsHeight = 0.0f;
@@ -17,8 +15,7 @@ struct BlendInput
     float verticalScale = 1.0f;
 };
 
-struct BlendResult
-{
+struct BlendResult {
     float height = 0.0f;
     float mountainWeight = 0.0f;
 };

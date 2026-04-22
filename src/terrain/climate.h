@@ -1,16 +1,14 @@
 #ifndef TERRAIN_CLIMATE_H
 #define TERRAIN_CLIMATE_H
 
-#include "fields.h"
 #include "../terrain.h"
+#include "fields.h"
 
 #include <functional>
 
-namespace terrain
-{
+namespace terrain {
 
-struct ClimateNoiseInput
-{
+struct ClimateNoiseInput {
     float sampleX = 0.0f;
     float sampleZ = 0.0f;
     float elevationNorm = 0.0f;
@@ -26,8 +24,7 @@ struct ClimateNoiseInput
     std::function<float(float, float, int, float, float)> fbm;
 };
 
-struct ClimateSample
-{
+struct ClimateSample {
     float temperature = 0.5f;
     float precipitation = 0.5f;
     float moisture = 0.5f;

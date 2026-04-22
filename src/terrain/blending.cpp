@@ -3,11 +3,9 @@
 
 #include <algorithm>
 
-namespace terrain
-{
+namespace terrain {
 
-BlendResult blendTerrain(const BlendInput& in)
-{
+BlendResult blendTerrain(const BlendInput& in) {
     float mw = in.mountainWeight;
     float pw = 1.0f - mw;
 
@@ -25,22 +23,18 @@ void smoothHeights(
     std::vector<float>& heights,
     const std::vector<float>& mountainWeights,
     int width,
-    int depth)
-{
-    const auto idxOf = [width](int x, int z) -> size_t
-    {
+    int depth) {
+    const auto idxOf = [width](int x, int z) -> size_t {
         return static_cast<size_t>(z) * static_cast<size_t>(width) + static_cast<size_t>(x);
     };
 
     std::vector<float> smoothed = heights;
 
-    for (int z = 0; z < depth; ++z)
-    {
+    for (int z = 0; z < depth; ++z) {
         const int z0 = std::max(0, z - 1);
         const int z1 = std::min(depth - 1, z + 1);
 
-        for (int x = 0; x < width; ++x)
-        {
+        for (int x = 0; x < width; ++x) {
             const int x0 = std::max(0, x - 1);
             const int x1 = std::min(width - 1, x + 1);
 

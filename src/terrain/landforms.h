@@ -3,8 +3,7 @@
 
 #include "fields.h"
 
-namespace terrain
-{
+namespace terrain {
 
 void computeLandformFields(TerrainFields& fields);
 

@@ -7,11 +7,9 @@
 #include <cstdint>
 #include <vector>
 
-namespace terrain
-{
+namespace terrain {
 
-struct TerrainFields
-{
+struct TerrainFields {
     int width = 0;
     int depth = 0;
     std::vector<float> heights;
@@ -35,13 +33,11 @@ struct TerrainFields
 
     TerrainFields() = default;
 
-    TerrainFields(int widthIn, int depthIn)
-    {
+    TerrainFields(int widthIn, int depthIn) {
         resize(widthIn, depthIn);
     }
 
-    void resize(int widthIn, int depthIn)
-    {
+    void resize(int widthIn, int depthIn) {
         width = widthIn;
         depth = depthIn;
         const size_t count = static_cast<size_t>(width) * static_cast<size_t>(depth);
@@ -65,14 +61,12 @@ struct TerrainFields
         secondaryBiomeWeights.assign(count, 0.0f);
     }
 
-    size_t size() const
-    {
+    size_t size() const {
         return heights.size();
     }
 };
 
-inline size_t fieldIndex(int x, int z, int width)
-{
+inline size_t fieldIndex(int x, int z, int width) {
     return static_cast<size_t>(z) * static_cast<size_t>(width) + static_cast<size_t>(x);
 }
 

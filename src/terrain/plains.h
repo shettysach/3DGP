@@ -3,11 +3,9 @@
 
 #include <functional>
 
-namespace terrain
-{
+namespace terrain {
 
-struct PlainsInput
-{
+struct PlainsInput {
     float continental = 0.0f;
     float plainsBase = 0.0f;
     float macroRelief = 0.5f;
@@ -17,8 +15,7 @@ struct PlainsInput
     float verticalScale = 1.0f;
 };
 
-struct PlainsNoiseInput
-{
+struct PlainsNoiseInput {
     float sampleX = 0.0f;
     float sampleZ = 0.0f;
     int octaves = 6;
