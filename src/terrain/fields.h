@@ -21,8 +21,6 @@ struct TerrainFields {
     std::vector<float> moisture;
     std::vector<float> sampleXs;
     std::vector<float> sampleZs;
-    std::vector<uint16_t> provinceIds;
-    std::vector<uint8_t> provinceEdgeDistance;
     std::vector<uint8_t> landformIds;
     std::vector<float> landformSignal;
     std::vector<uint8_t> ecologyIds;
@@ -50,8 +48,6 @@ struct TerrainFields {
         moisture.assign(count, 0.5f);
         sampleXs.assign(count, 0.0f);
         sampleZs.assign(count, 0.0f);
-        provinceIds.assign(count, 0u);
-        provinceEdgeDistance.assign(count, 0u);
         landformIds.assign(count, static_cast<uint8_t>(LandformId::Plain));
         landformSignal.assign(count, 0.0f);
         ecologyIds.assign(count, static_cast<uint8_t>(EcologyId::Grassland));

@@ -46,8 +46,6 @@ add_executable(terrain_demo
     src/terrain/fields.h
     src/terrain/landforms.cpp
     src/terrain/landforms.h
-    src/terrain/provinces.cpp
-    src/terrain/provinces.h
     src/terrain/util.h
     src/terrain/terrain_noise.cpp
     src/terrain/terrain_noise.h

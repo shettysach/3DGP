@@ -42,7 +42,6 @@ enum class BiomeId : uint8_t {
     RockyAlpine,
     Alpine,
     Snow,
-    River,
     Count,
 };
 
@@ -69,20 +68,7 @@ struct RiverSettings {
     float coreThreshold = 0.55f;
 };
 
-struct SettlementSettings {
-    float targetDensity = 0.00014f;
-    float minRiverWeight = 0.07f;
-    float maxRiverWeight = 0.65f;
-    float maxSlope = 0.26f;
-    float minElevationNorm = 0.06f;
-    float maxElevationNorm = 0.78f;
-    int minRiverDistanceCells = 1;
-    int maxRiverDistanceCells = 14;
-    float minHeightAboveRiver = 0.14f;
-    int minSeparation = 12;
-};
-struct ClimateSettings
-{
+struct ClimateSettings {
     float temperatureFrequency = 0.0007f;
     int temperatureOctaves = 3;
     float precipitationFrequency = 0.0005f;
@@ -99,8 +85,8 @@ struct ClimateSettings
 };
 
 struct TerrainSettings {
-    int width = 513;
-    int depth = 513;
+    int width = 200;
+    int depth = 200;
     float horizontalScale = 2.0f;
     float verticalScale = 80.0f;
     bool islandFalloff = true;
@@ -109,7 +95,6 @@ struct TerrainSettings {
     uint32_t seed = 1234u;
     NoiseSettings noise;
     RiverSettings rivers;
-    SettlementSettings settlements;
     ClimateSettings climate;
 };
 
@@ -127,7 +112,6 @@ struct TerrainVertex {
     float temperature = 0.5f;
     float precipitation = 0.5f;
     float moisture = 0.5f;
-    uint16_t provinceId = 0u;
     uint8_t landform = static_cast<uint8_t>(LandformId::Plain);
     uint8_t ecology = static_cast<uint8_t>(EcologyId::Grassland);
     uint8_t primaryBiome = static_cast<uint8_t>(BiomeId::GrasslandPlain);
@@ -150,7 +134,6 @@ struct TerrainMesh {
     std::vector<uint32_t> indices;
     std::vector<TerrainVertex> waterVertices;
     std::vector<uint32_t> waterIndices;
-    std::vector<TerrainVertex> settlementVertices;
 };
 
 class TerrainGenerator {

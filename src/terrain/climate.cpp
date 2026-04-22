@@ -98,7 +98,7 @@ ClimateSample computeClimateSample(const ClimateNoiseInput& in) {
     precipitation -= in.elevationNorm * 0.06f;
     precipitation = std::clamp(precipitation, 0.0f, 1.0f);
 
-const float localMoistureNoise = 0.5f * (in.fbm(
+    const float localMoistureNoise = 0.5f * (in.fbm(
                                               in.sampleX * moistureScale + 63.5f,
                                               in.sampleZ * moistureScale + 194.8f,
                                               in.settings.moistureOctaves,
@@ -118,9 +118,6 @@ const float localMoistureNoise = 0.5f * (in.fbm(
     float moisture = precipitation * 0.68f + localMoistureNoise * 0.14f;
     moisture += riverInfluence * in.settings.riverMoistureStrength + in.riverWeight * 0.08f + basinBonus;
     moisture -= mountainAridity;
-    moisture -= std::clamp(in.slope, 0.0f, 1.0f) * in.settings.slopeDryingStrength;
-    moisture -= temperature * in.settings.temperatureDryingStrength;
-    moisture += riverInfluence * in.settings.riverMoistureStrength + in.riverWeight * 0.08f + basinBonus;
     moisture -= std::clamp(in.slope, 0.0f, 1.0f) * in.settings.slopeDryingStrength;
     moisture -= temperature * in.settings.temperatureDryingStrength;
     moisture = std::clamp(moisture, 0.0f, 1.0f);

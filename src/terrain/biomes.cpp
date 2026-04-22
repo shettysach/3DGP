@@ -15,6 +15,14 @@ struct NamedColor {
     BiomeColor color;
 };
 
+struct EcologyClimateRule {
+    EcologyId ecology = EcologyId::Grassland;
+    float temperatureCenter = 0.5f;
+    float moistureCenter = 0.5f;
+    float temperatureSigma = 0.25f;
+    float moistureSigma = 0.25f;
+};
+
 constexpr size_t kEcologyCount = static_cast<size_t>(EcologyId::Count);
 constexpr size_t kLandformCount = static_cast<size_t>(LandformId::Count);
 constexpr size_t kBiomeCount = static_cast<size_t>(BiomeId::Count);
@@ -53,22 +61,36 @@ constexpr std::array<NamedColor, kBiomeCount> kBiomeInfo = {{
     {"Rocky mountain", {0.52f, 0.50f, 0.48f}},
     {"Alpine", {0.62f, 0.64f, 0.58f}},
     {"Snow", {0.95f, 0.97f, 0.99f}},
-    {"River", {0.10f, 0.40f, 0.68f}},
 }};
 
-constexpr std::array<BiomeColor, 12> kProvincePalette = {{
-    {0.78f, 0.34f, 0.29f},
-    {0.27f, 0.58f, 0.76f},
-    {0.48f, 0.66f, 0.28f},
-    {0.71f, 0.47f, 0.77f},
-    {0.84f, 0.61f, 0.25f},
-    {0.22f, 0.67f, 0.55f},
-    {0.68f, 0.52f, 0.32f},
-    {0.58f, 0.36f, 0.58f},
-    {0.33f, 0.43f, 0.77f},
-    {0.73f, 0.29f, 0.47f},
-    {0.42f, 0.66f, 0.62f},
-    {0.67f, 0.58f, 0.26f},
+constexpr std::array<EcologyClimateRule, kEcologyCount> kEcologyClimateRules = {{
+    {EcologyId::Desert, 0.82f, 0.10f, 0.32f, 0.18f},
+    {EcologyId::Steppe, 0.66f, 0.26f, 0.30f, 0.22f},
+    {EcologyId::Grassland, 0.54f, 0.48f, 0.28f, 0.24f},
+    {EcologyId::Forest, 0.56f, 0.72f, 0.26f, 0.22f},
+    {EcologyId::Taiga, 0.28f, 0.58f, 0.22f, 0.26f},
+    {EcologyId::Tundra, 0.12f, 0.34f, 0.20f, 0.24f},
+    {EcologyId::Marsh, 0.44f, 0.88f, 0.22f, 0.16f},
+}};
+
+constexpr std::array<BiomeId, kEcologyCount> kPlainBiomeByEcology = {{
+    BiomeId::DesertPlain,
+    BiomeId::SteppePlain,
+    BiomeId::GrasslandPlain,
+    BiomeId::ForestPlain,
+    BiomeId::TaigaPlain,
+    BiomeId::TundraPlain,
+    BiomeId::MarshLowland,
+}};
+
+constexpr std::array<BiomeId, kEcologyCount> kFoothillBiomeByEcology = {{
+    BiomeId::SteppeFoothill,
+    BiomeId::SteppeFoothill,
+    BiomeId::GrasslandFoothill,
+    BiomeId::ForestFoothill,
+    BiomeId::TaigaFoothill,
+    BiomeId::TaigaFoothill,
+    BiomeId::TaigaFoothill,
 }};
 
 using BiomeWeightVector = std::array<float, kBiomeCount>;
@@ -127,6 +149,15 @@ float gaussian2(float x, float y, float cx, float cy, float sx, float sy) {
     return std::exp(-(nx * nx + ny * ny));
 }
 
+void applyMappedEcologyWeights(
+    BiomeWeightVector& biomeWeights,
+    const EcologyWeightVector& ecologyWeights,
+    const std::array<BiomeId, kEcologyCount>& mapping) {
+    for (size_t ecology = 0; ecology < ecologyWeights.size(); ++ecology) {
+        biomeWeights[biomeIndex(mapping[ecology])] += ecologyWeights[ecology];
+    }
+}
+
 EcologyWeightVector ecologyWeightsFromClimate(
     float temperature,
     float moisture,
@@ -152,13 +183,15 @@ EcologyWeightVector ecologyWeightsFromClimate(
     const float mountainMoistureBonus = mw * 0.35f;
     const float effectiveMoisture = std::clamp(m + mountainMoistureBonus, 0.0f, 1.0f);
 
-    weights[ecologyIndex(EcologyId::Desert)] = gaussian2(t, effectiveMoisture, 0.82f, 0.10f, 0.32f, 0.18f);
-    weights[ecologyIndex(EcologyId::Steppe)] = gaussian2(t, effectiveMoisture, 0.66f, 0.26f, 0.30f, 0.22f);
-    weights[ecologyIndex(EcologyId::Grassland)] = gaussian2(t, effectiveMoisture, 0.54f, 0.48f, 0.28f, 0.24f);
-    weights[ecologyIndex(EcologyId::Forest)] = gaussian2(t, effectiveMoisture, 0.56f, 0.72f, 0.26f, 0.22f);
-    weights[ecologyIndex(EcologyId::Taiga)] = gaussian2(t, effectiveMoisture, 0.28f, 0.58f, 0.22f, 0.26f);
-    weights[ecologyIndex(EcologyId::Tundra)] = gaussian2(t, effectiveMoisture, 0.12f, 0.34f, 0.20f, 0.24f);
-    weights[ecologyIndex(EcologyId::Marsh)] = 0.0f;
+    for (const EcologyClimateRule& rule : kEcologyClimateRules) {
+        weights[ecologyIndex(rule.ecology)] = gaussian2(
+            t,
+            effectiveMoisture,
+            rule.temperatureCenter,
+            rule.moistureCenter,
+            rule.temperatureSigma,
+            rule.moistureSigma);
+    }
 
     weights[ecologyIndex(EcologyId::Desert)] += hot * dry * 0.48f;
     weights[ecologyIndex(EcologyId::Steppe)] += dry * (1.0f - hot * 0.50f) * 0.28f;
@@ -226,20 +259,12 @@ BiomeWeightVector biomeWeightsFromEcology(
     }
 
     if (landform == LandformId::Foothill) {
-        weights[biomeIndex(BiomeId::SteppeFoothill)] = eco(EcologyId::Desert) + eco(EcologyId::Steppe);
-        weights[biomeIndex(BiomeId::GrasslandFoothill)] = eco(EcologyId::Grassland);
-        weights[biomeIndex(BiomeId::ForestFoothill)] = eco(EcologyId::Forest);
-        weights[biomeIndex(BiomeId::TaigaFoothill)] = eco(EcologyId::Taiga) + eco(EcologyId::Tundra) + eco(EcologyId::Marsh);
+        applyMappedEcologyWeights(weights, ecology, kFoothillBiomeByEcology);
         normalizeWeights(weights);
         return weights;
     }
 
-    weights[biomeIndex(BiomeId::DesertPlain)] = eco(EcologyId::Desert);
-    weights[biomeIndex(BiomeId::SteppePlain)] = eco(EcologyId::Steppe);
-    weights[biomeIndex(BiomeId::GrasslandPlain)] = eco(EcologyId::Grassland);
-    weights[biomeIndex(BiomeId::ForestPlain)] = eco(EcologyId::Forest);
-    weights[biomeIndex(BiomeId::TaigaPlain)] = eco(EcologyId::Taiga);
-    weights[biomeIndex(BiomeId::TundraPlain)] = eco(EcologyId::Tundra);
+    applyMappedEcologyWeights(weights, ecology, kPlainBiomeByEcology);
 
     const float wetLowlandBoost =
         smoothstep(0.62f, 0.90f, std::clamp(moisture, 0.0f, 1.0f)) *
@@ -287,16 +312,23 @@ void writeBiomeWeights(TerrainFields& fields, size_t idx, const BiomeWeightVecto
 }
 
 float biomeNeighborCompatibility(const TerrainFields& fields, size_t idx, size_t nidx) {
+    const float temperatureDelta = std::fabs(fields.temperature[idx] - fields.temperature[nidx]);
+    const float moistureDelta = std::fabs(fields.moisture[idx] - fields.moisture[nidx]);
+    const float precipitationDelta = std::fabs(fields.precipitation[idx] - fields.precipitation[nidx]);
+    const float slopeDelta = std::fabs(fields.slopes[idx] - fields.slopes[nidx]);
     const int landformDelta = std::abs(static_cast<int>(fields.landformIds[idx]) - static_cast<int>(fields.landformIds[nidx]));
-    float compatibility = 1.0f;
+
+    const float climateCompatibility =
+        (1.0f - smoothstep(0.08f, 0.40f, temperatureDelta)) * 0.34f +
+        (1.0f - smoothstep(0.10f, 0.45f, moistureDelta)) * 0.38f +
+        (1.0f - smoothstep(0.10f, 0.50f, precipitationDelta)) * 0.18f +
+        (1.0f - smoothstep(0.08f, 0.35f, slopeDelta)) * 0.10f;
+
+    float compatibility = std::clamp(climateCompatibility, 0.18f, 1.0f);
     if (landformDelta == 1) {
         compatibility *= 0.84f;
     } else if (landformDelta >= 2) {
         compatibility *= 0.48f;
-    }
-
-    if (fields.ecologyIds[idx] != fields.ecologyIds[nidx]) {
-        compatibility *= 0.88f;
     }
 
     return compatibility;
@@ -355,123 +387,6 @@ void smoothSurfaceBiomeWeights(TerrainFields& fields) {
     }
 }
 
-BiomeId mapBiome(LandformId landform, EcologyId ecology) {
-    if (landform == LandformId::Snowcap) {
-        return BiomeId::Snow;
-    }
-    if (landform == LandformId::Alpine) {
-        return BiomeId::Alpine;
-    }
-    if (landform == LandformId::Mountain) {
-        return BiomeId::RockyAlpine;
-    }
-    if (landform == LandformId::Foothill) {
-        switch (ecology) {
-        case EcologyId::Forest:
-            return BiomeId::ForestFoothill;
-        case EcologyId::Taiga:
-        case EcologyId::Tundra:
-        case EcologyId::Marsh:
-            return BiomeId::TaigaFoothill;
-        case EcologyId::Grassland:
-            return BiomeId::GrasslandFoothill;
-        case EcologyId::Steppe:
-        case EcologyId::Desert:
-        default:
-            return BiomeId::SteppeFoothill;
-        }
-    }
-
-    switch (ecology) {
-    case EcologyId::Marsh:
-        return BiomeId::MarshLowland;
-    case EcologyId::Desert:
-        return BiomeId::DesertPlain;
-    case EcologyId::Steppe:
-        return BiomeId::SteppePlain;
-    case EcologyId::Forest:
-        return BiomeId::ForestPlain;
-    case EcologyId::Taiga:
-        return BiomeId::TaigaPlain;
-    case EcologyId::Tundra:
-        return BiomeId::TundraPlain;
-    case EcologyId::Grassland:
-    default:
-        return BiomeId::GrasslandPlain;
-    }
-}
-
-void storeBiomeBlend(TerrainFields& fields, size_t idx, BiomeId a, float weightA, BiomeId b, float weightB) {
-    weightA = std::max(0.0f, weightA);
-    weightB = std::max(0.0f, weightB);
-    if (b == a || weightB <= 0.001f) {
-        fields.primaryBiomeIds[idx] = static_cast<uint8_t>(a);
-        fields.secondaryBiomeIds[idx] = static_cast<uint8_t>(a);
-        fields.primaryBiomeWeights[idx] = 1.0f;
-        fields.secondaryBiomeWeights[idx] = 0.0f;
-        return;
-    }
-
-    if (weightB > weightA) {
-        std::swap(a, b);
-        std::swap(weightA, weightB);
-    }
-
-    const float sum = std::max(0.0001f, weightA + weightB);
-    fields.primaryBiomeIds[idx] = static_cast<uint8_t>(a);
-    fields.secondaryBiomeIds[idx] = static_cast<uint8_t>(b);
-    fields.primaryBiomeWeights[idx] = weightA / sum;
-    fields.secondaryBiomeWeights[idx] = weightB / sum;
-}
-
-EcologyId biomeEcology(BiomeId biome) {
-    switch (biome) {
-    case BiomeId::MarshLowland:
-        return EcologyId::Marsh;
-    case BiomeId::DesertPlain:
-        return EcologyId::Desert;
-    case BiomeId::SteppePlain:
-    case BiomeId::SteppeFoothill:
-        return EcologyId::Steppe;
-    case BiomeId::GrasslandPlain:
-    case BiomeId::GrasslandFoothill:
-        return EcologyId::Grassland;
-    case BiomeId::ForestPlain:
-    case BiomeId::ForestFoothill:
-        return EcologyId::Forest;
-    case BiomeId::TaigaPlain:
-    case BiomeId::TaigaFoothill:
-        return EcologyId::Taiga;
-    case BiomeId::TundraPlain:
-        return EcologyId::Tundra;
-    case BiomeId::RockyAlpine:
-    case BiomeId::Alpine:
-    case BiomeId::Snow:
-        return EcologyId::Tundra;
-    case BiomeId::River:
-        return EcologyId::Marsh;
-    default:
-        return EcologyId::Grassland;
-    }
-}
-
-void applyRiverBiomeOverlay(BiomeWeightVector& weights, LandformId landform, float riverWeight) {
-    if (landform > LandformId::Foothill) {
-        return;
-    }
-
-    const float riverBlend = smoothstep(0.12f, 0.58f, std::clamp(riverWeight, 0.0f, 1.0f));
-    if (riverBlend <= 0.001f) {
-        return;
-    }
-
-    for (float& w : weights) {
-        w *= (1.0f - riverBlend);
-    }
-    weights[biomeIndex(BiomeId::River)] += riverBlend;
-    normalizeWeights(weights);
-}
-
 } // namespace
 
 void computeBiomeFields(TerrainFields& fields) {
@@ -501,22 +416,10 @@ void computeBiomeFields(TerrainFields& fields) {
             elevationNorm,
             fields.temperature[idx],
             fields.moisture[idx]);
-        applyRiverBiomeOverlay(biomeWeights, landform, fields.riverWeights[idx]);
         writeBiomeWeights(fields, idx, biomeWeights);
     }
 
     smoothSurfaceBiomeWeights(fields);
-
-    for (size_t idx = 0; idx < fields.size(); ++idx) {
-        const BiomeId primary = static_cast<BiomeId>(fields.primaryBiomeIds[idx]);
-        const BiomeId secondary = static_cast<BiomeId>(fields.secondaryBiomeIds[idx]);
-        EcologyWeightVector ecology{};
-        ecology.fill(0.0f);
-        ecology[ecologyIndex(biomeEcology(primary))] += std::clamp(fields.primaryBiomeWeights[idx], 0.0f, 1.0f);
-        ecology[ecologyIndex(biomeEcology(secondary))] += std::clamp(fields.secondaryBiomeWeights[idx], 0.0f, 1.0f);
-        normalizeWeights(ecology);
-        fields.ecologyIds[idx] = static_cast<uint8_t>(dominantEcology(ecology));
-    }
 }
 
 const char* biomeName(BiomeId biome) {
@@ -541,16 +444,6 @@ const char* landformName(LandformId landform) {
 
 BiomeColor landformColor(LandformId landform) {
     return kLandformInfo[landformIndex(landform)].color;
-}
-
-BiomeColor provinceColor(uint16_t provinceId) {
-    const BiomeColor base = kProvincePalette[static_cast<size_t>(provinceId) % kProvincePalette.size()];
-    const float tint = 0.92f + 0.08f * static_cast<float>((provinceId / static_cast<uint16_t>(kProvincePalette.size())) % 3u);
-    return {
-        std::clamp(base.r * tint, 0.0f, 1.0f),
-        std::clamp(base.g * tint, 0.0f, 1.0f),
-        std::clamp(base.b * tint, 0.0f, 1.0f),
-    };
 }
 
 } // namespace terrain

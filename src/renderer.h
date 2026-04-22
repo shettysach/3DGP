@@ -14,23 +14,23 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <GL/gl.h>
-#include <GL/glu.h>
 #include <windows.h>
 #ifndef SDL_MAIN_HANDLED
 #define SDL_MAIN_HANDLED
 #endif
 #include <SDL.h>
+#include <SDL_opengl.h>
+#include <SDL_opengl_glext.h>
 
 #elif defined(__APPLE__)
-#include <OpenGL/gl.h>
-#include <OpenGL/glu.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_opengl.h>
+#include <SDL2/SDL_opengl_glext.h>
 
 #elif defined(__linux__)
-#include <GL/gl.h>
-#include <GL/glu.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_opengl.h>
+#include <SDL2/SDL_opengl_glext.h>
 
 #else
 #error "Unknown platform"
@@ -40,7 +40,6 @@ namespace renderer {
 
 enum class RenderMode {
     SurfaceBiomes = 0,
-    Provinces,
     Landforms,
     Ecology,
     Temperature,
@@ -85,12 +84,33 @@ class Renderer {
     float targetY_;
     float targetZ_;
     RenderMode renderMode_;
+    bool terrainBuffersValid_;
+    bool waterBuffersValid_;
     bool terrainColorsValid_;
-    bool waterColorsValid_;
     std::size_t cachedTerrainVertexCount_;
+    std::size_t cachedTerrainIndexCount_;
     std::size_t cachedWaterVertexCount_;
-    std::vector<float> terrainColors_;
-    std::vector<float> waterColors_;
+    std::size_t cachedWaterIndexCount_;
+    GLuint terrainVao_;
+    GLuint terrainVbo_;
+    GLuint terrainIbo_;
+    GLuint waterVao_;
+    GLuint waterVbo_;
+    GLuint waterIbo_;
+    GLuint skyVao_;
+    GLuint terrainProgram_;
+    GLuint skyProgram_;
+    GLuint waterProgram_;
+    GLuint shadowProgram_;
+    GLuint shadowFramebuffer_;
+    GLuint shadowDepthTexture_;
+    GLuint grassTexture_;
+    GLuint rockTexture_;
+    GLuint snowTexture_;
+    GLuint sandTexture_;
+    GLuint waterTexture_;
+    int shadowMapSize_;
+    std::vector<float> terrainBaseColors_;
 };
 
 void runDemo();

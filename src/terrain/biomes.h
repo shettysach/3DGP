@@ -25,8 +25,6 @@ BiomeColor ecologyColor(EcologyId ecology);
 const char* landformName(LandformId landform);
 BiomeColor landformColor(LandformId landform);
 
-BiomeColor provinceColor(uint16_t provinceId);
-
 } // namespace terrain
 
 #endif // TERRAIN_BIOMES_H

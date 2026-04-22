@@ -14,7 +14,6 @@
 #include <cmath>
 #include <limits>
 #include <numeric>
-#include <queue>
 #include <random>
 #include <stdexcept>
 
@@ -207,7 +206,6 @@ void buildVertices(
             v.temperature = fields.temperature[idx];
             v.precipitation = fields.precipitation[idx];
             v.moisture = fields.moisture[idx];
-            v.provinceId = fields.provinceIds[idx];
             v.landform = fields.landformIds[idx];
             v.ecology = fields.ecologyIds[idx];
             v.primaryBiome = fields.primaryBiomeIds[idx];
@@ -302,184 +300,6 @@ void buildWaterMesh(
             mesh.waterIndices.push_back(i01);
         }
     }
-}
-
-struct SettlementCandidate {
-    size_t idx = 0;
-    float score = 0.0f;
-};
-
-std::vector<size_t> placeSettlements(
-    const TerrainMesh& mesh,
-    const TerrainFields& fields,
-    const TerrainSettings& settings) {
-    const SettlementSettings& ss = settings.settlements;
-    const float invHeightRange = 1.0f / std::max(0.0001f, mesh.maxHeight - mesh.minHeight);
-
-    std::vector<int> riverDistance(mesh.vertices.size(), std::numeric_limits<int>::max());
-    std::vector<int> nearestCore(mesh.vertices.size(), -1);
-    std::queue<size_t> q;
-
-    for (size_t idx = 0; idx < mesh.vertices.size(); ++idx) {
-        if (fields.riverWeights[idx] >= settings.rivers.coreThreshold) {
-            riverDistance[idx] = 0;
-            nearestCore[idx] = static_cast<int>(idx);
-            q.push(idx);
-        }
-    }
-
-    const int neighborDx[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
-    const int neighborDz[8] = {-1, -1, -1, 0, 0, 1, 1, 1};
-    while (!q.empty()) {
-        const size_t cur = q.front();
-        q.pop();
-
-        const int cx = static_cast<int>(cur % static_cast<size_t>(settings.width));
-        const int cz = static_cast<int>(cur / static_cast<size_t>(settings.width));
-        const int nextDist = riverDistance[cur] + 1;
-
-        for (int i = 0; i < 8; ++i) {
-            const int nx = cx + neighborDx[i];
-            const int nz = cz + neighborDz[i];
-            if (nx < 0 || nx >= settings.width || nz < 0 || nz >= settings.depth) {
-                continue;
-            }
-
-            const size_t nidx = fieldIndex(nx, nz, settings.width);
-            if (nextDist >= riverDistance[nidx]) {
-                continue;
-            }
-
-            riverDistance[nidx] = nextDist;
-            nearestCore[nidx] = nearestCore[cur];
-            q.push(nidx);
-        }
-    }
-
-    std::vector<SettlementCandidate> candidates;
-    candidates.reserve(mesh.vertices.size() / 12u);
-
-    auto gatherCandidates = [&](float riverMin,
-                                float riverMax,
-                                int distMin,
-                                int distMax,
-                                float minAboveRiver,
-                                float maxSlope) {
-        candidates.clear();
-        for (size_t idx = 0; idx < mesh.vertices.size(); ++idx) {
-            const float river = std::clamp(fields.riverWeights[idx], 0.0f, 1.0f);
-            if (river < riverMin || river > riverMax) {
-                continue;
-            }
-
-            if (riverDistance[idx] < distMin || riverDistance[idx] > distMax) {
-                continue;
-            }
-
-            if (nearestCore[idx] >= 0) {
-                const size_t coreIdx = static_cast<size_t>(nearestCore[idx]);
-                if (mesh.heights[idx] < mesh.heights[coreIdx] + minAboveRiver) {
-                    continue;
-                }
-            }
-
-            const float slope = fields.slopes[idx];
-            if (slope > maxSlope) {
-                continue;
-            }
-
-            const float hNorm = (mesh.heights[idx] - mesh.minHeight) * invHeightRange;
-            if (hNorm < ss.minElevationNorm || hNorm > ss.maxElevationNorm) {
-                continue;
-            }
-
-            const float flatness = 1.0f - std::clamp(slope / std::max(0.001f, maxSlope), 0.0f, 1.0f);
-            const float elevationBand = 1.0f - std::fabs(hNorm - 0.42f);
-            const float score =
-                river * 0.58f +
-                flatness * 0.34f +
-                elevationBand * 0.08f +
-                hashJitter(idx, settings.seed) * 0.001f;
-            candidates.push_back({idx, score});
-        }
-    };
-
-    gatherCandidates(
-        ss.minRiverWeight,
-        ss.maxRiverWeight,
-        ss.minRiverDistanceCells,
-        ss.maxRiverDistanceCells,
-        ss.minHeightAboveRiver,
-        ss.maxSlope);
-
-    if (candidates.size() < 24u) {
-        gatherCandidates(
-            std::max(0.0f, ss.minRiverWeight * 0.6f),
-            std::min(1.0f, ss.maxRiverWeight + 0.2f),
-            std::max(0, ss.minRiverDistanceCells - 1),
-            ss.maxRiverDistanceCells + 6,
-            std::max(0.0f, ss.minHeightAboveRiver * 0.35f),
-            ss.maxSlope + 0.08f);
-    }
-
-    std::sort(candidates.begin(), candidates.end(), [](const SettlementCandidate& a, const SettlementCandidate& b) { return a.score > b.score; });
-
-    const int desiredSettlements = std::max(
-        1,
-        static_cast<int>(std::round(ss.targetDensity * static_cast<float>(mesh.vertices.size()))));
-    const int minSepSq = ss.minSeparation * ss.minSeparation;
-    std::vector<size_t> selected;
-    selected.reserve(static_cast<size_t>(desiredSettlements));
-
-    const int cellSize = std::max(1, ss.minSeparation * 2);
-    const int gridWidth = (settings.width + cellSize - 1) / cellSize;
-    const int gridDepth = (settings.depth + cellSize - 1) / cellSize;
-    std::vector<std::vector<size_t>> grid(static_cast<size_t>(gridWidth * gridDepth));
-
-    for (const SettlementCandidate& candidate : candidates) {
-        if (static_cast<int>(selected.size()) >= desiredSettlements) {
-            break;
-        }
-
-        const int cx = static_cast<int>(candidate.idx % static_cast<size_t>(settings.width));
-        const int cz = static_cast<int>(candidate.idx / static_cast<size_t>(settings.width));
-        bool tooClose = false;
-
-        const int cellX = cx / cellSize;
-        const int cellZ = cz / cellSize;
-        for (int dz = -1; dz <= 1 && !tooClose; ++dz) {
-            for (int dx = -1; dx <= 1 && !tooClose; ++dx) {
-                const int gnx = cellX + dx;
-                const int gnz = cellZ + dz;
-                if (gnx < 0 || gnx >= gridWidth || gnz < 0 || gnz >= gridDepth) {
-                    continue;
-                }
-
-                for (size_t sidx : grid[gnz * gridWidth + gnx]) {
-                    const int sx = static_cast<int>(sidx % static_cast<size_t>(settings.width));
-                    const int sz = static_cast<int>(sidx / static_cast<size_t>(settings.width));
-                    const int ddx = cx - sx;
-                    const int ddz = cz - sz;
-                    if (ddx * ddx + ddz * ddz < minSepSq) {
-                        tooClose = true;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (tooClose) {
-            continue;
-        }
-        selected.push_back(candidate.idx);
-        grid[(cz / cellSize) * gridWidth + (cx / cellSize)].push_back(candidate.idx);
-    }
-
-    if (selected.empty() && !candidates.empty()) {
-        selected.push_back(candidates.front().idx);
-    }
-
-    return selected;
 }
 
 } // namespace
@@ -591,7 +411,7 @@ float TerrainGenerator::ridgedFbm(
 
 // Main generation function
 // 1. Builds the scalar terrain fields (height, mountain mask, warped sample positions)
-// 2. Applies post-processing stages (smoothing, rivers, slopes, climate, provinces, landforms, biomes)
+// 2. Applies post-processing stages (smoothing, slopes, climate, landforms, biomes)
 // 3. Packs those fields into the renderable mesh
 TerrainMesh TerrainGenerator::generateMesh() const {
     const auto fbm = [this](float x, float y, int octaves, float lacunarity, float gain) {
@@ -622,16 +442,6 @@ TerrainMesh TerrainGenerator::generateMesh() const {
     buildVertices(mesh, fields, settings_);
     buildGridIndices(mesh, settings_.width, settings_.depth);
     buildWaterMesh(mesh, fields, settings_);
-
-    const std::vector<size_t> selectedSettlements = placeSettlements(mesh, fields, settings_);
-    mesh.settlementVertices.reserve(selectedSettlements.size());
-    const float settlementHeightOffset = 0.015f * settings_.verticalScale;
-    for (size_t idx : selectedSettlements) {
-        TerrainVertex marker = mesh.vertices[idx];
-        marker.y += settlementHeightOffset;
-        marker.riverWeight = 0.0f;
-        mesh.settlementVertices.push_back(marker);
-    }
 
     return mesh;
 }
