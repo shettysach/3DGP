@@ -47,20 +47,20 @@ constexpr std::array<NamedColor, kLandformCount> kLandformInfo = {{
 }};
 
 constexpr std::array<NamedColor, kBiomeCount> kBiomeInfo = {{
-    {"Marsh lowland", {0.26f, 0.40f, 0.20f}},
-    {"Desert plain", {0.82f, 0.75f, 0.50f}},
-    {"Steppe plain", {0.68f, 0.61f, 0.29f}},
-    {"Grassland plain", {0.51f, 0.66f, 0.28f}},
-    {"Forest plain", {0.22f, 0.43f, 0.19f}},
-    {"Taiga plain", {0.33f, 0.46f, 0.34f}},
-    {"Tundra plain", {0.70f, 0.72f, 0.63f}},
-    {"Steppe foothill", {0.58f, 0.52f, 0.31f}},
-    {"Grassland foothill", {0.45f, 0.52f, 0.27f}},
-    {"Forest foothill", {0.25f, 0.37f, 0.21f}},
-    {"Taiga foothill", {0.34f, 0.41f, 0.37f}},
-    {"Rocky mountain", {0.52f, 0.50f, 0.48f}},
-    {"Alpine", {0.62f, 0.64f, 0.58f}},
-    {"Snow", {0.95f, 0.97f, 0.99f}},
+    {"Marsh lowland", {0.22f, 0.41f, 0.31f}},
+    {"Desert plain", {0.86f, 0.74f, 0.48f}},
+    {"Steppe plain", {0.76f, 0.62f, 0.24f}},
+    {"Grassland plain", {0.57f, 0.69f, 0.24f}},
+    {"Forest plain", {0.14f, 0.33f, 0.12f}},
+    {"Taiga plain", {0.28f, 0.44f, 0.49f}},
+    {"Tundra plain", {0.76f, 0.75f, 0.80f}},
+    {"Steppe foothill", {0.66f, 0.50f, 0.24f}},
+    {"Grassland foothill", {0.46f, 0.58f, 0.18f}},
+    {"Forest foothill", {0.12f, 0.26f, 0.10f}},
+    {"Taiga foothill", {0.24f, 0.35f, 0.42f}},
+    {"Rocky mountain", {0.50f, 0.48f, 0.46f}},
+    {"Alpine", {0.80f, 0.82f, 0.85f}},
+    {"Snow", {0.98f, 0.99f, 1.00f}},
 }};
 
 constexpr std::array<EcologyClimateRule, kEcologyCount> kEcologyClimateRules = {{

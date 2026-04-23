@@ -1,5 +1,5 @@
-#ifndef RENDERER_H
-#define RENDERER_H
+#ifndef CORE_H
+#define CORE_H
 
 #include "terrain.h"
 
@@ -38,7 +38,7 @@
 
 namespace renderer {
 
-enum class RenderMode {
+enum class Mode {
     SurfaceBiomes = 0,
     Landforms,
     Ecology,
@@ -66,8 +66,8 @@ class Renderer {
     void moveForward(float amount);
     void moveRight(float amount);
     void setTarget(float x, float y, float z);
-    void setRenderMode(RenderMode mode);
-    RenderMode renderMode() const;
+    void setMode(Mode mode);
+    Mode mode() const;
     void invalidateMeshCache();
     bool captureScreenshot(const std::string& filepath) const;
 
@@ -83,7 +83,7 @@ class Renderer {
     float targetX_;
     float targetY_;
     float targetZ_;
-    RenderMode renderMode_;
+    Mode mode_;
     bool terrainBuffersValid_;
     bool waterBuffersValid_;
     bool terrainColorsValid_;
@@ -111,11 +111,13 @@ class Renderer {
     GLuint waterTexture_;
     int shadowMapSize_;
     std::vector<float> terrainBaseColors_;
+    bool profileNextFrame_;
+    std::string pendingProfileReason_;
 };
 
 void runDemo();
-const char* renderModeName(RenderMode mode);
+const char* modeName(Mode mode);
 
 } // namespace renderer
 
-#endif // RENDERER_H
+#endif // CORE_H

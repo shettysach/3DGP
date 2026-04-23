@@ -11,8 +11,9 @@
 #include "terrain/util.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
-#include <limits>
+#include <iostream>
 #include <numeric>
 #include <random>
 #include <stdexcept>
@@ -26,7 +27,8 @@ constexpr float kF2 = 0.5f * (kSqrt3 - 1.0f);
 constexpr float kG2 = (3.0f - kSqrt3) / 6.0f;
 
 int fastFloor(float x) {
-    return (x >= 0.0f) ? static_cast<int>(x) : static_cast<int>(x) - 1;
+    int x_int = static_cast<int>(x);
+    return (x >= 0.0f) ? x_int : x_int - 1;
 }
 
 struct HeightGradient {
@@ -150,7 +152,7 @@ void applyRiverPass(TerrainFields& fields, const TerrainSettings& settings) {
         settings.rivers,
         settings.seed);
     fields.heights = riverPass.carvedHeights;
-    fields.riverWeights = riverPass.riverWeights;
+    fields.riverWeights.assign(fields.size(), 0.0f);
 }
 
 HeightGradient sampleHeightGradient(
@@ -259,6 +261,14 @@ void buildWaterMesh(
     TerrainMesh& mesh,
     const TerrainFields& fields,
     const TerrainSettings& settings) {
+    const bool hasRivers = std::any_of(
+        fields.riverWeights.begin(), fields.riverWeights.end(), [](float w) { return w > 0.001f; });
+    if (!hasRivers) {
+        mesh.waterVertices.clear();
+        mesh.waterIndices.clear();
+        return;
+    }
+
     mesh.waterVertices.resize(mesh.vertices.size());
     for (int z = 0; z < settings.depth; ++z) {
         for (int x = 0; x < settings.width; ++x) {
@@ -414,6 +424,13 @@ float TerrainGenerator::ridgedFbm(
 // 2. Applies post-processing stages (smoothing, slopes, climate, landforms, biomes)
 // 3. Packs those fields into the renderable mesh
 TerrainMesh TerrainGenerator::generateMesh() const {
+    using Clock = std::chrono::steady_clock;
+    const auto totalStart = Clock::now();
+    auto stageStart = totalStart;
+    const auto stageMs = [](const Clock::time_point& start, const Clock::time_point& end) {
+        return std::chrono::duration<double, std::milli>(end - start).count();
+    };
+
     const auto fbm = [this](float x, float y, int octaves, float lacunarity, float gain) {
         return this->fractalBrownianMotion(x, y, octaves, lacunarity, gain);
     };
@@ -422,12 +439,19 @@ TerrainMesh TerrainGenerator::generateMesh() const {
     };
 
     TerrainFields fields = buildBaseTerrainFields({settings_, fbm, ridged});
+    const auto baseTerrainDone = Clock::now();
     smoothHeights(fields.heights, fields.mountainWeights, settings_.width, settings_.depth);
+    const auto smoothDone = Clock::now();
     applyRiverPass(fields, settings_);
+    const auto riversDone = Clock::now();
     computeSlopeField(fields, settings_.horizontalScale);
+    const auto slopesDone = Clock::now();
     computeClimateFields(fields, settings_, fbm);
+    const auto climateDone = Clock::now();
     computeLandformFields(fields);
+    const auto landformsDone = Clock::now();
     computeBiomeFields(fields);
+    const auto biomesDone = Clock::now();
 
     TerrainMesh mesh;
     mesh.width = settings_.width;
@@ -438,10 +462,31 @@ TerrainMesh TerrainGenerator::generateMesh() const {
     mesh.precipitationMap = fields.precipitation;
     mesh.moistureMap = fields.moisture;
     computeHeightExtents(mesh.heights, mesh.minHeight, mesh.maxHeight);
+    const auto extentsDone = Clock::now();
 
     buildVertices(mesh, fields, settings_);
+    const auto verticesDone = Clock::now();
     buildGridIndices(mesh, settings_.width, settings_.depth);
+    const auto indicesDone = Clock::now();
     buildWaterMesh(mesh, fields, settings_);
+    const auto waterDone = Clock::now();
+
+    std::cout << "[profile] terrain " << settings_.width << 'x' << settings_.depth
+              << " base=" << stageMs(stageStart, baseTerrainDone) << "ms"
+              << " smooth=" << stageMs(baseTerrainDone, smoothDone) << "ms"
+              << " rivers=" << stageMs(smoothDone, riversDone) << "ms"
+              << " slopes=" << stageMs(riversDone, slopesDone) << "ms"
+              << " climate=" << stageMs(slopesDone, climateDone) << "ms"
+              << " landforms=" << stageMs(climateDone, landformsDone) << "ms"
+              << " biomes=" << stageMs(landformsDone, biomesDone) << "ms"
+              << " extents=" << stageMs(biomesDone, extentsDone) << "ms"
+              << " vertices=" << stageMs(extentsDone, verticesDone) << "ms"
+              << " indices=" << stageMs(verticesDone, indicesDone) << "ms"
+              << " water=" << stageMs(indicesDone, waterDone) << "ms"
+              << " total=" << stageMs(totalStart, waterDone) << "ms"
+              << " verts=" << mesh.vertices.size()
+              << " tris=" << (mesh.indices.size() / 3u)
+              << " waterTris=" << (mesh.waterIndices.size() / 3u) << '\n';
 
     return mesh;
 }

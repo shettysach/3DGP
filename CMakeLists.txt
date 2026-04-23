@@ -51,9 +51,15 @@ add_executable(terrain_demo
     src/terrain/terrain_noise.h
     src/terrain/rivers.cpp
     src/terrain/rivers.h
-    src/renderer.cpp
-    src/renderer.h
+    src/renderer/core.cpp
+    src/renderer/core.h
+    src/renderer/demo.cpp
+    src/renderer/support.cpp
+    src/renderer/internal.h
+    src/renderer/shaders.h
  )
+
+target_include_directories(terrain_demo PRIVATE src)
 
 target_link_libraries(terrain_demo
     ${SDL2_LIBRARIES}
