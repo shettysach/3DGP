@@ -152,7 +152,7 @@ void applyRiverPass(TerrainFields& fields, const TerrainSettings& settings) {
         settings.rivers,
         settings.seed);
     fields.heights = riverPass.carvedHeights;
-    fields.riverWeights.assign(fields.size(), 0.0f);
+    fields.riverWeights = riverPass.riverWeights;
 }
 
 HeightGradient sampleHeightGradient(
@@ -253,61 +253,6 @@ void buildGridIndices(TerrainMesh& mesh, int width, int depth) {
             mesh.indices.push_back(i10);
             mesh.indices.push_back(i11);
             mesh.indices.push_back(i01);
-        }
-    }
-}
-
-void buildWaterMesh(
-    TerrainMesh& mesh,
-    const TerrainFields& fields,
-    const TerrainSettings& settings) {
-    const bool hasRivers = std::any_of(
-        fields.riverWeights.begin(), fields.riverWeights.end(), [](float w) { return w > 0.001f; });
-    if (!hasRivers) {
-        mesh.waterVertices.clear();
-        mesh.waterIndices.clear();
-        return;
-    }
-
-    mesh.waterVertices.resize(mesh.vertices.size());
-    for (int z = 0; z < settings.depth; ++z) {
-        for (int x = 0; x < settings.width; ++x) {
-            const size_t idx = fieldIndex(x, z, settings.width);
-            TerrainVertex water = mesh.vertices[idx];
-            const float w = std::clamp(fields.riverWeights[idx], 0.0f, 1.0f);
-            water.y = mesh.heights[idx] + 0.06f + w * 0.12f;
-            water.nx = 0.0f;
-            water.ny = 1.0f;
-            water.nz = 0.0f;
-            water.riverWeight = w;
-            mesh.waterVertices[idx] = water;
-        }
-    }
-
-    constexpr float kWaterSurfaceThreshold = 0.02f;
-    mesh.waterIndices.reserve(mesh.indices.size() / 8u);
-    const auto hasWater = [&mesh](uint32_t idx) {
-        return mesh.waterVertices[idx].riverWeight > kWaterSurfaceThreshold;
-    };
-
-    for (int z = 0; z < settings.depth - 1; ++z) {
-        for (int x = 0; x < settings.width - 1; ++x) {
-            const uint32_t i00 = static_cast<uint32_t>(z * settings.width + x);
-            const uint32_t i10 = static_cast<uint32_t>(z * settings.width + (x + 1));
-            const uint32_t i01 = static_cast<uint32_t>((z + 1) * settings.width + x);
-            const uint32_t i11 = static_cast<uint32_t>((z + 1) * settings.width + (x + 1));
-
-            if (!(hasWater(i00) || hasWater(i10) || hasWater(i01) || hasWater(i11))) {
-                continue;
-            }
-
-            mesh.waterIndices.push_back(i00);
-            mesh.waterIndices.push_back(i10);
-            mesh.waterIndices.push_back(i01);
-
-            mesh.waterIndices.push_back(i10);
-            mesh.waterIndices.push_back(i11);
-            mesh.waterIndices.push_back(i01);
         }
     }
 }
@@ -468,8 +413,6 @@ TerrainMesh TerrainGenerator::generateMesh() const {
     const auto verticesDone = Clock::now();
     buildGridIndices(mesh, settings_.width, settings_.depth);
     const auto indicesDone = Clock::now();
-    buildWaterMesh(mesh, fields, settings_);
-    const auto waterDone = Clock::now();
 
     std::cout << "[profile] terrain " << settings_.width << 'x' << settings_.depth
               << " base=" << stageMs(stageStart, baseTerrainDone) << "ms"
@@ -482,11 +425,9 @@ TerrainMesh TerrainGenerator::generateMesh() const {
               << " extents=" << stageMs(biomesDone, extentsDone) << "ms"
               << " vertices=" << stageMs(extentsDone, verticesDone) << "ms"
               << " indices=" << stageMs(verticesDone, indicesDone) << "ms"
-              << " water=" << stageMs(indicesDone, waterDone) << "ms"
-              << " total=" << stageMs(totalStart, waterDone) << "ms"
+              << " total=" << stageMs(totalStart, indicesDone) << "ms"
               << " verts=" << mesh.vertices.size()
-              << " tris=" << (mesh.indices.size() / 3u)
-              << " waterTris=" << (mesh.waterIndices.size() / 3u) << '\n';
+              << " tris=" << (mesh.indices.size() / 3u) << '\n';
 
     return mesh;
 }

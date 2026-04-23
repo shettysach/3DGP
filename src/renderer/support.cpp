@@ -171,8 +171,14 @@ Color3 biomeVertexColor(const terrain::TerrainVertex& v, float minH, float maxH)
     };
 
     const Color3 rockTint{0.44f, 0.42f, 0.40f};
-    const float rockBoost = terrain::smoothstep(0.20f, 0.66f, slope + v.mountainWeight * 0.22f + h * 0.12f);
-    color = lerpColor(color, rockTint, rockBoost * 0.18f);
+    const float rockSignal = slope * 0.38f + v.mountainWeight * 0.82f + h * 0.08f;
+    const float rockBoost = terrain::smoothstep(0.46f, 0.88f, rockSignal);
+    color = lerpColor(color, rockTint, rockBoost * 0.10f);
+
+    const float colorMean = (color.r + color.g + color.b) / 3.0f;
+    color.r = std::clamp(colorMean + (color.r - colorMean) * 1.10f, 0.0f, 1.0f);
+    color.g = std::clamp(colorMean + (color.g - colorMean) * 1.10f, 0.0f, 1.0f);
+    color.b = std::clamp(colorMean + (color.b - colorMean) * 1.10f, 0.0f, 1.0f);
 
     const float terraceNoise =
         0.5f + 0.5f * std::sin(v.x * 0.048f + v.z * 0.031f) * std::cos(v.x * 0.019f - v.z * 0.043f);
@@ -348,42 +354,6 @@ GLuint createProceduralTexture(
             data[idx + 0u] = static_cast<unsigned char>(std::round(std::clamp(c.r, 0.0f, 1.0f) * 255.0f));
             data[idx + 1u] = static_cast<unsigned char>(std::round(std::clamp(c.g, 0.0f, 1.0f) * 255.0f));
             data[idx + 2u] = static_cast<unsigned char>(std::round(std::clamp(c.b, 0.0f, 1.0f) * 255.0f));
-        }
-    }
-
-    GLuint tex = 0u;
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, size, size, 0, GL_RGB, GL_UNSIGNED_BYTE, data.data());
-    glfn::GenerateMipmap(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    return tex;
-}
-
-GLuint createWaterTexture(int size) {
-    std::vector<unsigned char> data(static_cast<size_t>(size) * static_cast<size_t>(size) * 3u, 0u);
-    for (int y = 0; y < size; ++y) {
-        for (int x = 0; x < size; ++x) {
-            const float fx = static_cast<float>(x) / static_cast<float>(size);
-            const float fy = static_cast<float>(y) / static_cast<float>(size);
-            const float ring = 0.5f + 0.5f * std::sin((fx * 12.0f + fy * 9.0f) * kPi);
-            const float crossDetail = 0.5f + 0.5f * std::cos((fx * 8.0f - fy * 10.0f) * kPi);
-            const float ripple = 0.5f + 0.5f * std::sin((fx * 22.0f - fy * 18.0f) * kPi + crossDetail * 1.6f);
-            const float micro = valueNoise2D(fx * 24.0f, fy * 24.0f, 919u);
-            const float n = std::clamp(ring * 0.30f + crossDetail * 0.28f + ripple * 0.24f + micro * 0.18f, 0.0f, 1.0f);
-
-            const float r = terrain::lerp(0.24f, 0.78f, n);
-            const float g = terrain::lerp(0.46f, 0.92f, n);
-            const float b = terrain::lerp(0.60f, 1.00f, n);
-
-            const size_t idx = (static_cast<size_t>(y) * static_cast<size_t>(size) + static_cast<size_t>(x)) * 3u;
-            data[idx + 0u] = static_cast<unsigned char>(std::round(r * 255.0f));
-            data[idx + 1u] = static_cast<unsigned char>(std::round(g * 255.0f));
-            data[idx + 2u] = static_cast<unsigned char>(std::round(b * 255.0f));
         }
     }
 

@@ -10,7 +10,6 @@ namespace renderer {
 
 inline constexpr float kPi = 3.14159265358979323846f;
 inline constexpr int kMaterialTextureSize = 256;
-inline constexpr int kWaterTextureSize = 256;
 inline constexpr int kShadowMapSize = 1024;
 inline constexpr float kCameraFovDeg = 60.0f;
 inline constexpr float kCameraNear = 0.5f;
@@ -55,11 +54,6 @@ struct TerrainGpuVertex {
     float baseColor[3];
     float params0[4];
     float params1[4];
-};
-
-struct WaterGpuVertex {
-    float position[3];
-    float params[4];
 };
 
 namespace glfn {
@@ -122,7 +116,6 @@ GLuint createProceduralTexture(
     const Color3& tint,
     float contrast,
     float grainMix);
-GLuint createWaterTexture(int size);
 GLuint createProgram(const char* vertexSource, const char* fragmentSource);
 
 Vec3 operator+(const Vec3& a, const Vec3& b);

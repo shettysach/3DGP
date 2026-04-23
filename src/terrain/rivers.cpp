@@ -253,7 +253,7 @@ RiverPassResult runRiverPass(
             }
 
             const float strength = smoothstep(settings.sourceAccumulation, settings.mainAccumulation, accumulation[idx]);
-            const int halfWidth = std::max(1, 1 + static_cast<int>(std::round(strength * static_cast<float>(settings.maxHalfWidth))));
+            const int halfWidth = std::max(0, static_cast<int>(std::round(strength * static_cast<float>(settings.maxHalfWidth))));
             const float carveDepth = verticalScale * lerp(settings.baseCarveFraction, settings.maxCarveFraction, strength);
 
             const int z0 = std::max(0, z - halfWidth);

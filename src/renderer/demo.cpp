@@ -28,12 +28,11 @@ void runDemo() {
     settings.noise.ridgeSharpness = 1.5f;
     settings.noise.warpFrequency = 0.0038f;
     settings.noise.warpAmplitude = 20.0f;
-    settings.rivers.sourceDensity = 0.000f;
-    settings.rivers.sourceAccumulation = 0.0f;
-    settings.rivers.mainAccumulation = 0.0f;
-    settings.rivers.maxHalfWidth = 0;
-    settings.rivers.baseCarveFraction = 0.0f;
-    settings.rivers.maxCarveFraction = 0.0f;
+    settings.rivers.sourceDensity = 0.00005f;
+    settings.rivers.sourceAccumulation = 135.0f;
+    settings.rivers.mainAccumulation = 320.0f;
+    settings.rivers.minSourceSeparation = 28;
+    settings.rivers.coreThreshold = 0.42f;
 
     auto printBiomeStats = [](const terrain::TerrainMesh& mesh) {
         std::array<size_t, static_cast<size_t>(terrain::BiomeId::Count)> counts{};

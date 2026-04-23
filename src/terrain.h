@@ -132,8 +132,6 @@ struct TerrainMesh {
     std::vector<float> moistureMap;
     std::vector<TerrainVertex> vertices;
     std::vector<uint32_t> indices;
-    std::vector<TerrainVertex> waterVertices;
-    std::vector<uint32_t> waterIndices;
 };
 
 class TerrainGenerator {

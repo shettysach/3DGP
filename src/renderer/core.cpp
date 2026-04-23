@@ -48,22 +48,15 @@ Renderer::Renderer(int width, int height)
       targetZ_(0.0f),
       mode_(Mode::SurfaceBiomes),
       terrainBuffersValid_(false),
-      waterBuffersValid_(false),
       terrainColorsValid_(false),
       cachedTerrainVertexCount_(0u),
       cachedTerrainIndexCount_(0u),
-      cachedWaterVertexCount_(0u),
-      cachedWaterIndexCount_(0u),
       terrainVao_(0u),
       terrainVbo_(0u),
       terrainIbo_(0u),
-      waterVao_(0u),
-      waterVbo_(0u),
-      waterIbo_(0u),
       skyVao_(0u),
       terrainProgram_(0u),
       skyProgram_(0u),
-      waterProgram_(0u),
       shadowProgram_(0u),
       shadowFramebuffer_(0u),
       shadowDepthTexture_(0u),
@@ -71,7 +64,6 @@ Renderer::Renderer(int width, int height)
       rockTexture_(0u),
       snowTexture_(0u),
       sandTexture_(0u),
-      waterTexture_(0u),
       shadowMapSize_(kShadowMapSize),
       profileNextFrame_(true),
       pendingProfileReason_("startup") {}
@@ -141,9 +133,8 @@ bool Renderer::init() {
 
     terrainProgram_ = createProgram(kTerrainVertexShader, kTerrainFragmentShader);
     skyProgram_ = createProgram(kSkyVertexShader, kSkyFragmentShader);
-    waterProgram_ = createProgram(kWaterVertexShader, kWaterFragmentShader);
     shadowProgram_ = createProgram(kShadowVertexShader, kShadowFragmentShader);
-    if (terrainProgram_ == 0u || skyProgram_ == 0u || waterProgram_ == 0u || shadowProgram_ == 0u) {
+    if (terrainProgram_ == 0u || skyProgram_ == 0u || shadowProgram_ == 0u) {
         return false;
     }
     const auto shadersReady = Clock::now();
@@ -214,7 +205,6 @@ bool Renderer::init() {
         {0.82f, 0.74f, 0.53f},
         1.20f,
         0.18f);
-    waterTexture_ = createWaterTexture(kWaterTextureSize);
     const auto texturesReady = Clock::now();
 
     std::cout << "GL Vendor: " << glGetString(GL_VENDOR) << '\n';
@@ -233,7 +223,6 @@ void Renderer::shutdown() {
     destroyTexture(rockTexture_);
     destroyTexture(snowTexture_);
     destroyTexture(sandTexture_);
-    destroyTexture(waterTexture_);
     destroyTexture(shadowDepthTexture_);
 
     if (shadowFramebuffer_ != 0u) {
@@ -243,15 +232,11 @@ void Renderer::shutdown() {
 
     destroyProgram(terrainProgram_);
     destroyProgram(skyProgram_);
-    destroyProgram(waterProgram_);
     destroyProgram(shadowProgram_);
 
     destroyBuffer(terrainVbo_);
     destroyBuffer(terrainIbo_);
-    destroyBuffer(waterVbo_);
-    destroyBuffer(waterIbo_);
     destroyVertexArray(terrainVao_);
-    destroyVertexArray(waterVao_);
     destroyVertexArray(skyVao_);
 
     if (glContext_) {
@@ -329,12 +314,9 @@ Mode Renderer::mode() const {
 
 void Renderer::invalidateMeshCache() {
     terrainBuffersValid_ = false;
-    waterBuffersValid_ = false;
     terrainColorsValid_ = false;
     cachedTerrainVertexCount_ = 0u;
     cachedTerrainIndexCount_ = 0u;
-    cachedWaterVertexCount_ = 0u;
-    cachedWaterIndexCount_ = 0u;
     terrainBaseColors_.clear();
     profileNextFrame_ = true;
     pendingProfileReason_ = "mesh rebuild";
@@ -393,7 +375,6 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
         return std::chrono::duration<double, std::milli>(end - start).count();
     };
     double terrainUploadMs = 0.0;
-    double waterUploadMs = 0.0;
     double shadowSubmitMs = 0.0;
     double sceneSubmitMs = 0.0;
 
@@ -502,74 +483,6 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
         terrainColorsValid_ = true;
         terrainBuffersValid_ = true;
         terrainUploadMs = elapsedMs(uploadStart, Clock::now());
-    }
-
-    if (usesMaterials(mode_) &&
-        (!waterBuffersValid_ || cachedWaterVertexCount_ != mesh.waterVertices.size() ||
-         cachedWaterIndexCount_ != mesh.waterIndices.size())) {
-        const auto uploadStart = Clock::now();
-        std::vector<WaterGpuVertex> waterVertices(mesh.waterVertices.size());
-        const float invHeightRange = 1.0f / std::max(0.001f, mesh.maxHeight - mesh.minHeight);
-        for (size_t i = 0; i < mesh.waterVertices.size(); ++i) {
-            const terrain::TerrainVertex& water = mesh.waterVertices[i];
-            const terrain::TerrainVertex& terrainVertex = mesh.vertices[i];
-            WaterGpuVertex gpu{};
-            gpu.position[0] = water.x;
-            gpu.position[1] = water.y;
-            gpu.position[2] = water.z;
-            gpu.params[0] = std::clamp(water.riverWeight, 0.0f, 1.0f);
-            gpu.params[1] = std::clamp(terrainVertex.slope, 0.0f, 1.0f);
-            gpu.params[2] = std::clamp((terrainVertex.y - mesh.minHeight) * invHeightRange, 0.0f, 1.0f);
-            const float edge = terrain::smoothstep(0.02f, 0.18f, gpu.params[0]) *
-                               terrain::smoothstep(0.0f, 0.42f, 1.0f - gpu.params[0]);
-            const float turbulent = terrain::smoothstep(0.06f, 0.42f, gpu.params[1]) *
-                                    terrain::smoothstep(0.10f, 0.85f, gpu.params[0]);
-            gpu.params[3] = std::clamp(edge * 0.58f + turbulent * 0.46f, 0.0f, 1.0f);
-            waterVertices[i] = gpu;
-        }
-
-        if (waterVao_ == 0u) {
-            glfn::GenVertexArrays(1, &waterVao_);
-            glfn::GenBuffers(1, &waterVbo_);
-            glfn::GenBuffers(1, &waterIbo_);
-        }
-
-        glfn::BindVertexArray(waterVao_);
-        glfn::BindBuffer(GL_ARRAY_BUFFER, waterVbo_);
-        glfn::BufferData(
-            GL_ARRAY_BUFFER,
-            static_cast<GLsizeiptr>(waterVertices.size() * sizeof(WaterGpuVertex)),
-            waterVertices.data(),
-            GL_STATIC_DRAW);
-        glfn::BindBuffer(GL_ELEMENT_ARRAY_BUFFER, waterIbo_);
-        glfn::BufferData(
-            GL_ELEMENT_ARRAY_BUFFER,
-            static_cast<GLsizeiptr>(mesh.waterIndices.size() * sizeof(uint32_t)),
-            mesh.waterIndices.data(),
-            GL_STATIC_DRAW);
-
-        glfn::EnableVertexAttribArray(0);
-        glfn::VertexAttribPointer(
-            0,
-            3,
-            GL_FLOAT,
-            GL_FALSE,
-            static_cast<GLsizei>(sizeof(WaterGpuVertex)),
-            reinterpret_cast<const void*>(offsetof(WaterGpuVertex, position)));
-        glfn::EnableVertexAttribArray(1);
-        glfn::VertexAttribPointer(
-            1,
-            4,
-            GL_FLOAT,
-            GL_FALSE,
-            static_cast<GLsizei>(sizeof(WaterGpuVertex)),
-            reinterpret_cast<const void*>(offsetof(WaterGpuVertex, params)));
-        glfn::BindVertexArray(0);
-
-        cachedWaterVertexCount_ = mesh.waterVertices.size();
-        cachedWaterIndexCount_ = mesh.waterIndices.size();
-        waterBuffersValid_ = true;
-        waterUploadMs = elapsedMs(uploadStart, Clock::now());
     }
 
     int drawableWidth = 0;
@@ -700,48 +613,6 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
         nullptr);
     glfn::BindVertexArray(0);
 
-    if (enableMaterials && waterBuffersValid_ && cachedWaterIndexCount_ > 0u) {
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDisable(GL_CULL_FACE);
-        glDepthMask(GL_FALSE);
-
-        glfn::UseProgram(waterProgram_);
-        setUniform(waterProgram_, "uViewProj", viewProjection);
-        setUniform(waterProgram_, "uLightViewProj", lightViewProjection);
-        setUniform(waterProgram_, "uCameraPos", eye);
-        setUniform(waterProgram_, "uSunLightDir", sunLightDir);
-        setUniform(waterProgram_, "uSunColor", kSunColor);
-        setUniform(waterProgram_, "uSkyZenithColor", kSkyZenithColor);
-        setUniform(waterProgram_, "uFogHorizonColor", kFogHorizonColor);
-        setUniform(waterProgram_, "uFogZenithColor", kFogZenithColor);
-        setUniform(waterProgram_, "uFogSunColor", kFogSunColor);
-        setUniform(waterProgram_, "uFogDensity", 0.00028f + std::clamp(distance_ / 12000.0f, 0.0f, 0.00008f));
-        setUniform(waterProgram_, "uFogHeightFalloff", 0.020f);
-        setUniform(waterProgram_, "uFogBaseHeight", mesh.minHeight + 8.0f);
-        setUniform(waterProgram_, "uShadowTexelSize", 1.0f / static_cast<float>(shadowMapSize_));
-        setUniform(waterProgram_, "uTime", static_cast<float>(SDL_GetTicks()) * 0.001f);
-        setUniform(waterProgram_, "uWaterTex", 0);
-        setUniform(waterProgram_, "uShadowMap", 1);
-
-        glfn::ActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, waterTexture_);
-        glfn::ActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, shadowDepthTexture_);
-
-        glfn::BindVertexArray(waterVao_);
-        glDrawElements(
-            GL_TRIANGLES,
-            static_cast<GLsizei>(cachedWaterIndexCount_),
-            GL_UNSIGNED_INT,
-            nullptr);
-        glfn::BindVertexArray(0);
-
-        glDepthMask(GL_TRUE);
-        glEnable(GL_CULL_FACE);
-        glDisable(GL_BLEND);
-    }
-
     glfn::ActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
     glfn::UseProgram(0);
@@ -757,7 +628,6 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
             static_cast<double>(mesh.indices.size() * sizeof(uint32_t)) / (1024.0 * 1024.0);
         std::cout << "[profile] renderer.frame reason=" << pendingProfileReason_
                   << " terrainUpload=" << terrainUploadMs << "ms"
-                  << " waterUpload=" << waterUploadMs << "ms"
                   << " shadowSubmit=" << shadowSubmitMs << "ms"
                   << " sceneSubmit=" << sceneSubmitMs << "ms"
                   << " cpuTotal=" << cpuTotalMs << "ms"
@@ -765,8 +635,7 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
                   << " terrainVerts=" << mesh.vertices.size()
                   << " terrainTris=" << (mesh.indices.size() / 3u)
                   << " terrainVB=" << terrainVertexMiB << "MiB"
-                  << " terrainIB=" << terrainIndexMiB << "MiB"
-                  << " waterTris=" << (mesh.waterIndices.size() / 3u) << '\n';
+                  << " terrainIB=" << terrainIndexMiB << "MiB" << '\n';
         profileNextFrame_ = false;
         pendingProfileReason_.clear();
     }
