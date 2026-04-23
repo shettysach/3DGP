@@ -25,6 +25,7 @@ BlendResult blendTerrain(const BlendInput& in);
 void smoothHeights(
     std::vector<float>& heights,
     const std::vector<float>& mountainWeights,
+    const std::vector<float>& valleyWeights,
     int width,
     int depth);
 

@@ -9,6 +9,7 @@ namespace terrain {
 enum class LandformId : uint8_t {
     Lowland = 0,
     Plain,
+    Valley,
     Foothill,
     Mountain,
     Alpine,

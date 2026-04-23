@@ -22,6 +22,7 @@ BlendResult blendTerrain(const BlendInput& in) {
 void smoothHeights(
     std::vector<float>& heights,
     const std::vector<float>& mountainWeights,
+    const std::vector<float>& valleyWeights,
     int width,
     int depth) {
     const auto idxOf = [width](int x, int z) -> size_t {
@@ -46,7 +47,8 @@ void smoothHeights(
                                     2.0f * heights[idxOf(x, z1)] + heights[idxOf(x1, z1)]) /
                                    16.0f;
 
-            const float smoothAmount = smoothstep(0.28f, 0.88f, mountainWeights[idx]) * 0.62f;
+            const float valleyPreserve = smoothstep(0.20f, 0.82f, valleyWeights[idx]);
+            const float smoothAmount = smoothstep(0.28f, 0.88f, mountainWeights[idx]) * 0.62f * (1.0f - 0.35f * valleyPreserve);
             smoothed[idx] = lerp(heights[idx], filtered, smoothAmount);
         }
     }

@@ -40,6 +40,7 @@ constexpr std::array<NamedColor, kEcologyCount> kEcologyInfo = {{
 constexpr std::array<NamedColor, kLandformCount> kLandformInfo = {{
     {"Lowland", {0.23f, 0.53f, 0.38f}},
     {"Plain", {0.55f, 0.67f, 0.33f}},
+    {"Valley", {0.34f, 0.49f, 0.26f}},
     {"Foothill", {0.61f, 0.55f, 0.31f}},
     {"Mountain", {0.52f, 0.50f, 0.47f}},
     {"Alpine", {0.72f, 0.71f, 0.68f}},
@@ -254,6 +255,16 @@ BiomeWeightVector biomeWeightsFromEcology(
             0.15f * eco(EcologyId::Taiga);
         weights[biomeIndex(BiomeId::RockyAlpine)] = 1.0f - std::clamp(alpineWeight, 0.0f, 0.55f);
         weights[biomeIndex(BiomeId::Alpine)] = std::clamp(alpineWeight, 0.0f, 0.55f);
+        normalizeWeights(weights);
+        return weights;
+    }
+
+    if (landform == LandformId::Valley) {
+        applyMappedEcologyWeights(weights, ecology, kPlainBiomeByEcology);
+        const float wetValleyBoost = smoothstep(0.42f, 0.85f, std::clamp(moisture, 0.0f, 1.0f));
+        weights[biomeIndex(BiomeId::MarshLowland)] += eco(EcologyId::Marsh) * 0.80f + wetValleyBoost * 0.15f;
+        weights[biomeIndex(BiomeId::ForestPlain)] += eco(EcologyId::Forest) * 0.16f;
+        weights[biomeIndex(BiomeId::GrasslandPlain)] += eco(EcologyId::Grassland) * 0.12f;
         normalizeWeights(weights);
         return weights;
     }

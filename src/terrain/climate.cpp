@@ -115,8 +115,10 @@ ClimateSample computeClimateSample(const ClimateNoiseInput& in) {
         (1.0f - smoothstep(0.60f, 0.88f, in.elevationNorm)) *
         in.mountainWeight * 0.18f;
 
+    const float valleyHumidity = smoothstep(0.18f, 0.72f, 1.0f - in.elevationNorm) * riverInfluence * 0.08f;
+
     float moisture = precipitation * 0.68f + localMoistureNoise * 0.14f;
-    moisture += riverInfluence * in.settings.riverMoistureStrength + in.riverWeight * 0.08f + basinBonus;
+    moisture += riverInfluence * in.settings.riverMoistureStrength + in.riverWeight * 0.08f + basinBonus + valleyHumidity;
     moisture -= mountainAridity;
     moisture -= std::clamp(in.slope, 0.0f, 1.0f) * in.settings.slopeDryingStrength;
     moisture -= temperature * in.settings.temperatureDryingStrength;

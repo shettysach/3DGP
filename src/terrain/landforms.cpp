@@ -14,6 +14,9 @@ LandformId classifyLandform(float elevationNorm, float temperature, float slope,
     if (elevationNorm < 0.22f && slope < 0.09f && signal < 0.30f) {
         return LandformId::Lowland;
     }
+    if (elevationNorm < 0.46f && slope < 0.14f && signal < 0.42f) {
+        return LandformId::Valley;
+    }
     if (elevationNorm > 0.88f && temperature < 0.32f) {
         return LandformId::Snowcap;
     }
@@ -31,6 +34,9 @@ LandformId classifyLandform(float elevationNorm, float temperature, float slope,
 
 int maxAllowedLevel(float elevationNorm, float temperature, float signal) {
     int maxLevel = static_cast<int>(LandformId::Plain);
+    if (elevationNorm < 0.46f && signal < 0.42f) {
+        maxLevel = static_cast<int>(LandformId::Valley);
+    }
     if (signal > 0.40f || elevationNorm > 0.38f) {
         maxLevel = static_cast<int>(LandformId::Foothill);
     }
@@ -83,8 +89,10 @@ void computeLandformFields(TerrainFields& fields) {
     for (size_t idx = 0; idx < fields.size(); ++idx) {
         const float elevationNorm = (fields.heights[idx] - minHeight) * invHeightRange;
         const float slope = std::clamp(fields.slopes[idx], 0.0f, 1.0f);
+        const float valleyPull = std::clamp(fields.valleyWeights[idx], 0.0f, 1.0f);
         rawSignal[idx] = std::clamp(
             fields.mountainWeights[idx] * 0.72f +
+                valleyPull * 0.30f +
                 smoothstep(0.04f, 0.36f, slope) * 0.35f +
                 smoothstep(0.35f, 0.82f, elevationNorm) * 0.38f,
             0.0f,
@@ -137,6 +145,9 @@ void computeLandformFields(TerrainFields& fields) {
                 }
 
                 level = std::min(level, maxAllowedLevel(elevationNorms[idx], fields.temperature[idx], fields.landformSignal[idx]));
+                if (fields.valleyWeights[idx] > 0.45f && level > static_cast<int>(LandformId::Valley) && level < static_cast<int>(LandformId::Mountain)) {
+                    level = static_cast<int>(LandformId::Valley);
+                }
                 if (level == static_cast<int>(LandformId::Lowland) &&
                     !(elevationNorms[idx] < 0.30f && fields.slopes[idx] < 0.12f)) {
                     level = static_cast<int>(LandformId::Plain);

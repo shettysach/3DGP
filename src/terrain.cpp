@@ -6,6 +6,7 @@
 #include "terrain/landforms.h"
 #include "terrain/mountains.h"
 #include "terrain/plains.h"
+#include "terrain/valleys.h"
 #include "terrain/rivers.h"
 #include "terrain/terrain_noise.h"
 #include "terrain/util.h"
@@ -120,6 +121,16 @@ TerrainFields buildBaseTerrainFields(const HeightStageInput& in) {
                 in.ridgedFbm};
             const MountainResult mountain = computeMountainResult(mountainNoiseIn, terrainNoise.detail);
 
+            const ValleyNoiseInput valleyNoiseIn{
+                sampleX,
+                sampleZ,
+                in.settings.noise.octaves,
+                in.settings.noise.lacunarity,
+                in.settings.noise.gain,
+                in.settings.verticalScale,
+                in.fbm};
+            const ValleyResult valley = computeValleyResult(valleyNoiseIn, terrainNoise.detail);
+
             const PlainsNoiseInput plainsNoiseIn{
                 sampleX,
                 sampleZ,
@@ -133,10 +144,11 @@ TerrainFields buildBaseTerrainFields(const HeightStageInput& in) {
             const float falloff =
                 computeIslandFalloff(in.settings, worldX, worldZ, centerX, centerZ, maxRadius);
             const BlendResult blend = blendTerrain(
-                {mountain.height, mountain.weight, plainsHeight, terrainNoise.detail, falloff, in.settings.verticalScale});
+                {mountain.height, mountain.weight, plainsHeight - valley.depth, terrainNoise.detail, falloff, in.settings.verticalScale});
 
             fields.heights[idx] = blend.height;
             fields.mountainWeights[idx] = blend.mountainWeight;
+            fields.valleyWeights[idx] = valley.weight;
         }
     }
 
@@ -385,7 +397,7 @@ TerrainMesh TerrainGenerator::generateMesh() const {
 
     TerrainFields fields = buildBaseTerrainFields({settings_, fbm, ridged});
     const auto baseTerrainDone = Clock::now();
-    smoothHeights(fields.heights, fields.mountainWeights, settings_.width, settings_.depth);
+    smoothHeights(fields.heights, fields.mountainWeights, fields.valleyWeights, settings_.width, settings_.depth);
     const auto smoothDone = Clock::now();
     applyRiverPass(fields, settings_);
     const auto riversDone = Clock::now();
