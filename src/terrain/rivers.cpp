@@ -27,6 +27,190 @@ struct SourceCandidate {
     float score = 0.0f;
 };
 
+struct RiverPoint {
+    float x = 0.0f;
+    float z = 0.0f;
+    float strength = 0.0f;
+};
+
+float neighborStepCost(int dx, int dz) {
+    return (dx != 0 && dz != 0) ? 1.41421356f : 1.0f;
+}
+
+void refineDownstreamDirections(
+    const std::vector<float>& heights,
+    const std::vector<float>& filledHeights,
+    int width,
+    int depth,
+    const std::vector<int>& distanceToEdge,
+    uint32_t seed,
+    std::vector<int>& downstream) {
+    constexpr float kDownhillEpsilon = 0.0001f;
+
+    for (int z = 0; z < depth; ++z) {
+        for (int x = 0; x < width; ++x) {
+            const size_t idx = fieldIndex(x, z, width);
+            const int fallback = downstream[idx];
+            if (fallback < 0) {
+                continue;
+            }
+
+            const float currentFilled = filledHeights[idx];
+            const float currentHeight = heights[idx];
+            int bestDownstream = fallback;
+            float bestScore = -1.0e9f;
+
+            const int z0 = std::max(0, z - 1);
+            const int z1 = std::min(depth - 1, z + 1);
+            const int x0 = std::max(0, x - 1);
+            const int x1 = std::min(width - 1, x + 1);
+
+            for (int nz = z0; nz <= z1; ++nz) {
+                for (int nx = x0; nx <= x1; ++nx) {
+                    if (nx == x && nz == z) {
+                        continue;
+                    }
+
+                    const size_t nidx = fieldIndex(nx, nz, width);
+                    const float filledDrop = currentFilled - filledHeights[nidx];
+                    const int edgeProgress = distanceToEdge[idx] - distanceToEdge[nidx];
+                    if (filledDrop <= kDownhillEpsilon && edgeProgress <= 0) {
+                        continue;
+                    }
+
+                    const float rawDrop = currentHeight - heights[nidx];
+                    const float stepCost = neighborStepCost(nx - x, nz - z);
+
+                    float score = -1.0e9f;
+                    if (filledDrop > kDownhillEpsilon) {
+                        score = filledDrop / stepCost;
+                        score += std::max(rawDrop, 0.0f) * 0.18f / stepCost;
+                    } else {
+                        score = static_cast<float>(edgeProgress) * 0.06f;
+                        score += rawDrop * 0.12f / stepCost;
+                    }
+
+                    score += hashJitter(idx ^ (nidx * 0x9e3779b9u), seed) * 0.0005f;
+                    if (score <= bestScore) {
+                        continue;
+                    }
+
+                    bestScore = score;
+                    bestDownstream = static_cast<int>(nidx);
+                }
+            }
+
+            downstream[idx] = bestDownstream;
+        }
+    }
+}
+
+std::vector<RiverPoint> smoothRiverPath(std::vector<RiverPoint> path, int iterations) {
+    if (path.size() < 3 || iterations <= 0) {
+        return path;
+    }
+
+    for (int iteration = 0; iteration < iterations; ++iteration) {
+        std::vector<RiverPoint> smoothed;
+        smoothed.reserve(path.size() * 2);
+        smoothed.push_back(path.front());
+
+        for (size_t i = 0; i + 1 < path.size(); ++i) {
+            const RiverPoint& a = path[i];
+            const RiverPoint& b = path[i + 1];
+            smoothed.push_back({
+                lerp(a.x, b.x, 0.25f),
+                lerp(a.z, b.z, 0.25f),
+                lerp(a.strength, b.strength, 0.25f),
+            });
+            smoothed.push_back({
+                lerp(a.x, b.x, 0.75f),
+                lerp(a.z, b.z, 0.75f),
+                lerp(a.strength, b.strength, 0.75f),
+            });
+        }
+
+        smoothed.push_back(path.back());
+        path.swap(smoothed);
+    }
+
+    return path;
+}
+
+std::vector<RiverPoint> applyRiverMeander(
+    std::vector<RiverPoint> path,
+    int width,
+    int depth,
+    uint32_t seed,
+    size_t sourceIdx) {
+    if (path.size() < 5) {
+        return path;
+    }
+
+    std::vector<float> cumulativeLength(path.size(), 0.0f);
+    for (size_t i = 1; i < path.size(); ++i) {
+        const float dx = path[i].x - path[i - 1].x;
+        const float dz = path[i].z - path[i - 1].z;
+        cumulativeLength[i] = cumulativeLength[i - 1] + std::sqrt(dx * dx + dz * dz);
+    }
+
+    const float totalLength = cumulativeLength.back();
+    if (totalLength <= 0.001f) {
+        return path;
+    }
+
+    const float phaseA = hashJitter(sourceIdx, seed) * 6.28318531f;
+    const float phaseB = hashJitter(sourceIdx ^ 0x9e3779b9u, seed + 17u) * 6.28318531f;
+    const float cyclesA = std::max(1.2f, totalLength / 26.0f);
+    const float cyclesB = std::max(2.0f, totalLength / 14.0f);
+    const float maxOffset = 0.85f;
+
+    for (size_t i = 1; i + 1 < path.size(); ++i) {
+        const float tangentX = path[i + 1].x - path[i - 1].x;
+        const float tangentZ = path[i + 1].z - path[i - 1].z;
+        const float tangentLength = std::sqrt(tangentX * tangentX + tangentZ * tangentZ);
+        if (tangentLength <= 0.0001f) {
+            continue;
+        }
+
+        const float progress = cumulativeLength[i] / totalLength;
+        const float envelope = std::pow(std::sin(progress * 3.14159265f), 0.85f);
+        const float meanderStrength = (0.35f + 0.65f * path[i].strength) * envelope;
+        const float wave =
+            std::sin(progress * cyclesA * 6.28318531f + phaseA) * 0.65f +
+            std::sin(progress * cyclesB * 6.28318531f + phaseB) * 0.35f;
+        const float offset = std::clamp(wave * meanderStrength * maxOffset, -maxOffset, maxOffset);
+
+        const float normalX = -tangentZ / tangentLength;
+        const float normalZ = tangentX / tangentLength;
+        path[i].x = std::clamp(path[i].x + normalX * offset, 0.35f, static_cast<float>(width - 1) - 0.35f);
+        path[i].z = std::clamp(path[i].z + normalZ * offset, 0.35f, static_cast<float>(depth - 1) - 0.35f);
+    }
+
+    return path;
+}
+
+float distanceToSegment(float px, float pz, const RiverPoint& a, const RiverPoint& b, float& outT) {
+    const float vx = b.x - a.x;
+    const float vz = b.z - a.z;
+    const float lengthSq = vx * vx + vz * vz;
+    if (lengthSq <= 0.000001f) {
+        outT = 0.0f;
+        const float dx = px - a.x;
+        const float dz = pz - a.z;
+        return std::sqrt(dx * dx + dz * dz);
+    }
+
+    const float wx = px - a.x;
+    const float wz = pz - a.z;
+    outT = std::clamp((wx * vx + wz * vz) / lengthSq, 0.0f, 1.0f);
+    const float closestX = a.x + vx * outT;
+    const float closestZ = a.z + vz * outT;
+    const float dx = px - closestX;
+    const float dz = pz - closestZ;
+    return std::sqrt(dx * dx + dz * dz);
+}
+
 void seedBoundaryCell(
     int x,
     int z,
@@ -113,13 +297,27 @@ RiverPassResult runRiverPass(
         }
     }
 
+    refineDownstreamDirections(
+        heights,
+        filledHeights,
+        width,
+        depth,
+        distanceToEdge,
+        seed,
+        downstream);
+
     const float minHeight = *std::min_element(heights.begin(), heights.end());
     const float maxHeight = *std::max_element(heights.begin(), heights.end());
     const float invHeightRange = 1.0f / std::max(0.0001f, maxHeight - minHeight);
 
     std::vector<size_t> order(cellCount);
     std::iota(order.begin(), order.end(), static_cast<size_t>(0));
-    std::sort(order.begin(), order.end(), [&distanceToEdge](size_t a, size_t b) { return distanceToEdge[a] > distanceToEdge[b]; });
+    std::sort(order.begin(), order.end(), [&filledHeights, &distanceToEdge](size_t a, size_t b) {
+        if (filledHeights[a] != filledHeights[b]) {
+            return filledHeights[a] > filledHeights[b];
+        }
+        return distanceToEdge[a] > distanceToEdge[b];
+    });
 
     for (size_t idx : order) {
         const int down = downstream[idx];
@@ -228,12 +426,14 @@ RiverPassResult runRiverPass(
         selectedSources.push_back(sourceCandidates.front().index);
     }
 
+    std::vector<float> riverStrengths(cellCount, 0.0f);
     for (size_t sourceIdx : selectedSources) {
         int current = static_cast<int>(sourceIdx);
         int guard = 0;
         while (current >= 0 && guard < width * depth) {
             const size_t cidx = static_cast<size_t>(current);
             activeRiver[cidx] = true;
+            riverStrengths[cidx] = smoothstep(settings.sourceAccumulation, settings.mainAccumulation, accumulation[cidx]);
 
             const int down = downstream[cidx];
             if (down < 0 || down == current) {
@@ -245,40 +445,90 @@ RiverPassResult runRiverPass(
         }
     }
 
-    for (int z = 0; z < depth; ++z) {
-        for (int x = 0; x < width; ++x) {
-            const size_t idx = fieldIndex(x, z, width);
-            if (!activeRiver[idx]) {
-                continue;
+    std::vector<float> carveDepths(cellCount, 0.0f);
+    std::vector<unsigned char> pathCoverage(cellCount, 0u);
+
+    for (size_t sourceIdx : selectedSources) {
+        std::vector<RiverPoint> path;
+        path.reserve(static_cast<size_t>(distanceToEdge[sourceIdx] + 1));
+
+        int current = static_cast<int>(sourceIdx);
+        int guard = 0;
+        while (current >= 0 && guard < width * depth) {
+            const size_t cidx = static_cast<size_t>(current);
+            const int cx = current % width;
+            const int cz = current / width;
+            path.push_back({
+                static_cast<float>(cx),
+                static_cast<float>(cz),
+                riverStrengths[cidx],
+            });
+
+            if (pathCoverage[cidx]) {
+                break;
+            }
+            pathCoverage[cidx] = 1u;
+
+            const int down = downstream[cidx];
+            if (down < 0 || down == current || !activeRiver[static_cast<size_t>(down)]) {
+                break;
             }
 
-            const float strength = smoothstep(settings.sourceAccumulation, settings.mainAccumulation, accumulation[idx]);
-            const int halfWidth = std::max(0, static_cast<int>(std::round(strength * static_cast<float>(settings.maxHalfWidth))));
-            const float carveDepth = verticalScale * lerp(settings.baseCarveFraction, settings.maxCarveFraction, strength);
+            current = down;
+            ++guard;
+        }
 
-            const int z0 = std::max(0, z - halfWidth);
-            const int z1 = std::min(depth - 1, z + halfWidth);
-            const int x0 = std::max(0, x - halfWidth);
-            const int x1 = std::min(width - 1, x + halfWidth);
+        if (path.size() < 2) {
+            continue;
+        }
+
+        // Smooth the centerline before carving so the river follows a natural-looking course
+        // even though the drainage network itself is still tracked on the terrain grid.
+        path = smoothRiverPath(std::move(path), 2);
+        path = applyRiverMeander(std::move(path), width, depth, seed, sourceIdx);
+        path = smoothRiverPath(std::move(path), 1);
+
+        for (size_t i = 0; i + 1 < path.size(); ++i) {
+            const RiverPoint& a = path[i];
+            const RiverPoint& b = path[i + 1];
+            const float radiusA = std::max(0.65f, lerp(0.55f, static_cast<float>(settings.maxHalfWidth) + 0.35f, a.strength));
+            const float radiusB = std::max(0.65f, lerp(0.55f, static_cast<float>(settings.maxHalfWidth) + 0.35f, b.strength));
+            const float maxRadius = std::max(radiusA, radiusB);
+
+            const int x0 = std::max(0, static_cast<int>(std::floor(std::min(a.x, b.x) - maxRadius - 1.0f)));
+            const int x1 = std::min(width - 1, static_cast<int>(std::ceil(std::max(a.x, b.x) + maxRadius + 1.0f)));
+            const int z0 = std::max(0, static_cast<int>(std::floor(std::min(a.z, b.z) - maxRadius - 1.0f)));
+            const int z1 = std::min(depth - 1, static_cast<int>(std::ceil(std::max(a.z, b.z) + maxRadius + 1.0f)));
 
             for (int nz = z0; nz <= z1; ++nz) {
                 for (int nx = x0; nx <= x1; ++nx) {
-                    const float dx = static_cast<float>(nx - x);
-                    const float dz = static_cast<float>(nz - z);
-                    const float dist = std::sqrt(dx * dx + dz * dz);
-                    if (dist > static_cast<float>(halfWidth)) {
+                    float segmentT = 0.0f;
+                    const float dist = distanceToSegment(static_cast<float>(nx), static_cast<float>(nz), a, b, segmentT);
+                    const float radius = lerp(radiusA, radiusB, segmentT);
+                    if (dist > radius) {
                         continue;
                     }
 
-                    const float t = std::clamp(1.0f - dist / std::max(0.001f, static_cast<float>(halfWidth)), 0.0f, 1.0f);
-                    const float falloff = std::pow(t, settings.bankFalloff);
+                    const float strength = lerp(a.strength, b.strength, segmentT);
+                    const float bank = 1.0f - smoothstep(0.0f, radius, dist);
+                    const float falloff = std::pow(bank, settings.bankFalloff);
+                    const float carveDepth =
+                        verticalScale * lerp(settings.baseCarveFraction, settings.maxCarveFraction, strength);
                     const size_t nidx = fieldIndex(nx, nz, width);
 
-                    out.carvedHeights[nidx] -= carveDepth * falloff;
-                    out.riverWeights[nidx] = std::max(out.riverWeights[nidx], falloff * (0.45f + 0.55f * strength));
+                    carveDepths[nidx] = std::max(carveDepths[nidx], carveDepth * falloff);
+                    out.riverWeights[nidx] = std::max(out.riverWeights[nidx], bank * (0.45f + 0.55f * strength));
                 }
             }
         }
+    }
+
+    for (size_t idx = 0; idx < cellCount; ++idx) {
+        if (carveDepths[idx] <= 0.0f) {
+            continue;
+        }
+
+        out.carvedHeights[idx] -= carveDepths[idx];
     }
 
     std::vector<float> smoothed = out.carvedHeights;

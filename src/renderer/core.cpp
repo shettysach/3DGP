@@ -1,8 +1,6 @@
 #include "renderer/internal.h"
 #include "renderer/shaders.h"
 
-#include "terrain/util.h"
-
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -31,7 +29,7 @@ const char* modeName(Mode mode) {
         return "Slope";
     }
 
-    return "Error: modeName";
+    return "Uncreachable modeName";
 }
 
 Renderer::Renderer(int width, int height)
