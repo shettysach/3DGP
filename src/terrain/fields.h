@@ -28,6 +28,7 @@ struct TerrainFields {
     std::vector<uint8_t> landformIds;
     std::vector<float> landformSignal;
     std::vector<float> valleyWeights;
+    std::vector<float> plateauWeights;
     std::vector<uint8_t> ecologyIds;
     std::vector<uint8_t> primaryBiomeIds;
     std::vector<uint8_t> secondaryBiomeIds;
@@ -60,6 +61,7 @@ struct TerrainFields {
         landformIds.assign(count, static_cast<uint8_t>(LandformId::Plain));
         landformSignal.assign(count, 0.0f);
         valleyWeights.assign(count, 0.0f);
+        plateauWeights.assign(count, 0.0f);
         ecologyIds.assign(count, static_cast<uint8_t>(EcologyId::Grassland));
         primaryBiomeIds.assign(count, static_cast<uint8_t>(BiomeId::GrasslandPlain));
         secondaryBiomeIds.assign(count, static_cast<uint8_t>(BiomeId::GrasslandPlain));

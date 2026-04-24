@@ -10,12 +10,15 @@ namespace terrain {
 
 namespace {
 
-LandformId classifyLandform(float elevationNorm, float temperature, float slope, float signal) {
+LandformId classifyLandform(float elevationNorm, float temperature, float slope, float signal, float plateauWeight) {
     if (elevationNorm < 0.22f && slope < 0.09f && signal < 0.30f) {
         return LandformId::Lowland;
     }
     if (elevationNorm < 0.46f && slope < 0.14f && signal < 0.42f) {
         return LandformId::Valley;
+    }
+    if (plateauWeight > 0.30f && slope < 0.18f && elevationNorm > 0.20f && elevationNorm < 0.85f) {
+        return LandformId::Plateau;
     }
     if (elevationNorm > 0.88f && temperature < 0.32f) {
         return LandformId::Snowcap;
@@ -32,10 +35,13 @@ LandformId classifyLandform(float elevationNorm, float temperature, float slope,
     return LandformId::Plain;
 }
 
-int maxAllowedLevel(float elevationNorm, float temperature, float signal) {
+int maxAllowedLevel(float elevationNorm, float temperature, float signal, float plateauWeight) {
     int maxLevel = static_cast<int>(LandformId::Plain);
     if (elevationNorm < 0.46f && signal < 0.42f) {
         maxLevel = static_cast<int>(LandformId::Valley);
+    }
+    if (plateauWeight > 0.25f && elevationNorm > 0.15f && elevationNorm < 0.88f) {
+        maxLevel = static_cast<int>(LandformId::Plateau);
     }
     if (signal > 0.40f || elevationNorm > 0.38f) {
         maxLevel = static_cast<int>(LandformId::Foothill);
@@ -110,7 +116,8 @@ void computeLandformFields(TerrainFields& fields) {
             elevationNorms[idx],
             fields.temperature[idx],
             fields.slopes[idx],
-            fields.landformSignal[idx]));
+            fields.landformSignal[idx],
+            fields.plateauWeights[idx]));
     }
 
     for (int iteration = 0; iteration < 2; ++iteration) {
@@ -143,7 +150,7 @@ void computeLandformFields(TerrainFields& fields) {
                     ++level;
                 }
 
-                level = std::min(level, maxAllowedLevel(elevationNorms[idx], fields.temperature[idx], fields.landformSignal[idx]));
+                level = std::min(level, maxAllowedLevel(elevationNorms[idx], fields.temperature[idx], fields.landformSignal[idx], fields.plateauWeights[idx]));
                 if (fields.valleyWeights[idx] > 0.45f && level > static_cast<int>(LandformId::Valley) && level < static_cast<int>(LandformId::Mountain)) {
                     level = static_cast<int>(LandformId::Valley);
                 }

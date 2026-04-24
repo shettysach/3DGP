@@ -10,6 +10,8 @@ struct BlendInput {
     float mountainHeight = 0.0f;
     float mountainWeight = 0.0f;
     float plainsHeight = 0.0f;
+    float plateauHeight = 0.0f;
+    float plateauWeight = 0.0f;
     float detail = 0.0f;
     float falloff = 1.0f;
     float verticalScale = 1.0f;

@@ -41,6 +41,7 @@ constexpr std::array<NamedColor, kLandformCount> kLandformInfo = {{
     {"Lowland", {0.23f, 0.53f, 0.38f}},
     {"Plain", {0.55f, 0.67f, 0.33f}},
     {"Valley", {0.34f, 0.49f, 0.26f}},
+    {"Plateau", {0.60f, 0.52f, 0.35f}},
     {"Foothill", {0.61f, 0.55f, 0.31f}},
     {"Mountain", {0.52f, 0.50f, 0.47f}},
     {"Alpine", {0.72f, 0.71f, 0.68f}},
@@ -59,6 +60,12 @@ constexpr std::array<NamedColor, kBiomeCount> kBiomeInfo = {{
     {"Grassland foothill", {0.46f, 0.58f, 0.18f}},
     {"Forest foothill", {0.12f, 0.26f, 0.10f}},
     {"Taiga foothill", {0.24f, 0.35f, 0.42f}},
+    {"Desert plateau", {0.80f, 0.62f, 0.38f}},
+    {"Steppe plateau", {0.68f, 0.55f, 0.26f}},
+    {"Grassland plateau", {0.50f, 0.60f, 0.22f}},
+    {"Forest plateau", {0.18f, 0.36f, 0.16f}},
+    {"Taiga plateau", {0.30f, 0.40f, 0.38f}},
+    {"Tundra plateau", {0.72f, 0.73f, 0.76f}},
     {"Rocky mountain", {0.50f, 0.48f, 0.46f}},
     {"Alpine", {0.80f, 0.82f, 0.85f}},
     {"Snow", {0.98f, 0.99f, 1.00f}},
@@ -92,6 +99,16 @@ constexpr std::array<BiomeId, kEcologyCount> kFoothillBiomeByEcology = {{
     BiomeId::TaigaFoothill,
     BiomeId::TaigaFoothill,
     BiomeId::TaigaFoothill,
+}};
+
+constexpr std::array<BiomeId, kEcologyCount> kPlateauBiomeByEcology = {{
+    BiomeId::DesertPlateau,
+    BiomeId::SteppePlateau,
+    BiomeId::GrasslandPlateau,
+    BiomeId::ForestPlateau,
+    BiomeId::TaigaPlateau,
+    BiomeId::TundraPlateau,
+    BiomeId::TundraPlateau,
 }};
 
 using BiomeWeightVector = std::array<float, kBiomeCount>;
@@ -261,6 +278,14 @@ BiomeWeightVector biomeWeightsFromEcology(
 
     if (landform == LandformId::Foothill) {
         applyMappedEcologyWeights(weights, ecology, kFoothillBiomeByEcology);
+        normalizeWeights(weights);
+        return weights;
+    }
+
+    if (landform == LandformId::Plateau) {
+        applyMappedEcologyWeights(weights, ecology, kPlateauBiomeByEcology);
+        const float dryBonus = smoothstep(0.55f, 0.85f, 1.0f - std::clamp(moisture, 0.0f, 1.0f));
+        weights[biomeIndex(BiomeId::DesertPlateau)] += dryBonus * 0.25f;
         normalizeWeights(weights);
         return weights;
     }

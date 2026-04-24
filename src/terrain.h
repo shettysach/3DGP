@@ -12,6 +12,7 @@ enum class LandformId : uint8_t {
     Lowland = 0,
     Plain,
     Valley,
+    Plateau,
     Foothill,
     Mountain,
     Alpine,
@@ -42,6 +43,12 @@ enum class BiomeId : uint8_t {
     GrasslandFoothill,
     ForestFoothill,
     TaigaFoothill,
+    DesertPlateau,
+    SteppePlateau,
+    GrasslandPlateau,
+    ForestPlateau,
+    TaigaPlateau,
+    TundraPlateau,
     RockyAlpine,
     Alpine,
     Snow,
@@ -86,9 +93,16 @@ struct ClimateSettings {
     float temperatureDryingStrength = 0.10f;
 };
 
+struct PlateauSettings {
+    float frequency = 0.028f;
+    float heightScale = 0.42f;
+    float steepness = 0.30f;
+    float detailAmount = 0.04f;
+};
+
 struct TerrainSettings {
-    int width = 200;
-    int depth = 200;
+    int width = 512;
+    int depth = 512;
     float horizontalScale = 2.0f;
     float verticalScale = 80.0f;
     bool islandFalloff = true;
@@ -98,6 +112,7 @@ struct TerrainSettings {
     NoiseSettings noise;
     RiverSettings rivers;
     ClimateSettings climate;
+    PlateauSettings plateaus;
 };
 
 struct TerrainVertex {

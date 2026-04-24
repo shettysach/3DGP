@@ -6,14 +6,17 @@
 namespace terrain {
 
 BlendResult blendTerrain(const BlendInput& in) {
-    float mw = in.mountainWeight;
+    // Plateaus replace plains and suppress mountains
+    const float effectivePlains = lerp(in.plainsHeight, in.plateauHeight, in.plateauWeight);
+    const float mountainSuppress = 1.0f - 0.75f * in.plateauWeight;
+    float mw = in.mountainWeight * mountainSuppress;
     float pw = 1.0f - mw;
 
     const float weightSum = std::max(0.0001f, mw + pw);
     mw /= weightSum;
     pw /= weightSum;
 
-    const float blendedHeight = mw * in.mountainHeight + pw * in.plainsHeight;
+    const float blendedHeight = mw * in.mountainHeight + pw * effectivePlains;
     const float fineDetail = (in.detail - 0.5f) * in.verticalScale * 0.035f;
 
     return {(blendedHeight + fineDetail) * in.falloff, mw};

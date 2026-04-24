@@ -15,8 +15,8 @@ void runDemo() {
     using namespace std::chrono;
 
     terrain::TerrainSettings settings;
-    settings.width = 512;
-    settings.depth = 512;
+    settings.width = 720;
+    settings.depth = 720;
     settings.horizontalScale = 1.0f;
     settings.verticalScale = 96.0f;
     settings.islandFalloff = false;

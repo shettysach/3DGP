@@ -35,6 +35,8 @@ add_executable(terrain_demo
     src/terrain.h
     src/terrain/plains.cpp
     src/terrain/plains.h
+    src/terrain/plateaus.cpp
+    src/terrain/plateaus.h
     src/terrain/mountains.cpp
     src/terrain/mountains.h
     src/terrain/valleys.cpp

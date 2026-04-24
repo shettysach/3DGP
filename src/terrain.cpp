@@ -5,6 +5,7 @@
 #include "terrain/landforms.h"
 #include "terrain/mountains.h"
 #include "terrain/plains.h"
+#include "terrain/plateaus.h"
 #include "terrain/valleys.h"
 #include "terrain/rivers.h"
 #include "terrain/util.h"
@@ -390,14 +391,25 @@ TerrainFields TerrainGenerator::buildBaseTerrainFields() const {
             const float plainsHeight = computePlainsHeight(
                 {continental, plainsBase, macroRelief, hilliness, basinNoise, detail, settings_.verticalScale});
 
+            const float plateauMask = 0.5f * (fractalBrownianMotion(
+                                                     sampleX * settings_.plateaus.frequency,
+                                                     sampleZ * settings_.plateaus.frequency,
+                                                     3,
+                                                     settings_.noise.lacunarity,
+                                                     0.52f) +
+                                                 1.0f);
+            const PlateauResult plateau = computePlateau(
+                {continental, plateauMask, detail, settings_.verticalScale});
+
             const float falloff =
                 computeIslandFalloff(settings_, worldX, worldZ, centerX, centerZ, maxRadius);
             const BlendResult blend = blendTerrain(
-                {mountain.height, mountain.weight, plainsHeight - valley.depth, detail, falloff, settings_.verticalScale});
+                {mountain.height, mountain.weight, plainsHeight - valley.depth, plateau.height, plateau.weight, detail, falloff, settings_.verticalScale});
 
             fields.heights[idx] = blend.height;
             fields.mountainWeights[idx] = blend.mountainWeight;
             fields.valleyWeights[idx] = valley.weight;
+            fields.plateauWeights[idx] = plateau.weight;
         }
     }
 
