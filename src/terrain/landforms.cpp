@@ -81,14 +81,12 @@ void computeLandformFields(TerrainFields& fields) {
         return;
     }
 
-    float minHeight, maxHeight;
-    computeHeightExtents(fields.heights, minHeight, maxHeight);
-    const float invHeightRange = 1.0f / std::max(0.0001f, maxHeight - minHeight);
+    const float invHeightRange = 1.0f / std::max(0.0001f, fields.maxHeight - fields.minHeight);
     const size_t cellCount = fields.size();
 
     std::vector<float> rawSignal(cellCount, 0.0f);
     for (size_t idx = 0; idx < cellCount; ++idx) {
-        const float elevationNorm = (fields.heights[idx] - minHeight) * invHeightRange;
+        const float elevationNorm = (fields.heights[idx] - fields.minHeight) * invHeightRange;
         const float slope = std::clamp(fields.slopes[idx], 0.0f, 1.0f);
         const float valleyPull = std::clamp(fields.valleyWeights[idx], 0.0f, 1.0f);
         rawSignal[idx] = std::clamp(
@@ -107,7 +105,7 @@ void computeLandformFields(TerrainFields& fields) {
     std::vector<uint8_t> levels(cellCount, static_cast<uint8_t>(LandformId::Plain));
     std::vector<float> elevationNorms(cellCount, 0.0f);
     for (size_t idx = 0; idx < cellCount; ++idx) {
-        elevationNorms[idx] = (fields.heights[idx] - minHeight) * invHeightRange;
+        elevationNorms[idx] = (fields.heights[idx] - fields.minHeight) * invHeightRange;
         levels[idx] = static_cast<uint8_t>(classifyLandform(
             elevationNorms[idx],
             fields.temperature[idx],

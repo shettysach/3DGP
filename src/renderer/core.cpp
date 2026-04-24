@@ -135,6 +135,53 @@ bool Renderer::init() {
     if (terrainProgram_ == 0u || skyProgram_ == 0u || shadowProgram_ == 0u) {
         return false;
     }
+
+    const auto cacheUniform = [](GLuint program, const char* name) {
+        return glfn::GetUniformLocation(program, name);
+    };
+    terrainUniforms_.viewProj = cacheUniform(terrainProgram_, "uViewProj");
+    terrainUniforms_.lightViewProj = cacheUniform(terrainProgram_, "uLightViewProj");
+    terrainUniforms_.cameraPos = cacheUniform(terrainProgram_, "uCameraPos");
+    terrainUniforms_.sunLightDir = cacheUniform(terrainProgram_, "uSunLightDir");
+    terrainUniforms_.sunColor = cacheUniform(terrainProgram_, "uSunColor");
+    terrainUniforms_.skyAmbientColor = cacheUniform(terrainProgram_, "uSkyAmbientColor");
+    terrainUniforms_.groundAmbientColor = cacheUniform(terrainProgram_, "uGroundAmbientColor");
+    terrainUniforms_.fogHorizonColor = cacheUniform(terrainProgram_, "uFogHorizonColor");
+    terrainUniforms_.fogZenithColor = cacheUniform(terrainProgram_, "uFogZenithColor");
+    terrainUniforms_.fogSunColor = cacheUniform(terrainProgram_, "uFogSunColor");
+    terrainUniforms_.fogDensity = cacheUniform(terrainProgram_, "uFogDensity");
+    terrainUniforms_.fogHeightFalloff = cacheUniform(terrainProgram_, "uFogHeightFalloff");
+    terrainUniforms_.fogBaseHeight = cacheUniform(terrainProgram_, "uFogBaseHeight");
+    terrainUniforms_.shadowTexelSize = cacheUniform(terrainProgram_, "uShadowTexelSize");
+    terrainUniforms_.enableMaterials = cacheUniform(terrainProgram_, "uEnableMaterials");
+    terrainUniforms_.enableShadows = cacheUniform(terrainProgram_, "uEnableShadows");
+    terrainUniforms_.grassTex = cacheUniform(terrainProgram_, "uGrassTex");
+    terrainUniforms_.rockTex = cacheUniform(terrainProgram_, "uRockTex");
+    terrainUniforms_.sandTex = cacheUniform(terrainProgram_, "uSandTex");
+    terrainUniforms_.snowTex = cacheUniform(terrainProgram_, "uSnowTex");
+    terrainUniforms_.shadowMap = cacheUniform(terrainProgram_, "uShadowMap");
+
+    skyUniforms_.cameraForward = cacheUniform(skyProgram_, "uCameraForward");
+    skyUniforms_.cameraRight = cacheUniform(skyProgram_, "uCameraRight");
+    skyUniforms_.cameraUp = cacheUniform(skyProgram_, "uCameraUp");
+    skyUniforms_.sunLightDir = cacheUniform(skyProgram_, "uSunLightDir");
+    skyUniforms_.sunColor = cacheUniform(skyProgram_, "uSunColor");
+    skyUniforms_.skyZenithColor = cacheUniform(skyProgram_, "uSkyZenithColor");
+    skyUniforms_.skyHorizonColor = cacheUniform(skyProgram_, "uSkyHorizonColor");
+    skyUniforms_.fogHorizonColor = cacheUniform(skyProgram_, "uFogHorizonColor");
+    skyUniforms_.aspect = cacheUniform(skyProgram_, "uAspect");
+    skyUniforms_.tanHalfFov = cacheUniform(skyProgram_, "uTanHalfFov");
+
+    shadowUniforms_.lightViewProj = cacheUniform(shadowProgram_, "uLightViewProj");
+
+    glfn::UseProgram(terrainProgram_);
+    setUniform(terrainUniforms_.shadowTexelSize, 1.0f / static_cast<float>(shadowMapSize_));
+    setUniform(terrainUniforms_.grassTex, 0);
+    setUniform(terrainUniforms_.rockTex, 1);
+    setUniform(terrainUniforms_.sandTex, 2);
+    setUniform(terrainUniforms_.snowTex, 3);
+    setUniform(terrainUniforms_.shadowMap, 4);
+    glfn::UseProgram(0);
     const auto shadersReady = Clock::now();
 
     glfn::GenVertexArrays(1, &skyVao_);
@@ -516,7 +563,7 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
         glClear(GL_DEPTH_BUFFER_BIT);
         glCullFace(GL_FRONT);
         glfn::UseProgram(shadowProgram_);
-        setUniform(shadowProgram_, "uLightViewProj", lightViewProjection);
+        setUniform(shadowUniforms_.lightViewProj, lightViewProjection);
         glfn::BindVertexArray(terrainVao_);
         glDrawElements(
             GL_TRIANGLES,
@@ -535,16 +582,16 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
 
     glDisable(GL_DEPTH_TEST);
     glfn::UseProgram(skyProgram_);
-    setUniform(skyProgram_, "uCameraForward", cameraForward);
-    setUniform(skyProgram_, "uCameraRight", cameraRight);
-    setUniform(skyProgram_, "uCameraUp", cameraUp);
-    setUniform(skyProgram_, "uSunLightDir", sunLightDir);
-    setUniform(skyProgram_, "uSunColor", kSunColor);
-    setUniform(skyProgram_, "uSkyZenithColor", kSkyZenithColor);
-    setUniform(skyProgram_, "uSkyHorizonColor", kSkyHorizonColor);
-    setUniform(skyProgram_, "uFogHorizonColor", kFogHorizonColor);
-    setUniform(skyProgram_, "uAspect", static_cast<float>(drawableWidth) / static_cast<float>(drawableHeight));
-    setUniform(skyProgram_, "uTanHalfFov", tanHalfFov);
+    setUniform(skyUniforms_.cameraForward, cameraForward);
+    setUniform(skyUniforms_.cameraRight, cameraRight);
+    setUniform(skyUniforms_.cameraUp, cameraUp);
+    setUniform(skyUniforms_.sunLightDir, sunLightDir);
+    setUniform(skyUniforms_.sunColor, kSunColor);
+    setUniform(skyUniforms_.skyZenithColor, kSkyZenithColor);
+    setUniform(skyUniforms_.skyHorizonColor, kSkyHorizonColor);
+    setUniform(skyUniforms_.fogHorizonColor, kFogHorizonColor);
+    setUniform(skyUniforms_.aspect, static_cast<float>(drawableWidth) / static_cast<float>(drawableHeight));
+    setUniform(skyUniforms_.tanHalfFov, tanHalfFov);
     glfn::BindVertexArray(skyVao_);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glfn::BindVertexArray(0);
@@ -555,27 +602,21 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
     glDepthMask(GL_TRUE);
 
     glfn::UseProgram(terrainProgram_);
-    setUniform(terrainProgram_, "uViewProj", viewProjection);
-    setUniform(terrainProgram_, "uLightViewProj", lightViewProjection);
-    setUniform(terrainProgram_, "uCameraPos", eye);
-    setUniform(terrainProgram_, "uSunLightDir", sunLightDir);
-    setUniform(terrainProgram_, "uSunColor", kSunColor);
-    setUniform(terrainProgram_, "uSkyAmbientColor", kSkyAmbientColor);
-    setUniform(terrainProgram_, "uGroundAmbientColor", kGroundAmbientColor);
-    setUniform(terrainProgram_, "uFogHorizonColor", kFogHorizonColor);
-    setUniform(terrainProgram_, "uFogZenithColor", kFogZenithColor);
-    setUniform(terrainProgram_, "uFogSunColor", kFogSunColor);
-    setUniform(terrainProgram_, "uFogDensity", 0.00028f + std::clamp(distance_ / 12000.0f, 0.0f, 0.00008f));
-    setUniform(terrainProgram_, "uFogHeightFalloff", 0.020f);
-    setUniform(terrainProgram_, "uFogBaseHeight", mesh.minHeight + 8.0f);
-    setUniform(terrainProgram_, "uShadowTexelSize", 1.0f / static_cast<float>(shadowMapSize_));
-    setUniform(terrainProgram_, "uEnableMaterials", enableMaterials ? 1 : 0);
-    setUniform(terrainProgram_, "uEnableShadows", enableShadows ? 1 : 0);
-    setUniform(terrainProgram_, "uGrassTex", 0);
-    setUniform(terrainProgram_, "uRockTex", 1);
-    setUniform(terrainProgram_, "uSandTex", 2);
-    setUniform(terrainProgram_, "uSnowTex", 3);
-    setUniform(terrainProgram_, "uShadowMap", 4);
+    setUniform(terrainUniforms_.viewProj, viewProjection);
+    setUniform(terrainUniforms_.lightViewProj, lightViewProjection);
+    setUniform(terrainUniforms_.cameraPos, eye);
+    setUniform(terrainUniforms_.sunLightDir, sunLightDir);
+    setUniform(terrainUniforms_.sunColor, kSunColor);
+    setUniform(terrainUniforms_.skyAmbientColor, kSkyAmbientColor);
+    setUniform(terrainUniforms_.groundAmbientColor, kGroundAmbientColor);
+    setUniform(terrainUniforms_.fogHorizonColor, kFogHorizonColor);
+    setUniform(terrainUniforms_.fogZenithColor, kFogZenithColor);
+    setUniform(terrainUniforms_.fogSunColor, kFogSunColor);
+    setUniform(terrainUniforms_.fogDensity, 0.00028f + std::clamp(distance_ / 12000.0f, 0.0f, 0.00008f));
+    setUniform(terrainUniforms_.fogHeightFalloff, 0.020f);
+    setUniform(terrainUniforms_.fogBaseHeight, mesh.minHeight + 8.0f);
+    setUniform(terrainUniforms_.enableMaterials, enableMaterials ? 1 : 0);
+    setUniform(terrainUniforms_.enableShadows, enableShadows ? 1 : 0);
 
     glfn::ActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, grassTexture_);

@@ -1,14 +1,12 @@
 #include "terrain.h"
 #include "terrain/biomes.h"
 #include "terrain/blending.h"
-#include "terrain/climate.h"
 #include "terrain/fields.h"
 #include "terrain/landforms.h"
 #include "terrain/mountains.h"
 #include "terrain/plains.h"
 #include "terrain/valleys.h"
 #include "terrain/rivers.h"
-#include "terrain/terrain_noise.h"
 #include "terrain/util.h"
 
 #include <algorithm>
@@ -38,12 +36,6 @@ struct HeightGradient {
     float slope = 0.0f;
 };
 
-struct HeightStageInput {
-    const TerrainSettings& settings;
-    std::function<float(float, float, int, float, float)> fbm;
-    std::function<float(float, float, int, float, float, float)> ridgedFbm;
-};
-
 float computeIslandFalloff(
     const TerrainSettings& settings,
     float worldX,
@@ -62,97 +54,6 @@ float computeIslandFalloff(
     float t = 1.0f - radius / scaledRadius;
     t = std::clamp(t, 0.0f, 1.0f);
     return std::pow(t, settings.falloffPower);
-}
-
-TerrainFields buildBaseTerrainFields(const HeightStageInput& in) {
-    TerrainFields fields(in.settings.width, in.settings.depth);
-    const float centerX = static_cast<float>(in.settings.width - 1) * 0.5f * in.settings.horizontalScale;
-    const float centerZ = static_cast<float>(in.settings.depth - 1) * 0.5f * in.settings.horizontalScale;
-    const float maxRadius =
-        std::min(static_cast<float>(in.settings.width - 1), static_cast<float>(in.settings.depth - 1)) *
-        0.5f * in.settings.horizontalScale;
-    const float baseFrequency = std::max(0.00001f, in.settings.noise.frequency);
-    const float warpScale = in.settings.noise.warpFrequency / baseFrequency;
-
-    for (int z = 0; z < in.settings.depth; ++z) {
-        for (int x = 0; x < in.settings.width; ++x) {
-            const size_t idx = fieldIndex(x, z, in.settings.width);
-            const float worldX = static_cast<float>(x) * in.settings.horizontalScale;
-            const float worldZ = static_cast<float>(z) * in.settings.horizontalScale;
-
-            const float warpX = in.fbm(worldX * warpScale + 31.7f,
-                                       worldZ * warpScale - 18.2f,
-                                       3,
-                                       in.settings.noise.lacunarity,
-                                       0.5f) *
-                                in.settings.noise.warpAmplitude;
-            const float warpZ = in.fbm(worldX * warpScale - 47.1f,
-                                       worldZ * warpScale + 22.8f,
-                                       3,
-                                       in.settings.noise.lacunarity,
-                                       0.5f) *
-                                in.settings.noise.warpAmplitude;
-
-            const float sampleX = worldX + warpX;
-            const float sampleZ = worldZ + warpZ;
-            fields.sampleXs[idx] = sampleX;
-            fields.sampleZs[idx] = sampleZ;
-
-            const TerrainNoiseInput terrainNoiseIn{
-                sampleX,
-                sampleZ,
-                in.settings.noise.octaves,
-                in.settings.noise.lacunarity,
-                in.settings.noise.gain,
-                in.settings.noise.ridgeSharpness,
-                in.fbm,
-                in.ridgedFbm};
-            const TerrainNoiseComputation terrainNoise = computeTerrainNoiseComputation(terrainNoiseIn);
-
-            const MountainNoiseInput mountainNoiseIn{
-                sampleX,
-                sampleZ,
-                in.settings.noise.octaves,
-                in.settings.noise.lacunarity,
-                in.settings.noise.gain,
-                in.settings.noise.ridgeSharpness,
-                in.settings.verticalScale,
-                in.fbm,
-                in.ridgedFbm};
-            const MountainResult mountain = computeMountainResult(mountainNoiseIn, terrainNoise.detail);
-
-            const ValleyNoiseInput valleyNoiseIn{
-                sampleX,
-                sampleZ,
-                in.settings.noise.octaves,
-                in.settings.noise.lacunarity,
-                in.settings.noise.gain,
-                in.settings.verticalScale,
-                in.fbm};
-            const ValleyResult valley = computeValleyResult(valleyNoiseIn, terrainNoise.detail);
-
-            const PlainsNoiseInput plainsNoiseIn{
-                sampleX,
-                sampleZ,
-                in.settings.noise.octaves,
-                in.settings.noise.lacunarity,
-                in.settings.noise.gain,
-                in.settings.verticalScale,
-                in.fbm};
-            const float plainsHeight = computePlainsHeightFromNoise(plainsNoiseIn, terrainNoise.detail);
-
-            const float falloff =
-                computeIslandFalloff(in.settings, worldX, worldZ, centerX, centerZ, maxRadius);
-            const BlendResult blend = blendTerrain(
-                {mountain.height, mountain.weight, plainsHeight - valley.depth, terrainNoise.detail, falloff, in.settings.verticalScale});
-
-            fields.heights[idx] = blend.height;
-            fields.mountainWeights[idx] = blend.mountainWeight;
-            fields.valleyWeights[idx] = valley.weight;
-        }
-    }
-
-    return fields;
 }
 
 void applyRiverPass(TerrainFields& fields, const TerrainSettings& settings) {
@@ -193,8 +94,11 @@ void computeSlopeField(TerrainFields& fields, float horizontalScale) {
     for (int z = 0; z < fields.depth; ++z) {
         for (int x = 0; x < fields.width; ++x) {
             const size_t idx = fieldIndex(x, z, fields.width);
-            fields.slopes[idx] =
-                sampleHeightGradient(fields.heights, fields.width, fields.depth, horizontalScale, x, z).slope;
+            const HeightGradient gradient =
+                sampleHeightGradient(fields.heights, fields.width, fields.depth, horizontalScale, x, z);
+            fields.gradientXs[idx] = gradient.dx;
+            fields.gradientZs[idx] = gradient.dz;
+            fields.slopes[idx] = gradient.slope;
         }
     }
 }
@@ -211,11 +115,10 @@ void buildVertices(
 
             TerrainVertex v;
             v.x = static_cast<float>(x) * settings.horizontalScale;
-            v.y = mesh.heights[idx];
+            v.y = fields.heights[idx];
             v.z = static_cast<float>(z) * settings.horizontalScale;
             v.slope = fields.slopes[idx];
             v.mountainWeight = fields.mountainWeights[idx];
-            v.plainsWeight = 1.0f - fields.mountainWeights[idx];
             v.riverWeight = fields.riverWeights[idx];
             v.temperature = fields.temperature[idx];
             v.precipitation = fields.precipitation[idx];
@@ -226,23 +129,14 @@ void buildVertices(
             v.secondaryBiome = fields.secondaryBiomeIds[idx];
             v.primaryBiomeWeight = fields.primaryBiomeWeights[idx];
             v.secondaryBiomeWeight = fields.secondaryBiomeWeights[idx];
-            mesh.vertices[idx] = v;
-        }
-    }
-
-    for (int z = 0; z < settings.depth; ++z) {
-        for (int x = 0; x < settings.width; ++x) {
-            const HeightGradient gradient =
-                sampleHeightGradient(mesh.heights, settings.width, settings.depth, settings.horizontalScale, x, z);
-            const size_t idx = fieldIndex(x, z, settings.width);
-            TerrainVertex& v = mesh.vertices[idx];
-            const float nx = -gradient.dx;
+            const float nx = -fields.gradientXs[idx];
             const float ny = 1.0f;
-            const float nz = -gradient.dz;
+            const float nz = -fields.gradientZs[idx];
             const float invLen = 1.0f / std::sqrt(nx * nx + ny * ny + nz * nz);
             v.nx = nx * invLen;
             v.ny = ny * invLen;
             v.nz = nz * invLen;
+            mesh.vertices[idx] = v;
         }
     }
 }
@@ -376,6 +270,140 @@ float TerrainGenerator::ridgedFbm(
     return octaveNoise(x, y, octaves, lacunarity, gain, [sharpness](float n) { return std::pow(std::clamp(1.0f - std::fabs(n), 0.0f, 1.0f), sharpness); });
 }
 
+TerrainFields TerrainGenerator::buildBaseTerrainFields() const {
+    TerrainFields fields(settings_.width, settings_.depth);
+    const float centerX = static_cast<float>(settings_.width - 1) * 0.5f * settings_.horizontalScale;
+    const float centerZ = static_cast<float>(settings_.depth - 1) * 0.5f * settings_.horizontalScale;
+    const float maxRadius =
+        std::min(static_cast<float>(settings_.width - 1), static_cast<float>(settings_.depth - 1)) *
+        0.5f * settings_.horizontalScale;
+    const float baseFrequency = std::max(0.00001f, settings_.noise.frequency);
+    const float warpScale = settings_.noise.warpFrequency / baseFrequency;
+
+    for (int z = 0; z < settings_.depth; ++z) {
+        for (int x = 0; x < settings_.width; ++x) {
+            const size_t idx = fieldIndex(x, z, settings_.width);
+            const float worldX = static_cast<float>(x) * settings_.horizontalScale;
+            const float worldZ = static_cast<float>(z) * settings_.horizontalScale;
+
+            const float warpX = fractalBrownianMotion(worldX * warpScale + 31.7f,
+                                                      worldZ * warpScale - 18.2f,
+                                                      3,
+                                                      settings_.noise.lacunarity,
+                                                      0.5f) *
+                                settings_.noise.warpAmplitude;
+            const float warpZ = fractalBrownianMotion(worldX * warpScale - 47.1f,
+                                                      worldZ * warpScale + 22.8f,
+                                                      3,
+                                                      settings_.noise.lacunarity,
+                                                      0.5f) *
+                                settings_.noise.warpAmplitude;
+
+            const float sampleX = worldX + warpX;
+            const float sampleZ = worldZ + warpZ;
+            fields.sampleXs[idx] = sampleX;
+            fields.sampleZs[idx] = sampleZ;
+
+            const float continental =
+                0.5f * (fractalBrownianMotion(sampleX, sampleZ, settings_.noise.octaves, settings_.noise.lacunarity, settings_.noise.gain) + 1.0f);
+            const float detail =
+                0.5f * (fractalBrownianMotion(sampleX * 2.7f, sampleZ * 2.7f, 4, 2.0f, 0.5f) + 1.0f);
+
+            const float ridges = ridgedFbm(
+                sampleX + 101.3f,
+                sampleZ - 77.9f,
+                settings_.noise.octaves,
+                settings_.noise.lacunarity,
+                settings_.noise.gain,
+                settings_.noise.ridgeSharpness);
+            const float rangeMask = smoothstep(
+                0.42f,
+                0.72f,
+                0.5f * (fractalBrownianMotion(
+                            sampleX * 0.3f + 400.0f,
+                            sampleZ * 0.3f - 250.0f,
+                            3,
+                            settings_.noise.lacunarity,
+                            0.45f) +
+                        1.0f));
+            const float slopeHint = std::clamp((ridges - 0.35f) * 1.55f + detail * 0.2f, 0.0f, 1.0f);
+            const MountainResult mountain = computeMountain(
+                {continental, ridges, detail, slopeHint, rangeMask, settings_.verticalScale});
+
+            const float basin = 0.5f * (fractalBrownianMotion(
+                                              sampleX * 0.28f - 191.7f,
+                                              sampleZ * 0.28f + 83.4f,
+                                              3,
+                                              settings_.noise.lacunarity,
+                                              0.52f) +
+                                          1.0f);
+            const float detailBand = 0.5f * (fractalBrownianMotion(
+                                                   sampleX * 1.9f + 52.3f,
+                                                   sampleZ * 1.9f - 61.8f,
+                                                   std::max(3, settings_.noise.octaves - 2),
+                                                   settings_.noise.lacunarity,
+                                                   settings_.noise.gain) +
+                                               1.0f);
+            const float rimMask = smoothstep(
+                0.38f,
+                0.74f,
+                0.5f * (fractalBrownianMotion(
+                            sampleX * 0.17f + 420.0f,
+                            sampleZ * 0.17f - 301.0f,
+                            3,
+                            settings_.noise.lacunarity,
+                            0.45f) +
+                        1.0f));
+            const float valleySlopeHint = std::clamp((0.62f - basin) * 1.35f + detail * 0.22f, 0.0f, 1.0f);
+            const ValleyResult valley = computeValley(
+                {continental, basin, detailBand, valleySlopeHint, rimMask, settings_.verticalScale});
+
+            const int plainsOctaves = std::max(3, settings_.noise.octaves - 2);
+            const float plainsBase = 0.5f * (fractalBrownianMotion(
+                                                   sampleX - 63.2f,
+                                                   sampleZ + 41.8f,
+                                                   plainsOctaves,
+                                                   settings_.noise.lacunarity,
+                                                   settings_.noise.gain) +
+                                               1.0f);
+            const float macroRelief = 0.5f * (fractalBrownianMotion(
+                                                    sampleX * 0.30f + 219.4f,
+                                                    sampleZ * 0.30f - 174.6f,
+                                                    3,
+                                                    settings_.noise.lacunarity,
+                                                    0.48f) +
+                                                1.0f);
+            const float hilliness = 0.5f * (fractalBrownianMotion(
+                                                  sampleX * 0.82f - 141.5f,
+                                                  sampleZ * 0.82f + 96.8f,
+                                                  std::max(3, settings_.noise.octaves - 1),
+                                                  settings_.noise.lacunarity,
+                                                  settings_.noise.gain) +
+                                              1.0f);
+            const float basinNoise = 0.5f * (fractalBrownianMotion(
+                                                   sampleX * 0.18f - 331.7f,
+                                                   sampleZ * 0.18f + 271.4f,
+                                                   2,
+                                                   settings_.noise.lacunarity,
+                                                   0.55f) +
+                                               1.0f);
+            const float plainsHeight = computePlainsHeight(
+                {continental, plainsBase, macroRelief, hilliness, basinNoise, detail, settings_.verticalScale});
+
+            const float falloff =
+                computeIslandFalloff(settings_, worldX, worldZ, centerX, centerZ, maxRadius);
+            const BlendResult blend = blendTerrain(
+                {mountain.height, mountain.weight, plainsHeight - valley.depth, detail, falloff, settings_.verticalScale});
+
+            fields.heights[idx] = blend.height;
+            fields.mountainWeights[idx] = blend.mountainWeight;
+            fields.valleyWeights[idx] = valley.weight;
+        }
+    }
+
+    return fields;
+}
+
 // Main generation function
 // 1. Builds the scalar terrain fields (height, mountain mask, warped sample positions)
 // 2. Applies post-processing stages (smoothing, slopes, climate, landforms, biomes)
@@ -388,37 +416,28 @@ TerrainMesh TerrainGenerator::generateMesh() const {
         return std::chrono::duration<double, std::milli>(end - start).count();
     };
 
-    const auto fbm = [this](float x, float y, int octaves, float lacunarity, float gain) {
-        return this->fractalBrownianMotion(x, y, octaves, lacunarity, gain);
-    };
-    const auto ridged = [this](float x, float y, int octaves, float lacunarity, float gain, float sharpness) {
-        return this->ridgedFbm(x, y, octaves, lacunarity, gain, sharpness);
-    };
-
-    TerrainFields fields = buildBaseTerrainFields({settings_, fbm, ridged});
+    TerrainFields fields = buildBaseTerrainFields();
     const auto baseTerrainDone = Clock::now();
     smoothHeights(fields.heights, fields.mountainWeights, fields.valleyWeights, settings_.width, settings_.depth);
     const auto smoothDone = Clock::now();
     applyRiverPass(fields, settings_);
     const auto riversDone = Clock::now();
+    computeHeightExtents(fields.heights, fields.minHeight, fields.maxHeight);
     computeSlopeField(fields, settings_.horizontalScale);
     const auto slopesDone = Clock::now();
-    computeClimateFields(fields, settings_, fbm);
+    computeClimateFields(fields);
     const auto climateDone = Clock::now();
     computeLandformFields(fields);
     const auto landformsDone = Clock::now();
     computeBiomeFields(fields);
     const auto biomesDone = Clock::now();
 
-TerrainMesh mesh;
+    TerrainMesh mesh;
     mesh.width = settings_.width;
     mesh.depth = settings_.depth;
     mesh.horizontalScale = settings_.horizontalScale;
-    mesh.heights = fields.heights;
-    mesh.temperatureMap = fields.temperature;
-    mesh.precipitationMap = fields.precipitation;
-    mesh.moistureMap = fields.moisture;
-    computeHeightExtents(mesh.heights, mesh.minHeight, mesh.maxHeight);
+    mesh.minHeight = fields.minHeight;
+    mesh.maxHeight = fields.maxHeight;
     const auto extentsDone = Clock::now();
 
     buildVertices(mesh, fields, settings_);

@@ -32,7 +32,6 @@ void runDemo() {
     settings.rivers.sourceAccumulation = 135.0f;
     settings.rivers.mainAccumulation = 320.0f;
     settings.rivers.minSourceSeparation = 28;
-    settings.rivers.coreThreshold = 0.42f;
 
     auto printBiomeStats = [](const terrain::TerrainMesh& mesh) {
         std::array<size_t, static_cast<size_t>(terrain::BiomeId::Count)> counts{};

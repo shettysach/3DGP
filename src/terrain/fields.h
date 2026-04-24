@@ -12,10 +12,14 @@ namespace terrain {
 struct TerrainFields {
     int width = 0;
     int depth = 0;
+    float minHeight = 0.0f;
+    float maxHeight = 0.0f;
     std::vector<float> heights;
     std::vector<float> mountainWeights;
     std::vector<float> riverWeights;
     std::vector<float> slopes;
+    std::vector<float> gradientXs;
+    std::vector<float> gradientZs;
     std::vector<float> temperature;
     std::vector<float> precipitation;
     std::vector<float> moisture;
@@ -39,11 +43,15 @@ struct TerrainFields {
     void resize(int widthIn, int depthIn) {
         width = widthIn;
         depth = depthIn;
+        minHeight = 0.0f;
+        maxHeight = 0.0f;
         const size_t count = static_cast<size_t>(width) * static_cast<size_t>(depth);
         heights.assign(count, 0.0f);
         mountainWeights.assign(count, 0.0f);
         riverWeights.assign(count, 0.0f);
         slopes.assign(count, 0.0f);
+        gradientXs.assign(count, 0.0f);
+        gradientZs.assign(count, 0.0f);
         temperature.assign(count, 0.5f);
         precipitation.assign(count, 0.5f);
         moisture.assign(count, 0.5f);

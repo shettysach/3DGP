@@ -396,9 +396,7 @@ void computeBiomeFields(TerrainFields& fields) {
         return;
     }
 
-    float minHeight, maxHeight;
-    computeHeightExtents(fields.heights, minHeight, maxHeight);
-    const float invHeightRange = 1.0f / std::max(0.0001f, maxHeight - minHeight);
+    const float invHeightRange = 1.0f / std::max(0.0001f, fields.maxHeight - fields.minHeight);
     const size_t cellCount = fields.size();
 
     for (size_t idx = 0; idx < cellCount; ++idx) {
@@ -412,7 +410,7 @@ void computeBiomeFields(TerrainFields& fields) {
             landform);
         fields.ecologyIds[idx] = static_cast<uint8_t>(dominantEcology(ecologyWeights));
 
-        const float elevationNorm = (fields.heights[idx] - minHeight) * invHeightRange;
+        const float elevationNorm = (fields.heights[idx] - fields.minHeight) * invHeightRange;
         BiomeWeightVector biomeWeights = biomeWeightsFromEcology(
             landform,
             ecologyWeights,

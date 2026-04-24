@@ -9,9 +9,10 @@
 
 #include "terrain.h"
 #include "terrain/util.h"
-#include "utils.h"
 
 namespace renderer {
+
+using terrain::lerp;
 
 inline constexpr float kPi = 3.14159265358979323846f;
 inline constexpr int kMaterialTextureSize = 256;
@@ -64,19 +65,15 @@ inline Color3 scaleColor(Color3 c, float s) {
     return {c.r * s, c.g * s, c.b * s};
 }
 
-inline Color3 addColor(Color3 a, Color3 b) {
-    return {a.r + b.r, a.g + b.g, a.b + b.b};
-}
-
 inline Color3 mulColor(Color3 a, Color3 b) {
     return {a.r * b.r, a.g * b.g, a.b * b.b};
 }
 
 inline Color3 mixColor(Color3 a, Color3 b, float t) {
     return {
-        ::lerp(a.r, b.r, t),
-        ::lerp(a.g, b.g, t),
-        ::lerp(a.b, b.b, t),
+        lerp(a.r, b.r, t),
+        lerp(a.g, b.g, t),
+        lerp(a.b, b.b, t),
     };
 }
 
@@ -164,10 +161,10 @@ Mat4 lookAt(const Vec3& eye, const Vec3& target, const Vec3& up);
 Mat4 orthoBox(float left, float right, float bottom, float top, float nearPlane, float farPlane);
 Mat4 buildLightViewProjection(const terrain::TerrainMesh& mesh);
 
-void setUniform(GLuint program, const char* name, const Mat4& value);
-void setUniform(GLuint program, const char* name, int value);
-void setUniform(GLuint program, const char* name, float value);
-void setUniform(GLuint program, const char* name, const Vec3& value);
+void setUniform(GLint location, const Mat4& value);
+void setUniform(GLint location, int value);
+void setUniform(GLint location, float value);
+void setUniform(GLint location, const Vec3& value);
 
 void destroyTexture(GLuint& texture);
 void destroyProgram(GLuint& program);

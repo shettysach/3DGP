@@ -390,31 +390,27 @@ GLuint createProgram(const char* vertexSource, const char* fragmentSource) {
     return 0u;
 }
 
-void setUniform(GLuint program, const char* name, const Mat4& value) {
-    const GLint loc = glfn::GetUniformLocation(program, name);
-    if (loc >= 0) {
-        glfn::UniformMatrix4fv(loc, 1, GL_FALSE, value.m);
+void setUniform(GLint location, const Mat4& value) {
+    if (location >= 0) {
+        glfn::UniformMatrix4fv(location, 1, GL_FALSE, value.m);
     }
 }
 
-void setUniform(GLuint program, const char* name, int value) {
-    const GLint loc = glfn::GetUniformLocation(program, name);
-    if (loc >= 0) {
-        glfn::Uniform1i(loc, value);
+void setUniform(GLint location, int value) {
+    if (location >= 0) {
+        glfn::Uniform1i(location, value);
     }
 }
 
-void setUniform(GLuint program, const char* name, float value) {
-    const GLint loc = glfn::GetUniformLocation(program, name);
-    if (loc >= 0) {
-        glfn::Uniform1f(loc, value);
+void setUniform(GLint location, float value) {
+    if (location >= 0) {
+        glfn::Uniform1f(location, value);
     }
 }
 
-void setUniform(GLuint program, const char* name, const Vec3& value) {
-    const GLint loc = glfn::GetUniformLocation(program, name);
-    if (loc >= 0) {
-        glfn::Uniform3f(loc, value.x, value.y, value.z);
+void setUniform(GLint location, const Vec3& value) {
+    if (location >= 0) {
+        glfn::Uniform3f(location, value.x, value.y, value.z);
     }
 }
 

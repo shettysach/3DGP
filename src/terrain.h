@@ -6,6 +6,8 @@
 
 namespace terrain {
 
+struct TerrainFields;
+
 enum class LandformId : uint8_t {
     Lowland = 0,
     Plain,
@@ -66,7 +68,6 @@ struct RiverSettings {
     float baseCarveFraction = 0.02f;
     float maxCarveFraction = 0.07f;
     float bankFalloff = 1.8f;
-    float coreThreshold = 0.55f;
 };
 
 struct ClimateSettings {
@@ -108,7 +109,6 @@ struct TerrainVertex {
     float nz = 0.0f;
     float slope = 0.0f;
     float mountainWeight = 0.0f;
-    float plainsWeight = 1.0f;
     float riverWeight = 0.0f;
     float temperature = 0.5f;
     float precipitation = 0.5f;
@@ -127,10 +127,6 @@ struct TerrainMesh {
     float horizontalScale = 1.0f;
     float minHeight = 0.0f;
     float maxHeight = 0.0f;
-    std::vector<float> heights;
-    std::vector<float> temperatureMap;
-    std::vector<float> precipitationMap;
-    std::vector<float> moistureMap;
     std::vector<TerrainVertex> vertices;
     std::vector<uint32_t> indices;
 };
@@ -147,6 +143,9 @@ class TerrainGenerator {
   private:
     TerrainSettings settings_;
     std::vector<int> permutation_;
+
+    TerrainFields buildBaseTerrainFields() const;
+    void computeClimateFields(TerrainFields& fields) const;
 
     void reseed(uint32_t seed);
     float simplexNoise2D(float x, float y) const;
