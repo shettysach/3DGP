@@ -3,8 +3,13 @@
 
 #include "renderer/core.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <vector>
+
+#include "terrain.h"
+#include "terrain/util.h"
+#include "utils.h"
 
 namespace renderer {
 
@@ -47,6 +52,33 @@ struct Color3 {
     float g = 0.0f;
     float b = 0.0f;
 };
+
+inline Color3 clampColor(Color3 c, float min, float max) {
+    c.r = std::clamp(c.r, min, max);
+    c.g = std::clamp(c.g, min, max);
+    c.b = std::clamp(c.b, min, max);
+    return c;
+}
+
+inline Color3 scaleColor(Color3 c, float s) {
+    return {c.r * s, c.g * s, c.b * s};
+}
+
+inline Color3 addColor(Color3 a, Color3 b) {
+    return {a.r + b.r, a.g + b.g, a.b + b.b};
+}
+
+inline Color3 mulColor(Color3 a, Color3 b) {
+    return {a.r * b.r, a.g * b.g, a.b * b.b};
+}
+
+inline Color3 mixColor(Color3 a, Color3 b, float t) {
+    return {
+        ::lerp(a.r, b.r, t),
+        ::lerp(a.g, b.g, t),
+        ::lerp(a.b, b.b, t),
+    };
+}
 
 struct TerrainGpuVertex {
     float position[3];

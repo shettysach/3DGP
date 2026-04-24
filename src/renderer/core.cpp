@@ -389,29 +389,14 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
         const float invHeightRange = 1.0f / std::max(0.001f, mesh.maxHeight - mesh.minHeight);
         for (size_t i = 0; i < mesh.vertices.size(); ++i) {
             const terrain::TerrainVertex& v = mesh.vertices[i];
-            TerrainGpuVertex gpu{};
-            gpu.position[0] = v.x;
-            gpu.position[1] = v.y;
-            gpu.position[2] = v.z;
-            gpu.normal[0] = v.nx;
-            gpu.normal[1] = v.ny;
-            gpu.normal[2] = v.nz;
-
             const size_t colorBase = i * 3u;
-            gpu.baseColor[0] = terrainBaseColors_[colorBase + 0u];
-            gpu.baseColor[1] = terrainBaseColors_[colorBase + 1u];
-            gpu.baseColor[2] = terrainBaseColors_[colorBase + 2u];
-
-            gpu.params0[0] = std::clamp(v.slope, 0.0f, 1.0f);
-            gpu.params0[1] = std::clamp(v.mountainWeight, 0.0f, 1.0f);
-            gpu.params0[2] = std::clamp(v.riverWeight, 0.0f, 1.0f);
-            gpu.params0[3] = std::clamp(v.moisture, 0.0f, 1.0f);
-
-            gpu.params1[0] = std::clamp((v.y - mesh.minHeight) * invHeightRange, 0.0f, 1.0f);
-            gpu.params1[1] = std::clamp(v.temperature, 0.0f, 1.0f);
-            gpu.params1[2] = std::clamp(v.precipitation, 0.0f, 1.0f);
-            gpu.params1[3] = 0.0f;
-            terrainVertices[i] = gpu;
+            terrainVertices[i] = TerrainGpuVertex{
+                {v.x, v.y, v.z},
+                {v.nx, v.ny, v.nz},
+                {terrainBaseColors_[colorBase], terrainBaseColors_[colorBase + 1u], terrainBaseColors_[colorBase + 2u]},
+                {std::clamp(v.slope, 0.0f, 1.0f), std::clamp(v.mountainWeight, 0.0f, 1.0f), std::clamp(v.riverWeight, 0.0f, 1.0f), std::clamp(v.moisture, 0.0f, 1.0f)},
+                {std::clamp((v.y - mesh.minHeight) * invHeightRange, 0.0f, 1.0f), std::clamp(v.temperature, 0.0f, 1.0f), std::clamp(v.precipitation, 0.0f, 1.0f), 0.0f}
+            };
         }
 
         if (terrainVao_ == 0u) {

@@ -84,9 +84,10 @@ void computeLandformFields(TerrainFields& fields) {
     float minHeight, maxHeight;
     computeHeightExtents(fields.heights, minHeight, maxHeight);
     const float invHeightRange = 1.0f / std::max(0.0001f, maxHeight - minHeight);
+    const size_t cellCount = fields.size();
 
-    std::vector<float> rawSignal(fields.size(), 0.0f);
-    for (size_t idx = 0; idx < fields.size(); ++idx) {
+    std::vector<float> rawSignal(cellCount, 0.0f);
+    for (size_t idx = 0; idx < cellCount; ++idx) {
         const float elevationNorm = (fields.heights[idx] - minHeight) * invHeightRange;
         const float slope = std::clamp(fields.slopes[idx], 0.0f, 1.0f);
         const float valleyPull = std::clamp(fields.valleyWeights[idx], 0.0f, 1.0f);
@@ -103,9 +104,9 @@ void computeLandformFields(TerrainFields& fields) {
     blurScalarField(rawSignal, blurredSignal, fields.width, fields.depth);
     blurScalarField(blurredSignal, fields.landformSignal, fields.width, fields.depth);
 
-    std::vector<uint8_t> levels(fields.size(), static_cast<uint8_t>(LandformId::Plain));
-    std::vector<float> elevationNorms(fields.size(), 0.0f);
-    for (size_t idx = 0; idx < fields.size(); ++idx) {
+    std::vector<uint8_t> levels(cellCount, static_cast<uint8_t>(LandformId::Plain));
+    std::vector<float> elevationNorms(cellCount, 0.0f);
+    for (size_t idx = 0; idx < cellCount; ++idx) {
         elevationNorms[idx] = (fields.heights[idx] - minHeight) * invHeightRange;
         levels[idx] = static_cast<uint8_t>(classifyLandform(
             elevationNorms[idx],
@@ -137,7 +138,7 @@ void computeLandformFields(TerrainFields& fields) {
                     }
                 }
 
-                const int neighborAverage = static_cast<int>(std::round(static_cast<float>(sum) / static_cast<float>(count)));
+                const int neighborAverage = (count > 0) ? (sum / count) : 0;
                 if (level > neighborAverage + 1) {
                     --level;
                 } else if (level < neighborAverage - 1) {

@@ -109,41 +109,30 @@ size_t biomeIndex(BiomeId biome) {
     return static_cast<size_t>(biome);
 }
 
-void normalizeWeights(BiomeWeightVector& weights) {
+inline void normalizeWeightArray(float* weights, size_t size, size_t defaultIdx) {
     float sum = 0.0f;
-    for (float weight : weights) {
-        sum += weight;
+    for (size_t i = 0; i < size; ++i) {
+        sum += weights[i];
     }
-
     if (sum <= 0.0001f) {
-        weights.fill(0.0f);
-        weights[biomeIndex(BiomeId::GrasslandPlain)] = 1.0f;
+        std::fill(weights, weights + size, 0.0f);
+        weights[defaultIdx] = 1.0f;
         return;
     }
-
     const float invSum = 1.0f / sum;
-    for (float& weight : weights) {
-        weight *= invSum;
+    for (size_t i = 0; i < size; ++i) {
+        weights[i] *= invSum;
     }
+}
+
+void normalizeWeights(BiomeWeightVector& weights) {
+    normalizeWeightArray(weights.data(), weights.size(), biomeIndex(BiomeId::GrasslandPlain));
 }
 
 void normalizeWeights(EcologyWeightVector& weights) {
-    float sum = 0.0f;
-    for (float weight : weights) {
-        sum += weight;
-    }
-
-    if (sum <= 0.0001f) {
-        weights.fill(0.0f);
-        weights[ecologyIndex(EcologyId::Grassland)] = 1.0f;
-        return;
-    }
-
-    const float invSum = 1.0f / sum;
-    for (float& weight : weights) {
-        weight *= invSum;
-    }
+    normalizeWeightArray(weights.data(), weights.size(), ecologyIndex(EcologyId::Grassland));
 }
+
 float gaussian2(float x, float y, float cx, float cy, float sx, float sy) {
     const float nx = (x - cx) / std::max(0.001f, sx);
     const float ny = (y - cy) / std::max(0.001f, sy);
@@ -154,7 +143,8 @@ void applyMappedEcologyWeights(
     BiomeWeightVector& biomeWeights,
     const EcologyWeightVector& ecologyWeights,
     const std::array<BiomeId, kEcologyCount>& mapping) {
-    for (size_t ecology = 0; ecology < ecologyWeights.size(); ++ecology) {
+    const size_t count = ecologyWeights.size();
+    for (size_t ecology = 0; ecology < count; ecology++) {
         biomeWeights[biomeIndex(mapping[ecology])] += ecologyWeights[ecology];
     }
 }
@@ -302,7 +292,7 @@ void writeBiomeWeights(TerrainFields& fields, size_t idx, const BiomeWeightVecto
     size_t secondary = primary;
     float primaryWeight = 0.0f;
     float secondaryWeight = 0.0f;
-    for (size_t biome = 0; biome < weights.size(); ++biome) {
+    for (size_t biome = 0; biome < weights.size(); biome++) {
         const float weight = weights[biome];
         if (weight > primaryWeight) {
             secondary = primary;
@@ -346,13 +336,14 @@ float biomeNeighborCompatibility(const TerrainFields& fields, size_t idx, size_t
 }
 
 void smoothSurfaceBiomeWeights(TerrainFields& fields) {
-    if (fields.size() == 0) {
+    const size_t cellCount = fields.size();
+    if (cellCount == 0) {
         return;
     }
 
-    std::vector<BiomeWeightVector> current(fields.size());
-    std::vector<BiomeWeightVector> next(fields.size());
-    for (size_t idx = 0; idx < fields.size(); ++idx) {
+    std::vector<BiomeWeightVector> current(cellCount);
+    std::vector<BiomeWeightVector> next(cellCount);
+    for (size_t idx = 0; idx < cellCount; ++idx) {
         current[idx] = vertexBiomeWeights(fields, idx);
     }
 
@@ -393,7 +384,7 @@ void smoothSurfaceBiomeWeights(TerrainFields& fields) {
         current.swap(next);
     }
 
-    for (size_t idx = 0; idx < fields.size(); ++idx) {
+    for (size_t idx = 0; idx < cellCount; ++idx) {
         writeBiomeWeights(fields, idx, current[idx]);
     }
 }
@@ -408,8 +399,9 @@ void computeBiomeFields(TerrainFields& fields) {
     float minHeight, maxHeight;
     computeHeightExtents(fields.heights, minHeight, maxHeight);
     const float invHeightRange = 1.0f / std::max(0.0001f, maxHeight - minHeight);
+    const size_t cellCount = fields.size();
 
-    for (size_t idx = 0; idx < fields.size(); ++idx) {
+    for (size_t idx = 0; idx < cellCount; ++idx) {
         const LandformId landform = static_cast<LandformId>(fields.landformIds[idx]);
         const EcologyWeightVector ecologyWeights = ecologyWeightsFromClimate(
             fields.temperature[idx],

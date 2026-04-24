@@ -111,11 +111,12 @@ std::vector<RiverPoint> smoothRiverPath(std::vector<RiverPoint> path, int iterat
     }
 
     for (int iteration = 0; iteration < iterations; ++iteration) {
+        const size_t currentSize = path.size();
         std::vector<RiverPoint> smoothed;
-        smoothed.reserve(path.size() * 2);
+        smoothed.reserve(currentSize * 2);
         smoothed.push_back(path.front());
 
-        for (size_t i = 0; i + 1 < path.size(); ++i) {
+        for (size_t i = 0; i + 1 < currentSize; ++i) {
             const RiverPoint& a = path[i];
             const RiverPoint& b = path[i + 1];
             smoothed.push_back({
@@ -143,12 +144,13 @@ std::vector<RiverPoint> applyRiverMeander(
     int depth,
     uint32_t seed,
     size_t sourceIdx) {
-    if (path.size() < 5) {
+    const size_t pathSize = path.size();
+    if (pathSize < 5) {
         return path;
     }
 
-    std::vector<float> cumulativeLength(path.size(), 0.0f);
-    for (size_t i = 1; i < path.size(); ++i) {
+    std::vector<float> cumulativeLength(pathSize, 0.0f);
+    for (size_t i = 1; i < pathSize; ++i) {
         const float dx = path[i].x - path[i - 1].x;
         const float dz = path[i].z - path[i - 1].z;
         cumulativeLength[i] = cumulativeLength[i - 1] + std::sqrt(dx * dx + dz * dz);
@@ -165,7 +167,7 @@ std::vector<RiverPoint> applyRiverMeander(
     const float cyclesB = std::max(2.0f, totalLength / 14.0f);
     const float maxOffset = 0.85f;
 
-    for (size_t i = 1; i + 1 < path.size(); ++i) {
+    for (size_t i = 1; i + 1 < pathSize; ++i) {
         const float tangentX = path[i + 1].x - path[i - 1].x;
         const float tangentZ = path[i + 1].z - path[i - 1].z;
         const float tangentLength = std::sqrt(tangentX * tangentX + tangentZ * tangentZ);
@@ -396,14 +398,14 @@ RiverPassResult runRiverPass(
                 continue;
             }
 
-            const int cx = static_cast<int>(candidate.index % static_cast<size_t>(width));
-            const int cz = static_cast<int>(candidate.index / static_cast<size_t>(width));
+            const int cx = static_cast<int>(candidate.index % width);
+            const int cz = static_cast<int>(candidate.index / width);
 
             bool tooClose = false;
             if (separationSq > 0) {
                 for (size_t selected : selectedSources) {
-                    const int sx = static_cast<int>(selected % static_cast<size_t>(width));
-                    const int sz = static_cast<int>(selected / static_cast<size_t>(width));
+                    const int sx = static_cast<int>(selected % width);
+                    const int sz = static_cast<int>(selected / width);
                     const int dx = cx - sx;
                     const int dz = cz - sz;
                     if (dx * dx + dz * dz < separationSq) {

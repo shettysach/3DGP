@@ -139,17 +139,9 @@ float valueNoise2D(float x, float y, uint32_t seed) {
     const float n10 = hash2D(x1, y0, seed);
     const float n01 = hash2D(x0, y1, seed);
     const float n11 = hash2D(x1, y1, seed);
-    const float nx0 = terrain::lerp(n00, n10, sx);
-    const float nx1 = terrain::lerp(n01, n11, sx);
-    return terrain::lerp(nx0, nx1, sy);
-}
-
-Color3 lerpColor(const Color3& a, const Color3& b, float t) {
-    return {
-        terrain::lerp(a.r, b.r, t),
-        terrain::lerp(a.g, b.g, t),
-        terrain::lerp(a.b, b.b, t),
-    };
+    const float nx0 = lerp(n00, n10, sx);
+    const float nx1 = lerp(n01, n11, sx);
+    return lerp(nx0, nx1, sy);
 }
 
 Color3 biomeVertexColor(const terrain::TerrainVertex& v, float minH, float maxH) {
@@ -170,15 +162,10 @@ Color3 biomeVertexColor(const terrain::TerrainVertex& v, float minH, float maxH)
         (primaryBiomeColor.b * primaryWeight + secondaryBiomeColor.b * secondaryWeight) / blendDenom,
     };
 
-    const Color3 rockTint{0.44f, 0.42f, 0.40f};
     const float rockSignal = slope * 0.38f + v.mountainWeight * 0.82f + h * 0.08f;
     const float rockBoost = terrain::smoothstep(0.46f, 0.88f, rockSignal);
-    color = lerpColor(color, rockTint, rockBoost * 0.10f);
-
-    const float colorMean = (color.r + color.g + color.b) / 3.0f;
-    color.r = std::clamp(colorMean + (color.r - colorMean) * 1.10f, 0.0f, 1.0f);
-    color.g = std::clamp(colorMean + (color.g - colorMean) * 1.10f, 0.0f, 1.0f);
-    color.b = std::clamp(colorMean + (color.b - colorMean) * 1.10f, 0.0f, 1.0f);
+    const Color3 rockTint{0.44f, 0.42f, 0.40f};
+    color = mixColor(color, rockTint, rockBoost * 0.10f);
 
     const float terraceNoise =
         0.5f + 0.5f * std::sin(v.x * 0.048f + v.z * 0.031f) * std::cos(v.x * 0.019f - v.z * 0.043f);
@@ -187,52 +174,51 @@ Color3 biomeVertexColor(const terrain::TerrainVertex& v, float minH, float maxH)
     const float slopeLightening = terrain::smoothstep(0.05f, 0.28f, 1.0f - slope) * 0.045f;
     const float shade =
         0.92f + h * 0.12f - cavity * 0.08f - riverDarkening + slopeLightening + (terraceNoise - 0.5f) * 0.03f;
-    color.r = std::clamp(color.r * shade, 0.0f, 1.0f);
-    color.g = std::clamp(color.g * shade, 0.0f, 1.0f);
-    color.b = std::clamp(color.b * shade, 0.0f, 1.0f);
+    color = scaleColor(color, shade);
 
     const Color3 coolShadowTint{0.97f, 0.98f, 1.00f};
     const float coolMix = cavity * 0.02f;
-    color = lerpColor(color, {color.r * coolShadowTint.r, color.g * coolShadowTint.g, color.b * coolShadowTint.b}, coolMix);
-    return color;
+    color = mixColor(color, mulColor(color, coolShadowTint), coolMix);
+
+    return clampColor(color, 0.0f, 1.0f);
 }
 
 Color3 heatmapColor(float value) {
     const float t = std::clamp(value, 0.0f, 1.0f);
     if (t < 0.33f) {
-        return lerpColor({0.06f, 0.12f, 0.42f}, {0.17f, 0.62f, 0.86f}, t / 0.33f);
+        return mixColor({0.06f, 0.12f, 0.42f}, {0.17f, 0.62f, 0.86f}, t / 0.33f);
     }
     if (t < 0.66f) {
-        return lerpColor({0.17f, 0.62f, 0.86f}, {0.90f, 0.82f, 0.24f}, (t - 0.33f) / 0.33f);
+        return mixColor({0.17f, 0.62f, 0.86f}, {0.90f, 0.82f, 0.24f}, (t - 0.33f) / 0.33f);
     }
-    return lerpColor({0.90f, 0.82f, 0.24f}, {0.82f, 0.22f, 0.14f}, (t - 0.66f) / 0.34f);
+    return mixColor({0.90f, 0.82f, 0.24f}, {0.82f, 0.22f, 0.14f}, (t - 0.66f) / 0.34f);
 }
 
 Color3 precipitationColor(float value) {
     const float t = std::clamp(value, 0.0f, 1.0f);
     if (t < 0.5f) {
-        return lerpColor({0.74f, 0.61f, 0.38f}, {0.42f, 0.68f, 0.28f}, t / 0.5f);
+        return mixColor({0.74f, 0.61f, 0.38f}, {0.42f, 0.68f, 0.28f}, t / 0.5f);
     }
-    return lerpColor({0.42f, 0.68f, 0.28f}, {0.12f, 0.38f, 0.63f}, (t - 0.5f) / 0.5f);
+    return mixColor({0.42f, 0.68f, 0.28f}, {0.12f, 0.38f, 0.63f}, (t - 0.5f) / 0.5f);
 }
 
 Color3 moistureColor(float value) {
     const float t = std::clamp(value, 0.0f, 1.0f);
     if (t < 0.5f) {
-        return lerpColor({0.63f, 0.52f, 0.34f}, {0.31f, 0.55f, 0.20f}, t / 0.5f);
+        return mixColor({0.63f, 0.52f, 0.34f}, {0.31f, 0.55f, 0.20f}, t / 0.5f);
     }
-    return lerpColor({0.31f, 0.55f, 0.20f}, {0.06f, 0.44f, 0.36f}, (t - 0.5f) / 0.5f);
+    return mixColor({0.31f, 0.55f, 0.20f}, {0.06f, 0.44f, 0.36f}, (t - 0.5f) / 0.5f);
 }
 
 Color3 slopeColor(float value) {
     const float t = std::clamp(value, 0.0f, 1.0f);
     if (t < 0.4f) {
-        return lerpColor({0.15f, 0.38f, 0.12f}, {0.57f, 0.56f, 0.26f}, t / 0.4f);
+        return mixColor({0.15f, 0.38f, 0.12f}, {0.57f, 0.56f, 0.26f}, t / 0.4f);
     }
     if (t < 0.75f) {
-        return lerpColor({0.57f, 0.56f, 0.26f}, {0.55f, 0.49f, 0.44f}, (t - 0.4f) / 0.35f);
+        return mixColor({0.57f, 0.56f, 0.26f}, {0.55f, 0.49f, 0.44f}, (t - 0.4f) / 0.35f);
     }
-    return lerpColor({0.55f, 0.49f, 0.44f}, {0.95f, 0.95f, 0.95f}, (t - 0.75f) / 0.25f);
+    return mixColor({0.55f, 0.49f, 0.44f}, {0.95f, 0.95f, 0.95f}, (t - 0.75f) / 0.25f);
 }
 
 Color3 debugVertexColor(const terrain::TerrainVertex& v, float minH, float maxH, Mode mode) {
@@ -338,14 +324,14 @@ GLuint createProceduralTexture(
             const float strata =
                 0.5f + 0.5f * std::sin((fx * 0.85f + fy * 0.55f) * kPi + (mid - 0.5f) * 3.6f);
             float n = low * 0.42f + mid * 0.24f + hi * 0.13f + ridge * 0.13f + strata * 0.08f;
-            n = terrain::lerp(n, grain, grainMix);
+            n = lerp(n, grain, grainMix);
             n = std::clamp((n - 0.5f) * contrast + 0.5f, 0.0f, 1.0f);
             const float highlight = 0.90f + (hi - 0.5f) * 0.22f + (grain - 0.5f) * 0.10f;
 
             Color3 c{
-                terrain::lerp(base.r, tint.r, n),
-                terrain::lerp(base.g, tint.g, n),
-                terrain::lerp(base.b, tint.b, n),
+                lerp(base.r, tint.r, n),
+                lerp(base.g, tint.g, n),
+                lerp(base.b, tint.b, n),
             };
             c.r = std::clamp(c.r * highlight, 0.0f, 1.0f);
             c.g = std::clamp(c.g * highlight, 0.0f, 1.0f);

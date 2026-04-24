@@ -34,8 +34,8 @@ std::vector<int> buildRiverDistanceField(const TerrainFields& fields, int maxRad
             continue;
         }
 
-        const int cx = static_cast<int>(cur % static_cast<size_t>(fields.width));
-        const int cz = static_cast<int>(cur / static_cast<size_t>(fields.width));
+        const int cx = static_cast<int>(cur % fields.width);
+        const int cz = static_cast<int>(cur / fields.width);
         for (int i = 0; i < 8; ++i) {
             const int nx = cx + neighborDx[i];
             const int nz = cz + neighborDz[i];

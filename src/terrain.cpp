@@ -410,7 +410,7 @@ TerrainMesh TerrainGenerator::generateMesh() const {
     computeBiomeFields(fields);
     const auto biomesDone = Clock::now();
 
-    TerrainMesh mesh;
+TerrainMesh mesh;
     mesh.width = settings_.width;
     mesh.depth = settings_.depth;
     mesh.horizontalScale = settings_.horizontalScale;
