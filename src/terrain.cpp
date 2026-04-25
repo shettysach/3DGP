@@ -6,9 +6,9 @@
 #include "terrain/mountains.h"
 #include "terrain/plains.h"
 #include "terrain/plateaus.h"
-#include "terrain/valleys.h"
 #include "terrain/rivers.h"
 #include "terrain/util.h"
+#include "terrain/valleys.h"
 
 #include <algorithm>
 #include <chrono>
@@ -332,19 +332,19 @@ TerrainFields TerrainGenerator::buildBaseTerrainFields() const {
                 {continental, ridges, detail, slopeHint, rangeMask, settings_.verticalScale});
 
             const float basin = 0.5f * (fractalBrownianMotion(
-                                              sampleX * 0.28f - 191.7f,
-                                              sampleZ * 0.28f + 83.4f,
-                                              3,
-                                              settings_.noise.lacunarity,
-                                              0.52f) +
-                                          1.0f);
+                                            sampleX * 0.28f - 191.7f,
+                                            sampleZ * 0.28f + 83.4f,
+                                            3,
+                                            settings_.noise.lacunarity,
+                                            0.52f) +
+                                        1.0f);
             const float detailBand = 0.5f * (fractalBrownianMotion(
-                                                   sampleX * 1.9f + 52.3f,
-                                                   sampleZ * 1.9f - 61.8f,
-                                                   std::max(3, settings_.noise.octaves - 2),
-                                                   settings_.noise.lacunarity,
-                                                   settings_.noise.gain) +
-                                               1.0f);
+                                                 sampleX * 1.9f + 52.3f,
+                                                 sampleZ * 1.9f - 61.8f,
+                                                 std::max(3, settings_.noise.octaves - 2),
+                                                 settings_.noise.lacunarity,
+                                                 settings_.noise.gain) +
+                                             1.0f);
             const float rimMask = smoothstep(
                 0.38f,
                 0.74f,
@@ -361,43 +361,43 @@ TerrainFields TerrainGenerator::buildBaseTerrainFields() const {
 
             const int plainsOctaves = std::max(3, settings_.noise.octaves - 2);
             const float plainsBase = 0.5f * (fractalBrownianMotion(
-                                                   sampleX - 63.2f,
-                                                   sampleZ + 41.8f,
-                                                   plainsOctaves,
-                                                   settings_.noise.lacunarity,
-                                                   settings_.noise.gain) +
-                                               1.0f);
+                                                 sampleX - 63.2f,
+                                                 sampleZ + 41.8f,
+                                                 plainsOctaves,
+                                                 settings_.noise.lacunarity,
+                                                 settings_.noise.gain) +
+                                             1.0f);
             const float macroRelief = 0.5f * (fractalBrownianMotion(
-                                                    sampleX * 0.30f + 219.4f,
-                                                    sampleZ * 0.30f - 174.6f,
-                                                    3,
-                                                    settings_.noise.lacunarity,
-                                                    0.48f) +
-                                                1.0f);
-            const float hilliness = 0.5f * (fractalBrownianMotion(
-                                                  sampleX * 0.82f - 141.5f,
-                                                  sampleZ * 0.82f + 96.8f,
-                                                  std::max(3, settings_.noise.octaves - 1),
+                                                  sampleX * 0.30f + 219.4f,
+                                                  sampleZ * 0.30f - 174.6f,
+                                                  3,
                                                   settings_.noise.lacunarity,
-                                                  settings_.noise.gain) +
+                                                  0.48f) +
                                               1.0f);
+            const float hilliness = 0.5f * (fractalBrownianMotion(
+                                                sampleX * 0.82f - 141.5f,
+                                                sampleZ * 0.82f + 96.8f,
+                                                std::max(3, settings_.noise.octaves - 1),
+                                                settings_.noise.lacunarity,
+                                                settings_.noise.gain) +
+                                            1.0f);
             const float basinNoise = 0.5f * (fractalBrownianMotion(
-                                                   sampleX * 0.18f - 331.7f,
-                                                   sampleZ * 0.18f + 271.4f,
-                                                   2,
-                                                   settings_.noise.lacunarity,
-                                                   0.55f) +
-                                               1.0f);
+                                                 sampleX * 0.18f - 331.7f,
+                                                 sampleZ * 0.18f + 271.4f,
+                                                 2,
+                                                 settings_.noise.lacunarity,
+                                                 0.55f) +
+                                             1.0f);
             const float plainsHeight = computePlainsHeight(
                 {continental, plainsBase, macroRelief, hilliness, basinNoise, detail, settings_.verticalScale});
 
             const float plateauMask = 0.5f * (fractalBrownianMotion(
-                                                     sampleX * settings_.plateaus.frequency,
-                                                     sampleZ * settings_.plateaus.frequency,
-                                                     3,
-                                                     settings_.noise.lacunarity,
-                                                     0.52f) +
-                                                 1.0f);
+                                                  sampleX * settings_.plateaus.frequency,
+                                                  sampleZ * settings_.plateaus.frequency,
+                                                  3,
+                                                  settings_.noise.lacunarity,
+                                                  0.52f) +
+                                              1.0f);
             const PlateauResult plateau = computePlateau(
                 {continental, plateauMask, detail, settings_.verticalScale});
 
