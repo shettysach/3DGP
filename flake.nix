@@ -38,6 +38,11 @@
         pkgs.libjpeg
         pkgs.libpng
         pkgs.scons
+
+        #
+        pkgs.imgui
+        pkgs.imnodes
+        pkgs.glfw
       ];
 
       shellHook = ''
@@ -50,7 +55,15 @@
           pkgs.libGL
           pkgs.libGLU
           pkgs.SDL2
+          pkgs.imgui
+          pkgs.imnodes
+          pkgs.glfw
         ]}:$LD_LIBRARY_PATH
+
+        export CMAKE_PREFIX_PATH=${pkgs.imgui}:${
+          pkgs.imnodes.dev
+        }:${pkgs.glfw}:$CMAKE_PREFIX_PATH
+        export IMGUI_SRC=${pkgs.imgui.src}
       '';
     };
 

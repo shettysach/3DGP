@@ -27,6 +27,14 @@ else()
   include_directories(${SDL2_INCLUDE_DIRS} ${GL_INCLUDE_DIRS} ${GLU_INCLUDE_DIRS})
   set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
   set(OPENGL_LIBRARIES ${GL_LIBRARIES} ${GLU_LIBRARIES})
+
+  find_package(imgui CONFIG REQUIRED)
+  find_package(imnodes CONFIG REQUIRED)
+
+  set(IMGUI_SRC_DIR "$ENV{IMGUI_SRC}")
+  if(NOT IMGUI_SRC_DIR)
+    message(FATAL_ERROR "IMGUI_SRC environment variable not set. Run nix develop first.")
+  endif()
 endif()
 
 add_executable(terrain_demo
@@ -61,11 +69,16 @@ add_executable(terrain_demo
     src/renderer/support.cpp
     src/renderer/internal.h
     src/renderer/shaders.h
+    src/graph/graph_view.cpp
+    ${IMGUI_SRC_DIR}/backends/imgui_impl_sdl2.cpp
+    ${IMGUI_SRC_DIR}/backends/imgui_impl_opengl3.cpp
  )
 
-target_include_directories(terrain_demo PRIVATE src)
+target_include_directories(terrain_demo PRIVATE src ${IMGUI_SRC_DIR}/backends)
 
 target_link_libraries(terrain_demo
     ${SDL2_LIBRARIES}
     ${OPENGL_LIBRARIES}
+    imgui::imgui
+    imnodes::imnodes
 )

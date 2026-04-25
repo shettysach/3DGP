@@ -1,6 +1,6 @@
-#include "renderer/core.h"
+#include "graph/graph_view.h"
 
 int main() {
-    renderer::runDemo();
+    graph::run();
     return 0;
 }
