@@ -404,7 +404,7 @@ TerrainFields TerrainGenerator::buildBaseTerrainFields() const {
             const float falloff =
                 computeIslandFalloff(settings_, worldX, worldZ, centerX, centerZ, maxRadius);
             const BlendResult blend = blendTerrain(
-                {mountain.height, mountain.weight, plainsHeight - valley.depth, plateau.height, plateau.weight, detail, falloff, settings_.verticalScale});
+                {mountain.height, mountain.weight, plainsHeight, plateau.height, plateau.weight, valley.depth, detail, falloff, settings_.verticalScale});
 
             fields.heights[idx] = blend.height;
             fields.mountainWeights[idx] = blend.mountainWeight;

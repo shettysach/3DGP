@@ -16,7 +16,7 @@ BlendResult blendTerrain(const BlendInput& in) {
     mw /= weightSum;
     pw /= weightSum;
 
-    const float blendedHeight = mw * in.mountainHeight + pw * effectivePlains;
+    const float blendedHeight = mw * in.mountainHeight + pw * effectivePlains - in.valleyDepth;
     const float fineDetail = (in.detail - 0.5f) * in.verticalScale * 0.035f;
 
     return {(blendedHeight + fineDetail) * in.falloff, mw};
