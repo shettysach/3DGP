@@ -1,14 +1,12 @@
 #include "graph/graph_view.h"
 
 #include "imgui.h"
-#include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
+#include "imgui_impl_sdl2.h"
 #include "imnodes.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
-
-#include <iostream>
 
 namespace graph {
 
@@ -16,11 +14,8 @@ static SDL_Window* gWindow = nullptr;
 static SDL_GLContext gGlContext = nullptr;
 static bool gRunning = true;
 
-static bool initSDL() {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        std::cerr << "SDL_Init failed: " << SDL_GetError() << '\n';
-        return false;
-    }
+static void initSDL() {
+    SDL_Init(SDL_INIT_VIDEO);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
@@ -35,39 +30,33 @@ static bool initSDL() {
         1280,
         800,
         SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
-    if (!gWindow) {
-        std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << '\n';
-        return false;
-    }
 
     gGlContext = SDL_GL_CreateContext(gWindow);
-    if (!gGlContext) {
-        std::cerr << "SDL_GL_CreateContext failed: " << SDL_GetError() << '\n';
-        return false;
-    }
-
     SDL_GL_SetSwapInterval(1);
-    return true;
 }
 
-static bool initImGui() {
+static void initImGui() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImNodes::CreateContext();
 
     ImGui::StyleColorsDark();
 
-    if (!ImGui_ImplSDL2_InitForOpenGL(gWindow, gGlContext)) {
-        std::cerr << "ImGui_ImplSDL2_InitForOpenGL failed\n";
-        return false;
-    }
+    ImGuiIO& io = ImGui::GetIO();
+    io.FontGlobalScale = 3.0f;
 
-    if (!ImGui_ImplOpenGL3_Init("#version 330")) {
-        std::cerr << "ImGui_ImplOpenGL3_Init failed\n";
-        return false;
-    }
+    ImGui::GetStyle().ScaleAllSizes(3.0f);
 
-    return true;
+    ImNodesStyle& ns = ImNodes::GetStyle();
+    ns.Flags |= ImNodesStyleFlags_GridLines;
+    ns.LinkThickness = 6.0f;
+    ns.PinCircleRadius = 8.0f;
+    ns.PinLineThickness = 4.0f;
+    ns.NodeBorderThickness = 4.0f;
+    ns.GridSpacing = 64.0f;
+
+    ImGui_ImplSDL2_InitForOpenGL(gWindow, gGlContext);
+    ImGui_ImplOpenGL3_Init("#version 330");
 }
 
 static void shutdownImGui() {
@@ -78,14 +67,8 @@ static void shutdownImGui() {
 }
 
 static void shutdownSDL() {
-    if (gGlContext) {
-        SDL_GL_DeleteContext(gGlContext);
-        gGlContext = nullptr;
-    }
-    if (gWindow) {
-        SDL_DestroyWindow(gWindow);
-        gWindow = nullptr;
-    }
+    SDL_GL_DeleteContext(gGlContext);
+    SDL_DestroyWindow(gWindow);
     SDL_Quit();
 }
 
@@ -103,10 +86,14 @@ static void processEvents() {
     }
 }
 
-static void drawGraphEditor() {
-    ImGui::Begin("Graph Editor");
-
-    ImNodes::BeginNodeEditor();
+static void sampleNodes() {
+    static bool initialized = false;
+    if (!initialized) {
+        ImNodes::SetNodeGridSpacePos(1, ImVec2(100.0f, 200.0f));
+        ImNodes::SetNodeGridSpacePos(3, ImVec2(400.0f, 200.0f));
+        ImNodes::SetNodeGridSpacePos(7, ImVec2(700.0f, 200.0f));
+        initialized = true;
+    }
 
     ImNodes::BeginNode(1);
     ImNodes::BeginNodeTitleBar();
@@ -140,20 +127,26 @@ static void drawGraphEditor() {
     ImGui::Text("value");
     ImNodes::EndInputAttribute();
     ImNodes::EndNode();
+}
+
+static void drawGraphEditor() {
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowSize(viewport->WorkSize);
+    auto flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus;
+    ImGui::Begin("Graph Editor", nullptr, flags);
+    ImNodes::BeginNodeEditor();
+
+    sampleNodes();
 
     ImNodes::EndNodeEditor();
-
     ImGui::End();
 }
 
 void run() {
-    if (!initSDL()) {
-        return;
-    }
-    if (!initImGui()) {
-        shutdownSDL();
-        return;
-    }
+    initSDL();
+    initImGui();
 
     glClearColor(0.12f, 0.12f, 0.14f, 1.0f);
 
@@ -168,8 +161,8 @@ void run() {
 
         ImGui::Render();
         glViewport(0, 0,
-            static_cast<int>(ImGui::GetIO().DisplaySize.x),
-            static_cast<int>(ImGui::GetIO().DisplaySize.y));
+                   static_cast<int>(ImGui::GetIO().DisplaySize.x),
+                   static_cast<int>(ImGui::GetIO().DisplaySize.y));
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
