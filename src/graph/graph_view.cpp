@@ -56,16 +56,12 @@ static std::string gFilePath = "graphs/current.json";
 
 // ---------- Id generators ----------
 
-static NodeId gNextNodeId = 1;
-static LinkId gNextLinkId = 1;
+static NodeId gNextNodeId = 0;
+static LinkId gNextLinkId = 0;
 
-static NodeId nextNodeId() {
-    return gNextNodeId++;
-}
+static NodeId nextNodeId() { return gNextNodeId++; }
 
-static LinkId nextLinkId() {
-    return gNextLinkId++;
-}
+static LinkId nextLinkId() { return gNextLinkId++; }
 
 // ---------- SDL + ImGui init / shutdown ----------
 
@@ -78,11 +74,8 @@ static void initSDL() {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
-    gWindow = SDL_CreateWindow(
-        "Graph Editor",
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        1280, 800,
-        SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    gWindow = SDL_CreateWindow("Graph Editor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280,
+                               800, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 
     gGlCtx = SDL_GL_CreateContext(gWindow);
     SDL_GL_SetSwapInterval(1);
@@ -100,7 +93,8 @@ static void initImGui() {
 
     ImNodesStyle& ns = ImNodes::GetStyle();
     ns.Flags |= ImNodesStyleFlags_GridLines;
-    ns.PinCircleRadius = 6.0f;
+    ns.PinCircleRadius *= 2.0f;
+    ns.LinkHoverDistance *= 2.0f;
 
     ImGui_ImplSDL2_InitForOpenGL(gWindow, gGlCtx);
     ImGui_ImplOpenGL3_Init("#version 330");
@@ -119,9 +113,7 @@ static void shutdown() {
 
 // ---------- IO ----------
 
-static void ensureGraphDir() {
-    mkdir("graphs", 0755);
-}
+static void ensureGraphDir() { mkdir("graphs", 0755); }
 
 static void saveToFile() {
     ensureGraphDir();
@@ -138,16 +130,17 @@ static void loadFromFile() {
     std::ifstream in(gFilePath);
     if (!in)
         return;
-    std::string text((std::istreambuf_iterator<char>(in)),
-                     std::istreambuf_iterator<char>());
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     try {
         gGraph = fromJson(text);
         // Sync ID counters past loaded graph
         for (const auto& n : gGraph.nodes) {
-            if (n.id >= gNextNodeId) gNextNodeId = n.id + 1;
+            if (n.id >= gNextNodeId)
+                gNextNodeId = n.id + 1;
         }
         for (const auto& l : gGraph.links) {
-            if (l.id >= gNextLinkId) gNextLinkId = l.id + 1;
+            if (l.id >= gNextLinkId)
+                gNextLinkId = l.id + 1;
         }
     } catch (const std::exception&) {
         // keep default graph
@@ -168,19 +161,20 @@ static bool handleDeleteSelected() {
     if (toRemove.empty())
         return false;
 
-    gGraph.nodes.erase(
-        std::remove_if(gGraph.nodes.begin(), gGraph.nodes.end(),
-                       [&](const EditorNode& n) {
-                           return std::find(toRemove.begin(), toRemove.end(), n.id) != toRemove.end();
-                       }),
-        gGraph.nodes.end());
-    gGraph.links.erase(
-        std::remove_if(gGraph.links.begin(), gGraph.links.end(),
-                       [&](const EditorLink& l) {
-                           return std::find(toRemove.begin(), toRemove.end(), l.from.nodeId) != toRemove.end() ||
-                                  std::find(toRemove.begin(), toRemove.end(), l.to.nodeId) != toRemove.end();
-                       }),
-        gGraph.links.end());
+    gGraph.nodes.erase(std::remove_if(gGraph.nodes.begin(), gGraph.nodes.end(),
+                                      [&](const EditorNode& n) {
+                                          return std::find(toRemove.begin(), toRemove.end(),
+                                                           n.id) != toRemove.end();
+                                      }),
+                       gGraph.nodes.end());
+    gGraph.links.erase(std::remove_if(gGraph.links.begin(), gGraph.links.end(),
+                                      [&](const EditorLink& l) {
+                                          return std::find(toRemove.begin(), toRemove.end(),
+                                                           l.from.nodeId) != toRemove.end() ||
+                                                 std::find(toRemove.begin(), toRemove.end(),
+                                                           l.to.nodeId) != toRemove.end();
+                                      }),
+                       gGraph.links.end());
     ImNodes::ClearNodeSelection();
     return true;
 }
@@ -188,11 +182,9 @@ static bool handleDeleteSelected() {
 static void addNode(NodeKind kind) {
     NodeId id = nextNodeId();
     if (kind == NodeKind::TerrainSynthesis) {
-        gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f,
-                                TerrainSynthesisParams{}});
+        gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f, TerrainSynthesisParams{}});
     } else {
-        gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f,
-                                NoiseParams{}});
+        gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f, NoiseParams{}});
     }
 }
 
@@ -221,13 +213,15 @@ static void drawToolbar() {
 
         if (ImGui::Button("Default")) {
             gGraph = defaultGraph();
-            gNextNodeId = 1;
-            gNextLinkId = 1;
+            gNextNodeId = 0;
+            gNextLinkId = 0;
             for (const auto& n : gGraph.nodes) {
-                if (n.id >= gNextNodeId) gNextNodeId = n.id + 1;
+                if (n.id >= gNextNodeId)
+                    gNextNodeId = n.id + 1;
             }
             for (const auto& l : gGraph.links) {
-                if (l.id >= gNextLinkId) gNextLinkId = l.id + 1;
+                if (l.id >= gNextLinkId)
+                    gNextLinkId = l.id + 1;
             }
             gErrorMsg.clear();
             saveToFile();
@@ -252,8 +246,8 @@ static void drawNodeEditor() {
     ImGui::SetNextWindowPos(vp->WorkPos);
     ImGui::SetNextWindowSize(vp->WorkSize);
     ImGui::Begin("Graph", nullptr,
-                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoBringToFrontOnFocus);
 
     ImNodes::BeginNodeEditor();
 
@@ -288,8 +282,7 @@ static void drawNodeEditor() {
 
     // Draw links
     for (const auto& link : gGraph.links) {
-        ImNodes::Link(link.id,
-                      outPinId(link.from.nodeId, link.from.slot),
+        ImNodes::Link(link.id, outPinId(link.from.nodeId, link.from.slot),
                       inPinId(link.to.nodeId, link.to.slot));
     }
 
