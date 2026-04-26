@@ -16,6 +16,10 @@ const char* kindToString(NodeKind kind) {
     switch (kind) {
     case NodeKind::Fbm:               return "Fbm";
     case NodeKind::RidgedFbm:         return "RidgedFbm";
+    case NodeKind::Mountains:         return "Mountains";
+    case NodeKind::Valleys:           return "Valleys";
+    case NodeKind::Plains:            return "Plains";
+    case NodeKind::Plateaus:          return "Plateaus";
     case NodeKind::TerrainSynthesis:  return "TerrainSynthesis";
     }
     throw std::runtime_error("Unknown NodeKind");
@@ -24,6 +28,10 @@ const char* kindToString(NodeKind kind) {
 NodeKind kindFromString(const std::string& s) {
     if (s == "Fbm")               return NodeKind::Fbm;
     if (s == "RidgedFbm")         return NodeKind::RidgedFbm;
+    if (s == "Mountains")         return NodeKind::Mountains;
+    if (s == "Valleys")           return NodeKind::Valleys;
+    if (s == "Plains")            return NodeKind::Plains;
+    if (s == "Plateaus")          return NodeKind::Plateaus;
     if (s == "TerrainSynthesis")  return NodeKind::TerrainSynthesis;
     throw std::runtime_error("Unknown NodeKind string: " + s);
 }
@@ -54,14 +62,14 @@ static NoiseParams noiseParamsFromJson(const json& j) {
     return p;
 }
 
-static json terrainSynthesisParamsToJson(const TerrainSynthesisParams& p) {
-    return {{"verticalScale", p.verticalScale}};
+static json verticalScaleParamsToJson(float verticalScale) {
+    return {{"verticalScale", verticalScale}};
 }
 
-static TerrainSynthesisParams terrainSynthesisParamsFromJson(const json& j) {
-    TerrainSynthesisParams p;
-    if (j.contains("verticalScale")) p.verticalScale = j["verticalScale"].get<float>();
-    return p;
+static float verticalScaleFromJson(const json& j) {
+    if (j.contains("verticalScale"))
+        return j["verticalScale"].get<float>();
+    return 80.0f;
 }
 
 static json paramsToJson(NodeKind kind, const NodeParams& params) {
@@ -69,8 +77,16 @@ static json paramsToJson(NodeKind kind, const NodeParams& params) {
     case NodeKind::Fbm:
     case NodeKind::RidgedFbm:
         return noiseParamsToJson(std::get<NoiseParams>(params));
+    case NodeKind::Mountains:
+        return verticalScaleParamsToJson(std::get<MountainParams>(params).verticalScale);
+    case NodeKind::Valleys:
+        return verticalScaleParamsToJson(std::get<ValleyParams>(params).verticalScale);
+    case NodeKind::Plains:
+        return verticalScaleParamsToJson(std::get<PlainsParams>(params).verticalScale);
+    case NodeKind::Plateaus:
+        return verticalScaleParamsToJson(std::get<PlateauParams>(params).verticalScale);
     case NodeKind::TerrainSynthesis:
-        return terrainSynthesisParamsToJson(std::get<TerrainSynthesisParams>(params));
+        return verticalScaleParamsToJson(std::get<TerrainSynthesisParams>(params).verticalScale);
     }
     return json::object();
 }
@@ -80,8 +96,31 @@ static NodeParams paramsFromJson(NodeKind kind, const json& j) {
     case NodeKind::Fbm:
     case NodeKind::RidgedFbm:
         return noiseParamsFromJson(j);
-    case NodeKind::TerrainSynthesis:
-        return terrainSynthesisParamsFromJson(j);
+    case NodeKind::Mountains: {
+        MountainParams p;
+        p.verticalScale = verticalScaleFromJson(j);
+        return p;
+    }
+    case NodeKind::Valleys: {
+        ValleyParams p;
+        p.verticalScale = verticalScaleFromJson(j);
+        return p;
+    }
+    case NodeKind::Plains: {
+        PlainsParams p;
+        p.verticalScale = verticalScaleFromJson(j);
+        return p;
+    }
+    case NodeKind::Plateaus: {
+        PlateauParams p;
+        p.verticalScale = verticalScaleFromJson(j);
+        return p;
+    }
+    case NodeKind::TerrainSynthesis: {
+        TerrainSynthesisParams p;
+        p.verticalScale = verticalScaleFromJson(j);
+        return p;
+    }
     }
     return NoiseParams{};
 }

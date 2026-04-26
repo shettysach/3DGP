@@ -181,10 +181,27 @@ static bool handleDeleteSelected() {
 
 static void addNode(NodeKind kind) {
     NodeId id = nextNodeId();
-    if (kind == NodeKind::TerrainSynthesis) {
-        gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f, TerrainSynthesisParams{}});
-    } else {
-        gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f, NoiseParams{}});
+    float y = 100.0f + id * 30.0f;
+    switch (kind) {
+    case NodeKind::Fbm:
+    case NodeKind::RidgedFbm:
+        gGraph.nodes.push_back({id, kind, 200.0f, y, NoiseParams{}});
+        break;
+    case NodeKind::Mountains:
+        gGraph.nodes.push_back({id, kind, 200.0f, y, MountainParams{}});
+        break;
+    case NodeKind::Valleys:
+        gGraph.nodes.push_back({id, kind, 200.0f, y, ValleyParams{}});
+        break;
+    case NodeKind::Plains:
+        gGraph.nodes.push_back({id, kind, 200.0f, y, PlainsParams{}});
+        break;
+    case NodeKind::Plateaus:
+        gGraph.nodes.push_back({id, kind, 200.0f, y, PlateauParams{}});
+        break;
+    case NodeKind::TerrainSynthesis:
+        gGraph.nodes.push_back({id, kind, 200.0f, y, TerrainSynthesisParams{}});
+        break;
     }
 }
 
@@ -206,6 +223,14 @@ static void drawToolbar() {
             addNode(NodeKind::Fbm);
         if (ImGui::Button("+ Ridged"))
             addNode(NodeKind::RidgedFbm);
+        if (ImGui::Button("+ Mountains"))
+            addNode(NodeKind::Mountains);
+        if (ImGui::Button("+ Valleys"))
+            addNode(NodeKind::Valleys);
+        if (ImGui::Button("+ Plains"))
+            addNode(NodeKind::Plains);
+        if (ImGui::Button("+ Plateaus"))
+            addNode(NodeKind::Plateaus);
         if (ImGui::Button("+ Synthesis"))
             addNode(NodeKind::TerrainSynthesis);
 
@@ -368,6 +393,18 @@ static void drawInspector() {
             if (node->kind == NodeKind::RidgedFbm) {
                 ImGui::DragFloat("Sharpness", &np.sharpness, 0.1f, 0.5f, 5.0f);
             }
+        } else if (node->kind == NodeKind::Mountains) {
+            auto& mp = std::get<MountainParams>(node->params);
+            ImGui::DragFloat("Vertical Scale", &mp.verticalScale, 1.0f, 1.0f, 500.0f);
+        } else if (node->kind == NodeKind::Valleys) {
+            auto& vp = std::get<ValleyParams>(node->params);
+            ImGui::DragFloat("Vertical Scale", &vp.verticalScale, 1.0f, 1.0f, 500.0f);
+        } else if (node->kind == NodeKind::Plains) {
+            auto& pp = std::get<PlainsParams>(node->params);
+            ImGui::DragFloat("Vertical Scale", &pp.verticalScale, 1.0f, 1.0f, 500.0f);
+        } else if (node->kind == NodeKind::Plateaus) {
+            auto& pp = std::get<PlateauParams>(node->params);
+            ImGui::DragFloat("Vertical Scale", &pp.verticalScale, 1.0f, 1.0f, 500.0f);
         } else if (node->kind == NodeKind::TerrainSynthesis) {
             auto& tp = std::get<TerrainSynthesisParams>(node->params);
             ImGui::DragFloat("Vertical Scale", &tp.verticalScale, 1.0f, 1.0f, 500.0f);

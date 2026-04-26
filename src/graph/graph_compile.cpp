@@ -23,6 +23,7 @@ CompiledGraph compile(const EditorGraph& editorGraph) {
         compiled.nodes[i].kind = en.kind;
         compiled.nodes[i].params = en.params;
         compiled.nodes[i].inputs.resize(nodeDefinition(en.kind).inputs.size());
+        compiled.nodes[i].channelCount = static_cast<uint8_t>(outputChannelCount(en.kind));
     }
 
     for (const auto& link : editorGraph.links) {

@@ -33,8 +33,6 @@ void runDemo() {
     settings.noise.lacunarity = 2.0f;
     settings.noise.gain = 0.5f;
     settings.noise.ridgeSharpness = 1.5f;
-    settings.noise.warpFrequency = 0.0038f;
-    settings.noise.warpAmplitude = 20.0f;
     settings.rivers.sourceDensity = 0.00005f;
     settings.rivers.sourceAccumulation = 135.0f;
     settings.rivers.mainAccumulation = 320.0f;

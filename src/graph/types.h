@@ -17,6 +17,10 @@ using LinkId = int32_t;
 enum class NodeKind : uint8_t {
     Fbm,
     RidgedFbm,
+    Mountains,
+    Valleys,
+    Plains,
+    Plateaus,
     TerrainSynthesis,
 };
 
@@ -43,7 +47,30 @@ struct TerrainSynthesisParams {
     float verticalScale = 80.0f;
 };
 
-using NodeParams = std::variant<NoiseParams, TerrainSynthesisParams>;
+struct MountainParams {
+    float verticalScale = 80.0f;
+};
+
+struct ValleyParams {
+    float verticalScale = 80.0f;
+};
+
+struct PlainsParams {
+    float verticalScale = 80.0f;
+};
+
+struct PlateauParams {
+    float verticalScale = 80.0f;
+};
+
+using NodeParams = std::variant<
+    NoiseParams,
+    TerrainSynthesisParams,
+    MountainParams,
+    ValleyParams,
+    PlainsParams,
+    PlateauParams
+>;
 
 // === Editor Graph Model ===
 
@@ -72,11 +99,29 @@ struct CompiledNode {
     NodeKind kind;
     NodeParams params;
     std::vector<uint16_t> inputs;       // source node index per input slot
+    uint8_t channelCount = 1;           // output channel count (interleaved)
 };
 
 struct CompiledGraph {
     std::vector<CompiledNode> nodes;
 };
+
+// Number of interleaved channels each node kind produces.
+constexpr int outputChannelCount(NodeKind kind) {
+    switch (kind) {
+    case NodeKind::Fbm:
+    case NodeKind::RidgedFbm:
+    case NodeKind::Plains:
+        return 1;
+    case NodeKind::Mountains:
+    case NodeKind::Valleys:
+    case NodeKind::Plateaus:
+        return 2;
+    case NodeKind::TerrainSynthesis:
+        return 0;
+    }
+    return 1;
+}
 
 // === Node Definition Table ===
 

@@ -42,6 +42,13 @@ float islandFalloff(const terrain::TerrainSettings& settings, float worldX, floa
     return std::pow(t, settings.falloffPower);
 }
 
+// Hard-coded warp constants (replaces settings.noise.warpFrequency / warpAmplitude)
+constexpr float kWarpFreqScale = 0.003f / 0.007f; // ≈ 0.4286
+constexpr float kWarpAmplitude = 45.0f;
+constexpr float kBaseFreq = 0.007f;
+constexpr float kWarpLacunarity = 2.0f;
+constexpr float kWarpGain = 0.5f;
+
 } // namespace
 
 terrain::TerrainFields execute(const CompiledGraph& compiled,
@@ -71,8 +78,6 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
     const float centerZ = static_cast<float>(d - 1) * 0.5f * hScale;
     const float maxRadius =
         std::min(static_cast<float>(w - 1), static_cast<float>(d - 1)) * 0.5f * hScale;
-    const float baseFreq = std::max(0.00001f, settings.noise.frequency);
-    const float warpFreqScale = settings.noise.warpFrequency / baseFreq;
 
     std::function<void(size_t)> eval = [&](size_t ni) {
         if (visited[ni])
@@ -85,16 +90,12 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
             eval(src);
         }
 
+        const uint8_t ch = cn.channelCount;
+        auto& out = nodeOutputs[ni];
+        out.assign(cellCount * ch, 0.0f);
+
         if (cn.kind == NodeKind::Fbm || cn.kind == NodeKind::RidgedFbm) {
             const auto& np = std::get<NoiseParams>(cn.params);
-            const float freq = np.frequency;
-            const int oct = np.octaves;
-            const float lac = np.lacunarity;
-            const float gn = np.gain;
-            const float sharp = np.sharpness;
-            const float xOff = np.xOffset;
-            auto& out = nodeOutputs[ni];
-            out.assign(cellCount, 0.0f);
 
             for (int z = 0; z < d; ++z) {
                 for (int x = 0; x < w; ++x) {
@@ -107,26 +108,96 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
                     } else {
                         out[idx] = noiseContext.ridgedFbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.sharpness, np.frequency);
                     }
-
                     out[idx] = 0.5f * (out[idx] + 1.0f);
+                }
+            }
+        } else if (cn.kind == NodeKind::Mountains) {
+            const auto& mp = std::get<MountainParams>(cn.params);
+            const std::vector<float>& continental = nodeOutputs[cn.inputs[0]];
+            const std::vector<float>& ridges       = nodeOutputs[cn.inputs[1]];
+            const std::vector<float>& detailIn     = nodeOutputs[cn.inputs[2]];
+            const std::vector<float>& rangeMaskIn  = nodeOutputs[cn.inputs[3]];
+
+            for (int z = 0; z < d; ++z) {
+                for (int x = 0; x < w; ++x) {
+                    const size_t idx = fieldIndex(x, z, w);
+                    const float detail = detailIn[idx];
+                    const float rangeMask = smoothstep(0.42f, 0.72f, rangeMaskIn[idx]);
+                    const float slopeHint =
+                        std::clamp((ridges[idx] - 0.35f) * 1.55f + detail * 0.2f, 0.0f, 1.0f);
+
+                    const MountainResult mr = computeMountain(
+                        {continental[idx], ridges[idx], detail, slopeHint, rangeMask, mp.verticalScale});
+
+                    out[idx * 2 + 0] = mr.height;
+                    out[idx * 2 + 1] = mr.weight;
+                }
+            }
+        } else if (cn.kind == NodeKind::Valleys) {
+            const auto& vp = std::get<ValleyParams>(cn.params);
+            const std::vector<float>& continental = nodeOutputs[cn.inputs[0]];
+            const std::vector<float>& basinIn     = nodeOutputs[cn.inputs[1]];
+            const std::vector<float>& detailIn    = nodeOutputs[cn.inputs[2]];
+            const std::vector<float>& rimMaskIn   = nodeOutputs[cn.inputs[3]];
+
+            for (int z = 0; z < d; ++z) {
+                for (int x = 0; x < w; ++x) {
+                    const size_t idx = fieldIndex(x, z, w);
+                    const float basin = basinIn[idx];
+                    const float detail = detailIn[idx];
+                    const float rimMask = smoothstep(0.38f, 0.74f, rimMaskIn[idx]);
+                    const float valleySlopeHint =
+                        std::clamp((0.62f - basin) * 1.35f + detail * 0.22f, 0.0f, 1.0f);
+
+                    const ValleyResult vr = computeValley(
+                        {continental[idx], basin, detail, valleySlopeHint, rimMask, vp.verticalScale});
+
+                    out[idx * 2 + 0] = vr.depth;
+                    out[idx * 2 + 1] = vr.weight;
+                }
+            }
+        } else if (cn.kind == NodeKind::Plains) {
+            const auto& pp = std::get<PlainsParams>(cn.params);
+            const std::vector<float>& continental = nodeOutputs[cn.inputs[0]];
+            const std::vector<float>& plainsBase  = nodeOutputs[cn.inputs[1]];
+            const std::vector<float>& macroRelief = nodeOutputs[cn.inputs[2]];
+            const std::vector<float>& hilliness   = nodeOutputs[cn.inputs[3]];
+            const std::vector<float>& detailIn    = nodeOutputs[cn.inputs[4]];
+
+            for (int z = 0; z < d; ++z) {
+                for (int x = 0; x < w; ++x) {
+                    const size_t idx = fieldIndex(x, z, w);
+                    const float height = computePlainsHeight(
+                        {continental[idx], plainsBase[idx], macroRelief[idx], hilliness[idx],
+                         0.5f, detailIn[idx], pp.verticalScale});
+                    out[idx] = height;
+                }
+            }
+        } else if (cn.kind == NodeKind::Plateaus) {
+            const auto& pp = std::get<PlateauParams>(cn.params);
+            const std::vector<float>& continental = nodeOutputs[cn.inputs[0]];
+            const std::vector<float>& plateauMask = nodeOutputs[cn.inputs[1]];
+            const std::vector<float>& detailIn    = nodeOutputs[cn.inputs[2]];
+
+            for (int z = 0; z < d; ++z) {
+                for (int x = 0; x < w; ++x) {
+                    const size_t idx = fieldIndex(x, z, w);
+                    const PlateauResult pr = computePlateau(
+                        {continental[idx], plateauMask[idx], detailIn[idx], pp.verticalScale});
+
+                    out[idx * 2 + 0] = pr.height;
+                    out[idx * 2 + 1] = pr.weight;
                 }
             }
         } else if (cn.kind == NodeKind::TerrainSynthesis) {
             const auto& tsp = std::get<TerrainSynthesisParams>(cn.params);
             const float vertScale = tsp.verticalScale;
 
-            const std::vector<float>& continental  = nodeOutputs[cn.inputs[0]];
-            const std::vector<float>& ridges       = nodeOutputs[cn.inputs[1]];
-            const std::vector<float>& detailIn     = nodeOutputs[cn.inputs[2]];
-            const std::vector<float>& rangeMaskIn  = nodeOutputs[cn.inputs[3]];
-            const std::vector<float>& basinIn      = nodeOutputs[cn.inputs[4]];
-            const std::vector<float>& detailBandIn = nodeOutputs[cn.inputs[5]];
-            const std::vector<float>& rimMaskIn    = nodeOutputs[cn.inputs[6]];
-            const std::vector<float>& plainsBaseIn = nodeOutputs[cn.inputs[7]];
-            const std::vector<float>& macroReliefIn= nodeOutputs[cn.inputs[8]];
-            const std::vector<float>& hillinessIn  = nodeOutputs[cn.inputs[9]];
-            const std::vector<float>& basinNoiseIn = nodeOutputs[cn.inputs[10]];
-            const std::vector<float>& plateauMaskIn= nodeOutputs[cn.inputs[11]];
+            const std::vector<float>& mountain = nodeOutputs[cn.inputs[0]]; // 2ch
+            const std::vector<float>& valley   = nodeOutputs[cn.inputs[1]]; // 2ch
+            const std::vector<float>& plains   = nodeOutputs[cn.inputs[2]]; // 1ch
+            const std::vector<float>& plateau  = nodeOutputs[cn.inputs[3]]; // 2ch
+            const std::vector<float>& detailIn = nodeOutputs[cn.inputs[4]]; // 1ch
 
             fields.heights.assign(cellCount, 0.0f);
             fields.mountainWeights.assign(cellCount, 0.0f);
@@ -141,64 +212,40 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
                     const float worldX = static_cast<float>(x) * hScale;
                     const float worldZ = static_cast<float>(z) * hScale;
 
-                    // Warp is kept so that climate post-processing still
-                    // sees a coherent warped coordinate space.
+                    // Hard-coded warp
                     const float warpX =
-                        noiseContext.fbm(worldX * warpFreqScale + 31.7f,
-                                         worldZ * warpFreqScale - 18.2f, 3,
-                                         settings.noise.lacunarity, 0.5f, baseFreq) *
-                        settings.noise.warpAmplitude;
+                        noiseContext.fbm(worldX * kWarpFreqScale + 31.7f,
+                                         worldZ * kWarpFreqScale - 18.2f, 3,
+                                         kWarpLacunarity, kWarpGain, kBaseFreq) *
+                        kWarpAmplitude;
                     const float warpZ =
-                        noiseContext.fbm(worldX * warpFreqScale - 47.1f,
-                                         worldZ * warpFreqScale + 22.8f, 3,
-                                         settings.noise.lacunarity, 0.5f, baseFreq) *
-                        settings.noise.warpAmplitude;
+                        noiseContext.fbm(worldX * kWarpFreqScale - 47.1f,
+                                         worldZ * kWarpFreqScale + 22.8f, 3,
+                                         kWarpLacunarity, kWarpGain, kBaseFreq) *
+                        kWarpAmplitude;
 
-                    const float sampleX = worldX + warpX;
-                    const float sampleZ = worldZ + warpZ;
-                    fields.sampleXs[idx] = sampleX;
-                    fields.sampleZs[idx] = sampleZ;
+                    fields.sampleXs[idx] = worldX + warpX;
+                    fields.sampleZs[idx] = worldZ + warpZ;
 
-                    const float detail      = detailIn[idx];
-                    const float rangeMask   = smoothstep(0.42f, 0.72f, rangeMaskIn[idx]);
-                    const float basin       = basinIn[idx];
-                    const float detailBand  = detailBandIn[idx];
-                    const float rimMask     = smoothstep(0.38f, 0.74f, rimMaskIn[idx]);
-                    const float plainsBase  = plainsBaseIn[idx];
-                    const float macroRelief = macroReliefIn[idx];
-                    const float hilliness   = hillinessIn[idx];
-                    const float basinNoise  = basinNoiseIn[idx];
-                    const float plateauMask = plateauMaskIn[idx];
-
-                    const float slopeHint =
-                        std::clamp((ridges[idx] - 0.35f) * 1.55f + detail * 0.2f, 0.0f, 1.0f);
-
-                    const MountainResult mountain = computeMountain(
-                        {continental[idx], ridges[idx], detail, slopeHint, rangeMask, vertScale});
-
-                    const float valleySlopeHint =
-                        std::clamp((0.62f - basin) * 1.35f + detail * 0.22f, 0.0f, 1.0f);
-
-                    const ValleyResult valley = computeValley(
-                        {continental[idx], basin, detailBand, valleySlopeHint, rimMask, vertScale});
-
-                    const float plainsHeight =
-                        computePlainsHeight({continental[idx], plainsBase, macroRelief, hilliness,
-                                             basinNoise, detail, vertScale});
-
-                    const PlateauResult plateau =
-                        computePlateau({continental[idx], plateauMask, detail, vertScale});
+                    const float mountainHeight = mountain[idx * 2 + 0];
+                    const float mountainWeight = mountain[idx * 2 + 1];
+                    const float valleyDepth    = valley[idx * 2 + 0];
+                    const float valleyWeight   = valley[idx * 2 + 1];
+                    const float plainsHeight   = plains[idx];
+                    const float plateauHeight  = plateau[idx * 2 + 0];
+                    const float plateauWeight  = plateau[idx * 2 + 1];
+                    const float detail         = detailIn[idx];
 
                     const float falloff =
                         islandFalloff(settings, worldX, worldZ, centerX, centerZ, maxRadius);
                     const BlendResult blend = blendTerrain(
-                        {mountain.height, mountain.weight, plainsHeight, plateau.height,
-                         plateau.weight, valley.depth, detail, falloff, vertScale});
+                        {mountainHeight, mountainWeight, plainsHeight, plateauHeight,
+                         plateauWeight, valleyDepth, detail, falloff, vertScale});
 
                     fields.heights[idx] = blend.height;
                     fields.mountainWeights[idx] = blend.mountainWeight;
-                    fields.valleyWeights[idx] = valley.weight;
-                    fields.plateauWeights[idx] = plateau.weight;
+                    fields.valleyWeights[idx] = valleyWeight;
+                    fields.plateauWeights[idx] = plateauWeight;
                 }
             }
         }

@@ -68,8 +68,6 @@ struct NoiseSettings {
     float lacunarity = 2.0f;
     float gain = 0.5f;
     float ridgeSharpness = 2.0f;
-    float warpFrequency = 0.003f;
-    float warpAmplitude = 45.0f;
 };
 
 struct RiverSettings {
