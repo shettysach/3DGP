@@ -10,6 +10,7 @@ struct NoiseContext {
     std::vector<int> permutation;
 
     float simplex2D(float x, float y) const;
+    float perlin2D(float x, float y) const;
 
     float fbm(float x, float y, int octaves, float lacunarity, float gain, float frequency) const;
     float ridgedFbm(float x, float y, int octaves, float lacunarity, float gain, float sharpness, float frequency) const;

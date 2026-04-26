@@ -16,6 +16,8 @@ const char* kindToString(NodeKind kind) {
     switch (kind) {
     case NodeKind::Fbm:               return "Fbm";
     case NodeKind::RidgedFbm:         return "RidgedFbm";
+    case NodeKind::Simplex:           return "Simplex";
+    case NodeKind::Perlin:            return "Perlin";
     case NodeKind::Mountains:         return "Mountains";
     case NodeKind::Valleys:           return "Valleys";
     case NodeKind::Plains:            return "Plains";
@@ -28,6 +30,8 @@ const char* kindToString(NodeKind kind) {
 NodeKind kindFromString(const std::string& s) {
     if (s == "Fbm")               return NodeKind::Fbm;
     if (s == "RidgedFbm")         return NodeKind::RidgedFbm;
+    if (s == "Simplex")           return NodeKind::Simplex;
+    if (s == "Perlin")            return NodeKind::Perlin;
     if (s == "Mountains")         return NodeKind::Mountains;
     if (s == "Valleys")           return NodeKind::Valleys;
     if (s == "Plains")            return NodeKind::Plains;

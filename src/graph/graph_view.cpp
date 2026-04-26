@@ -185,6 +185,8 @@ static void addNode(NodeKind kind) {
     switch (kind) {
     case NodeKind::Fbm:
     case NodeKind::RidgedFbm:
+    case NodeKind::Simplex:
+    case NodeKind::Perlin:
         gGraph.nodes.push_back({id, kind, 200.0f, y, NoiseParams{}});
         break;
     case NodeKind::Mountains:
@@ -223,6 +225,10 @@ static void drawToolbar() {
             addNode(NodeKind::Fbm);
         if (ImGui::Button("+ Ridged"))
             addNode(NodeKind::RidgedFbm);
+        if (ImGui::Button("+ Simplex"))
+            addNode(NodeKind::Simplex);
+        if (ImGui::Button("+ Perlin"))
+            addNode(NodeKind::Perlin);
         if (ImGui::Button("+ Mountains"))
             addNode(NodeKind::Mountains);
         if (ImGui::Button("+ Valleys"))
@@ -382,7 +388,8 @@ static void drawInspector() {
         ImGui::Separator();
         ImGui::Text("Kind: %s", kindToString(node->kind));
 
-        if (node->kind == NodeKind::Fbm || node->kind == NodeKind::RidgedFbm) {
+        if (node->kind == NodeKind::Fbm || node->kind == NodeKind::RidgedFbm ||
+            node->kind == NodeKind::Simplex || node->kind == NodeKind::Perlin) {
             auto& np = std::get<NoiseParams>(node->params);
             ImGui::DragFloat("Frequency", &np.frequency, 0.0001f, 0.0001f, 0.1f, "%.4f");
             ImGui::SliderInt("Octaves", &np.octaves, 1, 10);
@@ -392,6 +399,9 @@ static void drawInspector() {
             ImGui::DragFloat("Z Offset", &np.zOffset, 1.0f);
             if (node->kind == NodeKind::RidgedFbm) {
                 ImGui::DragFloat("Sharpness", &np.sharpness, 0.1f, 0.5f, 5.0f);
+            }
+            if (node->kind == NodeKind::Simplex || node->kind == NodeKind::Perlin) {
+                ImGui::Text("(octaves/lacunarity/gain/sharpness ignored)");
             }
         } else if (node->kind == NodeKind::Mountains) {
             auto& mp = std::get<MountainParams>(node->params);

@@ -22,6 +22,18 @@ const NodeDef kNodeDefs[] = {
         {{"field"}},
     },
     {
+        NodeKind::Simplex,
+        "Simplex Noise",
+        {/* inputs */},
+        {{"field"}},
+    },
+    {
+        NodeKind::Perlin,
+        "Perlin Noise",
+        {/* inputs */},
+        {{"field"}},
+    },
+    {
         NodeKind::Mountains,
         "Mountains",
         {
@@ -98,6 +110,10 @@ NodeParams defaultParams(NodeKind kind) {
         return NoiseParams{};
     case NodeKind::RidgedFbm:
         return NoiseParams{};
+    case NodeKind::Simplex:
+        return NoiseParams{};
+    case NodeKind::Perlin:
+        return NoiseParams{};
     case NodeKind::Mountains:
         return MountainParams{};
     case NodeKind::Valleys:
@@ -125,14 +141,14 @@ EditorGraph defaultGraph() {
     // x = 100, y = 100 + i*160
     g.nodes.push_back({0,  NodeKind::Fbm,        100.0f,  100.0f, NoiseParams{baseFreq, 6, 2.0f, 0.50f, 2.0f, 0.0f,     0.0f}});     // continental
     g.nodes.push_back({1,  NodeKind::RidgedFbm,  100.0f,  260.0f, NoiseParams{baseFreq, 6, 2.0f, 0.50f, 2.0f, 0.0f,     0.0f}});     // ridges
-    g.nodes.push_back({2,  NodeKind::Fbm,        100.0f,  420.0f, NoiseParams{baseFreq * 2.70f, 4, 2.0f, 0.50f, 2.0f, 0.0f,     0.0f}});     // detail
-    g.nodes.push_back({3,  NodeKind::Fbm,        100.0f,  580.0f, NoiseParams{baseFreq * 0.30f, 3, 2.0f, 0.45f, 2.0f, 400.0f,  -250.0f}});  // rangeMask
+    g.nodes.push_back({2,  NodeKind::Simplex,    100.0f,  420.0f,  NoiseParams{baseFreq * 2.70f, 1, 2.0f, 0.50f, 2.0f, 0.0f,     0.0f}});     // detail
+    g.nodes.push_back({3,  NodeKind::Perlin,     100.0f,  580.0f,  NoiseParams{baseFreq * 0.30f, 1, 2.0f, 0.45f, 2.0f, 400.0f,  -250.0f}});  // rangeMask
     g.nodes.push_back({4,  NodeKind::Fbm,        100.0f,  740.0f, NoiseParams{baseFreq * 0.28f, 3, 2.0f, 0.52f, 2.0f, -191.7f, 83.4f}});   // basin
     g.nodes.push_back({5,  NodeKind::Fbm,        100.0f,  900.0f, NoiseParams{baseFreq * 0.17f, 3, 2.0f, 0.45f, 2.0f, 420.0f,  -301.0f}});  // rimMask
     g.nodes.push_back({6,  NodeKind::Fbm,        100.0f,  1060.0f, NoiseParams{baseFreq, 4, 2.0f, 0.50f, 2.0f, -63.2f,  41.8f}});   // plainsBase
     g.nodes.push_back({7,  NodeKind::Fbm,        100.0f,  1220.0f, NoiseParams{baseFreq * 0.30f, 3, 2.0f, 0.48f, 2.0f, 219.4f,  -174.6f}});  // macroRelief
     g.nodes.push_back({8,  NodeKind::Fbm,        100.0f,  1380.0f, NoiseParams{baseFreq * 0.82f, 5, 2.0f, 0.50f, 2.0f, -141.5f, 96.8f}});   // hilliness
-    g.nodes.push_back({9,  NodeKind::Fbm,        100.0f,  1540.0f, NoiseParams{baseFreq * 0.028f, 3, 2.0f, 0.52f, 2.0f, 0.0f,     0.0f}});     // plateauMask
+    g.nodes.push_back({9,  NodeKind::Simplex,    100.0f,  1540.0f, NoiseParams{baseFreq * 0.028f, 1, 2.0f, 0.52f, 2.0f, 0.0f,     0.0f}});     // plateauMask
 
     // ---- Tier 2 (middle): Subsystems ----
     // x = 500

@@ -17,6 +17,8 @@ using LinkId = int32_t;
 enum class NodeKind : uint8_t {
     Fbm,
     RidgedFbm,
+    Simplex,
+    Perlin,
     Mountains,
     Valleys,
     Plains,
@@ -111,6 +113,8 @@ constexpr int outputChannelCount(NodeKind kind) {
     switch (kind) {
     case NodeKind::Fbm:
     case NodeKind::RidgedFbm:
+    case NodeKind::Simplex:
+    case NodeKind::Perlin:
     case NodeKind::Plains:
         return 1;
     case NodeKind::Mountains:

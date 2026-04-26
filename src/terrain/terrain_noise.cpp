@@ -61,6 +61,39 @@ float NoiseContext::simplex2D(float x, float y) const {
     return 70.0f * (n0 + n1 + n2);
 }
 
+float NoiseContext::perlin2D(float x, float y) const {
+    static constexpr float grads[4][2] = {
+        {1.0f, 1.0f}, {-1.0f, 1.0f}, {1.0f, -1.0f}, {-1.0f, -1.0f}
+    };
+
+    const int xi0 = fastFloor(x);
+    const int yi0 = fastFloor(y);
+    const float xf0 = x - static_cast<float>(xi0);
+    const float yf0 = y - static_cast<float>(yi0);
+    const float xf1 = xf0 - 1.0f;
+    const float yf1 = yf0 - 1.0f;
+
+    const int xi = xi0 & 255;
+    const int yi = yi0 & 255;
+
+    const float u = xf0 * xf0 * xf0 * (xf0 * (xf0 * 6.0f - 15.0f) + 10.0f);
+    const float v = yf0 * yf0 * yf0 * (yf0 * (yf0 * 6.0f - 15.0f) + 10.0f);
+
+    const int gi00 = permutation[xi + permutation[yi]] & 3;
+    const int gi10 = permutation[xi + 1 + permutation[yi]] & 3;
+    const int gi01 = permutation[xi + permutation[yi + 1]] & 3;
+    const int gi11 = permutation[xi + 1 + permutation[yi + 1]] & 3;
+
+    const float n00 = grads[gi00][0] * xf0 + grads[gi00][1] * yf0;
+    const float n10 = grads[gi10][0] * xf1 + grads[gi10][1] * yf0;
+    const float n01 = grads[gi01][0] * xf0 + grads[gi01][1] * yf1;
+    const float n11 = grads[gi11][0] * xf1 + grads[gi11][1] * yf1;
+
+    const float x0 = n00 + u * (n10 - n00);
+    const float x1 = n01 + u * (n11 - n01);
+    return x0 + v * (x1 - x0);
+}
+
 float NoiseContext::fbm(float x, float y, int octaves, float lacunarity, float gain, float frequency) const {
     return octaveNoise(x, y, octaves, lacunarity, gain, frequency, [](float n) { return n; });
 }

@@ -94,7 +94,8 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
         auto& out = nodeOutputs[ni];
         out.assign(cellCount * ch, 0.0f);
 
-        if (cn.kind == NodeKind::Fbm || cn.kind == NodeKind::RidgedFbm) {
+        if (cn.kind == NodeKind::Fbm || cn.kind == NodeKind::RidgedFbm ||
+            cn.kind == NodeKind::Simplex || cn.kind == NodeKind::Perlin) {
             const auto& np = std::get<NoiseParams>(cn.params);
 
             for (int z = 0; z < d; ++z) {
@@ -105,9 +106,14 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
 
                     if (cn.kind == NodeKind::Fbm) {
                         out[idx] = noiseContext.fbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.frequency);
-                    } else {
+                    } else if (cn.kind == NodeKind::RidgedFbm) {
                         out[idx] = noiseContext.ridgedFbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.sharpness, np.frequency);
+                    } else if (cn.kind == NodeKind::Simplex) {
+                        out[idx] = noiseContext.simplex2D(wx * np.frequency, wz * np.frequency);
+                    } else {
+                        out[idx] = noiseContext.perlin2D(wx * np.frequency, wz * np.frequency);
                     }
+
                     out[idx] = 0.5f * (out[idx] + 1.0f);
                 }
             }
