@@ -47,9 +47,9 @@ static bool decodePin(int pinId, NodeId& nid, uint8_t& slot, bool& isOutput) {
 
 // ---------- App state ----------
 
-static SDL_Window*   gWindow   = nullptr;
-static SDL_GLContext gGlCtx    = nullptr;
-static bool          gRunning  = true;
+static SDL_Window* gWindow = nullptr;
+static SDL_GLContext gGlCtx = nullptr;
+static bool gRunning = true;
 
 static EditorGraph gGraph;
 static std::string gErrorMsg;
@@ -57,20 +57,15 @@ static std::string gFilePath = "graphs/current.json";
 
 // ---------- Id generators ----------
 
+static NodeId gNextNodeId = 1;
+static LinkId gNextLinkId = 1;
+
 static NodeId nextNodeId() {
-    NodeId maxId = 0;
-    for (const auto& n : gGraph.nodes) {
-        if (n.id > maxId) maxId = n.id;
-    }
-    return maxId + 1;
+    return gNextNodeId++;
 }
 
 static LinkId nextLinkId() {
-    LinkId maxId = 0;
-    for (const auto& l : gGraph.links) {
-        if (l.id > maxId) maxId = l.id;
-    }
-    return maxId + 1;
+    return gNextLinkId++;
 }
 
 // ---------- SDL + ImGui init / shutdown ----------
@@ -106,6 +101,7 @@ static void initImGui() {
 
     ImNodesStyle& ns = ImNodes::GetStyle();
     ns.Flags |= ImNodesStyleFlags_GridLines;
+    ns.PinCircleRadius = 6.0f;
 
     ImGui_ImplSDL2_InitForOpenGL(gWindow, gGlCtx);
     ImGui_ImplOpenGL3_Init("#version 330");
@@ -141,11 +137,19 @@ static void saveToFile() {
 
 static void loadFromFile() {
     std::ifstream in(gFilePath);
-    if (!in) return;
+    if (!in)
+        return;
     std::string text((std::istreambuf_iterator<char>(in)),
                      std::istreambuf_iterator<char>());
     try {
         gGraph = fromJson(text);
+        // Sync ID counters past loaded graph
+        for (const auto& n : gGraph.nodes) {
+            if (n.id >= gNextNodeId) gNextNodeId = n.id + 1;
+        }
+        for (const auto& l : gGraph.links) {
+            if (l.id >= gNextLinkId) gNextLinkId = l.id + 1;
+        }
     } catch (const std::exception&) {
         // keep default graph
     }
@@ -159,9 +163,11 @@ static bool handleDeleteSelected() {
     if (count > 0) {
         std::vector<int> ids(static_cast<size_t>(count));
         ImNodes::GetSelectedNodes(ids.data());
-        for (int id : ids) toRemove.push_back(static_cast<NodeId>(id));
+        for (int id : ids)
+            toRemove.push_back(static_cast<NodeId>(id));
     }
-    if (toRemove.empty()) return false;
+    if (toRemove.empty())
+        return false;
 
     gGraph.nodes.erase(
         std::remove_if(gGraph.nodes.begin(), gGraph.nodes.end(),
@@ -180,14 +186,14 @@ static bool handleDeleteSelected() {
     return true;
 }
 
-static void addNode(NodeKind kind, const char* name) {
+static void addNode(NodeKind kind) {
     NodeId id = nextNodeId();
     if (kind == NodeKind::TerrainSynthesis) {
         gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f,
-                                name, TerrainSynthesisParams{}});
+                                TerrainSynthesisParams{}});
     } else {
         gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f,
-                                name + std::to_string(id), NoiseParams{}});
+                                NoiseParams{}});
     }
 }
 
@@ -205,12 +211,16 @@ static void drawToolbar() {
 
         ImGui::Separator();
 
-        if (ImGui::Button("+ FBm"))    addNode(NodeKind::Fbm, "Fbm ");
-        if (ImGui::Button("+ Ridged")) addNode(NodeKind::RidgedFbm, "Ridged ");
-        if (ImGui::Button("+ Synthesis")) addNode(NodeKind::TerrainSynthesis, "Synthesis");
+        if (ImGui::Button("+ FBm"))
+            addNode(NodeKind::Fbm);
+        if (ImGui::Button("+ Ridged"))
+            addNode(NodeKind::RidgedFbm);
+        if (ImGui::Button("+ Synthesis"))
+            addNode(NodeKind::TerrainSynthesis);
 
         if (ImNodes::NumSelectedNodes() > 0) {
-            if (ImGui::Button("Delete")) handleDeleteSelected();
+            if (ImGui::Button("Delete"))
+                handleDeleteSelected();
         }
 
         if (!gErrorMsg.empty()) {
@@ -228,7 +238,7 @@ static void drawNodeEditor() {
     ImGui::SetNextWindowSize(vp->WorkSize);
     ImGui::Begin("Graph", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
+                     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
     ImNodes::BeginNodeEditor();
 
@@ -243,7 +253,7 @@ static void drawNodeEditor() {
 
         ImNodes::BeginNode(node.id);
         ImNodes::BeginNodeTitleBar();
-        ImGui::Text("%s", node.title.empty() ? def.name : node.title.c_str());
+        ImGui::Text("%s", def.name);
         ImNodes::EndNodeTitleBar();
 
         for (size_t i = 0; i < def.inputs.size(); ++i) {
@@ -278,7 +288,7 @@ static void drawNodeEditor() {
             uint8_t fromSlot, toSlot;
             bool startOut, endOut;
             decodePin(startPin, fromNid, fromSlot, startOut);
-            decodePin(endPin,   toNid,   toSlot,   endOut);
+            decodePin(endPin, toNid, toSlot, endOut);
 
             // Ensure direction: output → input
             if (!startOut && endOut) {
@@ -287,27 +297,8 @@ static void drawNodeEditor() {
             }
 
             if (startOut && !endOut) {
-                // Check this isn't a duplicate
-                bool dup = false;
-                for (const auto& l : gGraph.links) {
-                    if (l.from.nodeId == fromNid && l.from.slot == fromSlot &&
-                        l.to.nodeId == toNid && l.to.slot == toSlot) {
-                        dup = true;
-                        break;
-                    }
-                }
-                // Check input pin isn't already connected
-                bool inputTaken = false;
-                for (const auto& l : gGraph.links) {
-                    if (l.to.nodeId == toNid && l.to.slot == toSlot) {
-                        inputTaken = true;
-                        break;
-                    }
-                }
-                if (!dup && !inputTaken) {
-                    gGraph.links.push_back({nextLinkId(), {fromNid, fromSlot}, {toNid, toSlot}});
-                    gErrorMsg.clear();
-                }
+                gGraph.links.push_back({nextLinkId(), {fromNid, fromSlot}, {toNid, toSlot}});
+                gErrorMsg.clear();
             }
         }
     }
@@ -345,15 +336,14 @@ static void drawInspector() {
 
         EditorNode* node = nullptr;
         for (auto& n : gGraph.nodes) {
-            if (n.id == selId) { node = &n; break; }
+            if (n.id == selId) {
+                node = &n;
+                break;
+            }
         }
-        if (!node) { ImGui::End(); return; }
-
-        char titleBuf[128];
-        std::strncpy(titleBuf, node->title.c_str(), sizeof(titleBuf) - 1);
-        titleBuf[sizeof(titleBuf) - 1] = '\0';
-        if (ImGui::InputText("Name", titleBuf, sizeof(titleBuf))) {
-            node->title = titleBuf;
+        if (!node) {
+            ImGui::End();
+            return;
         }
 
         ImGui::Separator();
@@ -398,7 +388,6 @@ static void processEvents() {
         if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
             gRunning = false;
         }
-
     }
 }
 

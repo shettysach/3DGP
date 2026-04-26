@@ -101,14 +101,11 @@ static NodeParams paramsFromJson(NodeKind kind, const json& j) {
 std::string toJson(const EditorGraph& g) {
     json j;
 
-    j["version"] = g.version;
-
     json nodesArr = json::array();
     for (const auto& node : g.nodes) {
         json nj;
         nj["id"]    = node.id;
         nj["kind"]  = kindToString(node.kind);
-        nj["title"] = node.title;
         nj["pos"]   = {node.posX, node.posY};
         nj["params"] = paramsToJson(node.kind, node.params);
         nodesArr.push_back(nj);
@@ -134,13 +131,11 @@ EditorGraph fromJson(const std::string& text) {
     json j = json::parse(text);
 
     EditorGraph g;
-    g.version = j.value("version", 1);
 
     for (const auto& nj : j.at("nodes")) {
         EditorNode node;
         node.id    = nj.at("id").get<NodeId>();
         node.kind  = kindFromString(nj.at("kind").get<std::string>());
-        node.title = nj.value("title", "");
         if (nj.contains("pos") && nj["pos"].is_array() && nj["pos"].size() == 2) {
             node.posX = nj["pos"][0].get<float>();
             node.posY = nj["pos"][1].get<float>();

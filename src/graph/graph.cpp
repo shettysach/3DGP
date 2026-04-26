@@ -77,9 +77,9 @@ NodeParams defaultParams(NodeKind kind) {
 EditorGraph defaultGraph() {
     EditorGraph g;
 
-    g.nodes.push_back({1, NodeKind::Fbm, 200.0f, 200.0f, "Continental", NoiseParams{}});
-    g.nodes.push_back({2, NodeKind::RidgedFbm, 600.0f, 200.0f, "Ridges", NoiseParams{}});
-    g.nodes.push_back({3, NodeKind::TerrainSynthesis, 400.0f, 450.0f, "Terrain", TerrainSynthesisParams{}});
+    g.nodes.push_back({1, NodeKind::Fbm, 200.0f, 200.0f, NoiseParams{}});
+    g.nodes.push_back({2, NodeKind::RidgedFbm, 600.0f, 200.0f, NoiseParams{}});
+    g.nodes.push_back({3, NodeKind::TerrainSynthesis, 400.0f, 450.0f, TerrainSynthesisParams{}});
 
     // Fbm → TerrainSynthesis continental (input slot 0)
     g.links.push_back({1, {1, 0}, {3, 0}});

@@ -170,7 +170,6 @@ class TerrainGenerator {
     NoiseContext noiseContext_;
     std::shared_ptr<const graph::CompiledGraph> baseGraph_;
 
-    TerrainFields buildBaseTerrainFields() const;
     void computeClimateFields(TerrainFields& fields) const;
 
     void reseed(uint32_t seed);

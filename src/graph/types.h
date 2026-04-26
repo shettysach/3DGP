@@ -57,7 +57,6 @@ struct EditorNode {
     NodeKind kind  = NodeKind::Fbm;
     float    posX  = 0.0f;
     float    posY  = 0.0f;
-    std::string title;
     NodeParams params;
 };
 
@@ -68,7 +67,6 @@ struct EditorLink {
 };
 
 struct EditorGraph {
-    int version = 1;
     std::vector<EditorNode> nodes;
     std::vector<EditorLink> links;
 };
