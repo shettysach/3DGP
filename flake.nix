@@ -9,10 +9,13 @@
     self,
     nixpkgs,
   }: let
-    system = "x86_64-linux";
-    pkgs = import nixpkgs {inherit system;};
+    supportedSystems = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
+    forEachSystem = f: nixpkgs.lib.genAttrs supportedSystems (system: f system);
   in {
-    devShells.${system}.default = pkgs.mkShell {
+    devShells = forEachSystem (system: let
+      pkgs = import nixpkgs {inherit system;};
+    in
+      pkgs.mkShell {
       packages = with pkgs; [
         # Python and package management
         pkgs.python312
@@ -66,8 +69,11 @@
         }:${pkgs.glfw}:${pkgs.nlohmann_json}:$CMAKE_PREFIX_PATH
         export IMGUI_SRC=${pkgs.imgui.src}
       '';
-    };
+    });
 
-    formatter.${system} = pkgs.alejandra;
+    formatter = forEachSystem (system: let
+      pkgs = import nixpkgs {inherit system;};
+    in
+      pkgs.alejandra);
   };
 }

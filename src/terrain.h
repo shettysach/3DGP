@@ -116,6 +116,8 @@ struct TerrainSettings {
     float falloffRadius = 0.9f;
     float falloffPower = 2.2f;
     uint32_t seed = 1234u;
+    bool useWFC = true;
+    float voronoiCellSize = 24.0f;
     NoiseSettings noise;
     RiverSettings rivers;
     ClimateSettings climate;

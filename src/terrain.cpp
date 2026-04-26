@@ -383,7 +383,12 @@ TerrainMesh TerrainGenerator::generateMesh() const {
     const auto climateDone = Clock::now();
     computeLandformFields(fields);
     const auto landformsDone = Clock::now();
-    computeBiomeFields(fields);
+    
+    if (settings_.useWFC) {
+        computeBiomeFieldsWFC(fields, settings_);
+    } else {
+        computeBiomeFields(fields);
+    }
     const auto biomesDone = Clock::now();
 
     TerrainMesh mesh;
