@@ -1,24 +1,26 @@
 #include "plains.h"
+#include "util.h"
 
 #include <algorithm>
 
-namespace terrain
-{
+namespace terrain {
 
-float computePlainsHeightFromNoise(const PlainsNoiseInput& params, float detail)
-{
-    const float continental = 0.5f * (params.fbm(params.sampleX, params.sampleZ, params.octaves, params.lacunarity, params.gain) + 1.0f);
-    const int plainsOctaves = std::max(3, params.octaves - 2);
-    const float plainsBase = 0.5f * (params.fbm(params.sampleX - 63.2f, params.sampleZ + 41.8f, plainsOctaves, params.lacunarity, params.gain) + 1.0f);
+float computePlainsHeight(const PlainsInput& in) {
+    const float macroOffset = (in.macroRelief - 0.5f) * 0.34f;
+    const float rollingOffset = (in.hilliness - 0.5f) * 0.18f;
+    const float plateauBoost = smoothstep(0.56f, 0.82f, in.macroRelief) * 0.12f;
+    const float basinCarve = smoothstep(0.54f, 0.82f, 1.0f - in.basinNoise) * 0.10f;
 
-    const PlainsInput in{continental, plainsBase, detail, params.verticalScale};
-    return computePlainsHeight(in);
-}
+    const float baseSignal =
+        0.46f * in.continental +
+        0.18f * in.plainsBase +
+        0.08f * in.detail +
+        macroOffset +
+        rollingOffset +
+        plateauBoost -
+        basinCarve;
 
-float computePlainsHeight(const PlainsInput& in)
-{
-    return (0.62f * in.continental + 0.28f * in.plainsBase + 0.10f * in.detail) *
-           in.verticalScale * 0.56f;
+    return std::max(0.0f, baseSignal) * in.verticalScale * 0.74f;
 }
 
 } // namespace terrain

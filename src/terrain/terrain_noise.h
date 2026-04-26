@@ -1,30 +1,38 @@
 #ifndef TERRAIN_NOISE_H
 #define TERRAIN_NOISE_H
 
-#include <functional>
+#include <cstdint>
+#include <vector>
 
-namespace terrain
-{
+namespace terrain {
 
-struct TerrainNoiseInput
-{
-    float sampleX = 0.0f;
-    float sampleZ = 0.0f;
-    int octaves = 6;
-    float lacunarity = 2.0f;
-    float gain = 0.5f;
-    float ridgeSharpness = 1.0f;
-    std::function<float(float, float, int, float, float)> fbm;
-    std::function<float(float, float, int, float, float, float)> ridgedFbm;
+struct NoiseContext {
+    std::vector<int> permutation;
+
+    float simplex2D(float x, float y) const;
+
+    float perlin2D(float x, float y) const;
+    float perlinFbm(float x, float y, int octaves, float lacunarity, float gain, float frequency) const;
+
+    float fbm(float x, float y, int octaves, float lacunarity, float gain, float frequency) const;
+    float ridgedFbm(float x, float y, int octaves, float lacunarity, float gain, float sharpness, float frequency) const;
+
+    template <typename F>
+    float octaveNoise(float x, float y, int octaves, float lacunarity, float gain, float frequency, F transform) const {
+        float value = 0.0f;
+        float amplitude = 1.0f;
+        float freq = frequency;
+        float amplitudeSum = 0.0f;
+        for (int octave = 0; octave < octaves; ++octave) {
+            const float n = simplex2D(x * freq, y * freq);
+            value += amplitude * transform(n);
+            amplitudeSum += amplitude;
+            amplitude *= gain;
+            freq *= lacunarity;
+        }
+        return amplitudeSum > 0.0f ? value / amplitudeSum : 0.0f;
+    }
 };
-
-struct TerrainNoiseComputation
-{
-    float continental = 0.0f;
-    float detail = 0.0f;
-};
-
-TerrainNoiseComputation computeTerrainNoiseComputation(const TerrainNoiseInput& in);
 
 } // namespace terrain
 
