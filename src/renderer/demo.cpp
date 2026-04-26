@@ -84,8 +84,7 @@ void runDemo() {
             graph::EditorGraph eg = graph::fromJson(ss.str());
             auto cg = std::make_shared<graph::CompiledGraph>(graph::compile(eg));
             generator.setBaseGraph(cg);
-            std::cout << "Reloaded graph: " << cg->nodes.size() << " nodes, "
-                      << cg->outputs.size() << " outputs\n";
+            std::cout << "Reloaded graph: " << cg->nodes.size() << " nodes\n";
             return true;
         } catch (const std::exception& e) {
             std::cerr << "Graph error: " << e.what() << '\n';

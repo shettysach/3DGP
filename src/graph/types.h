@@ -2,7 +2,6 @@
 #define GRAPH_TYPES_H
 
 #include <cstdint>
-#include <string>
 #include <variant>
 #include <vector>
 
@@ -18,6 +17,9 @@ using LinkId = int32_t;
 enum class NodeKind : uint8_t {
     Fbm,
     RidgedFbm,
+    FractalPerlin,
+    Perlin,
+    Simplex,
     TerrainSynthesis,
 };
 
@@ -36,16 +38,12 @@ struct NoiseParams {
     float lacunarity  = 2.0f;
     float gain        = 0.5f;
     float sharpness   = 2.0f;
-    float xOffset     = 0.0f;
-    float zOffset     = 0.0f;
-    bool  remapToUnit = true;
+    float xOffset = 0.0f;
+    float zOffset = 0.0f;
 };
 
 struct TerrainSynthesisParams {
-    float verticalScale  = 80.0f;
-    bool  islandFalloff  = true;
-    float falloffRadius  = 0.9f;
-    float falloffPower   = 2.2f;
+    float verticalScale = 80.0f;
 };
 
 using NodeParams = std::variant<NoiseParams, TerrainSynthesisParams>;
@@ -57,7 +55,6 @@ struct EditorNode {
     NodeKind kind  = NodeKind::Fbm;
     float    posX  = 0.0f;
     float    posY  = 0.0f;
-    std::string title;
     NodeParams params;
 };
 
@@ -68,42 +65,20 @@ struct EditorLink {
 };
 
 struct EditorGraph {
-    int version = 1;
     std::vector<EditorNode> nodes;
     std::vector<EditorLink> links;
 };
 
 // === Compiled Graph ===
 
-struct InputBinding {
-    uint16_t sourceNodeIndex   = 0;
-    uint8_t  sourceOutputSlot  = 0;
-};
-
 struct CompiledNode {
     NodeKind kind;
     NodeParams params;
-    std::vector<InputBinding> inputs;
-};
-
-enum class FieldSlot : uint8_t {
-    Height,
-    MountainWeight,
-    ValleyWeight,
-    PlateauWeight,
-    SampleX,
-    SampleZ,
-};
-
-struct OutputBinding {
-    FieldSlot slot;
-    uint16_t  sourceNodeIndex  = 0;
-    uint8_t   sourceOutputSlot = 0;
+    std::vector<uint16_t> inputs;       // source node index per input slot
 };
 
 struct CompiledGraph {
-    std::vector<CompiledNode>  nodes;
-    std::vector<OutputBinding> outputs;
+    std::vector<CompiledNode> nodes;
 };
 
 // === Node Definition Table ===

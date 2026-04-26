@@ -117,6 +117,8 @@ struct TerrainSettings {
     float falloffRadius = 0.9f;
     float falloffPower = 2.2f;
     uint32_t seed = 1234u;
+    bool useWFC = true;
+    float voronoiCellSize = 24.0f;
     NoiseSettings noise;
     RiverSettings rivers;
     ClimateSettings climate;
@@ -159,10 +161,8 @@ class TerrainGenerator {
     explicit TerrainGenerator(TerrainSettings settings = {});
 
     void setSettings(const TerrainSettings& settings);
-    const TerrainSettings& settings() const;
 
     void setBaseGraph(std::shared_ptr<const graph::CompiledGraph> graph);
-    const graph::CompiledGraph* baseGraph() const;
 
     TerrainMesh generateMesh() const;
 
@@ -171,7 +171,6 @@ class TerrainGenerator {
     NoiseContext noiseContext_;
     std::shared_ptr<const graph::CompiledGraph> baseGraph_;
 
-    TerrainFields buildBaseTerrainFields() const;
     void computeClimateFields(TerrainFields& fields) const;
 
     void reseed(uint32_t seed);

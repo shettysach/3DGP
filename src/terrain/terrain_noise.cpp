@@ -61,6 +61,57 @@ float NoiseContext::simplex2D(float x, float y) const {
     return 70.0f * (n0 + n1 + n2);
 }
 
+float NoiseContext::perlin2D(float x, float y) const {
+    static constexpr float grads[8][2] = {
+        {1.0f, 0.0f}, {-1.0f, 0.0f}, {0.0f, 1.0f}, {0.0f, -1.0f},
+        {0.70710678f, 0.70710678f}, {-0.70710678f, 0.70710678f},
+        {0.70710678f, -0.70710678f}, {-0.70710678f, -0.70710678f}
+    };
+
+    const int X = fastFloor(x) & 255;
+    const int Y = fastFloor(y) & 255;
+
+    const float xf = x - fastFloor(x);
+    const float yf = y - fastFloor(y);
+
+    const int gi00 = permutation[permutation[X] + Y] & 7;
+    const int gi10 = permutation[permutation[X + 1] + Y] & 7;
+    const int gi01 = permutation[permutation[X] + Y + 1] & 7;
+    const int gi11 = permutation[permutation[X + 1] + Y + 1] & 7;
+
+    auto dotGrad = [&](int gi, float dx, float dy) {
+        return grads[gi][0] * dx + grads[gi][1] * dy;
+    };
+
+    float n00 = dotGrad(gi00, xf, yf);
+    float n10 = dotGrad(gi10, xf - 1.0f, yf);
+    float n01 = dotGrad(gi01, xf, yf - 1.0f);
+    float n11 = dotGrad(gi11, xf - 1.0f, yf - 1.0f);
+
+    const float u = xf * xf * xf * (xf * (xf * 6.0f - 15.0f) + 10.0f);
+    const float v = yf * yf * yf * (yf * (yf * 6.0f - 15.0f) + 10.0f);
+
+    const float nx0 = n00 + u * (n10 - n00);
+    const float nx1 = n01 + u * (n11 - n01);
+
+    return nx0 + v * (nx1 - nx0);
+}
+
+float NoiseContext::perlinFbm(float x, float y, int octaves, float lacunarity, float gain, float frequency) const {
+    float value = 0.0f;
+    float amplitude = 1.0f;
+    float freq = frequency;
+    float amplitudeSum = 0.0f;
+    for (int octave = 0; octave < octaves; ++octave) {
+        const float n = perlin2D(x * freq, y * freq);
+        value += amplitude * n;
+        amplitudeSum += amplitude;
+        amplitude *= gain;
+        freq *= lacunarity;
+    }
+    return amplitudeSum > 0.0f ? value / amplitudeSum : 0.0f;
+}
+
 float NoiseContext::fbm(float x, float y, int octaves, float lacunarity, float gain, float frequency) const {
     return octaveNoise(x, y, octaves, lacunarity, gain, frequency, [](float n) { return n; });
 }

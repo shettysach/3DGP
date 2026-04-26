@@ -1,5 +1,8 @@
 #include "biomes.h"
 #include "util.h"
+#include "voronoi.h"
+#include "wfc.h"
+#include <iostream>
 
 #include <algorithm>
 #include <array>
@@ -470,6 +473,69 @@ const char* landformName(LandformId landform) {
 
 BiomeColor landformColor(LandformId landform) {
     return kLandformInfo[landformIndex(landform)].color;
+}
+
+void computeBiomeFieldsWFC(TerrainFields& fields, const TerrainSettings& settings) {
+    if (fields.heights.empty()) {
+        return;
+    }
+
+    // 1. Generate Voronoi Graph
+    std::cout << "[WFC] Generating Voronoi graph with cell size " << settings.voronoiCellSize << "..." << std::endl;
+    VoronoiGraph graph(fields.width, fields.depth, settings.voronoiCellSize);
+
+    // 2. Prepare Heuristics (average climate per cell)
+    size_t cellCount = graph.cells().size();
+    std::cout << "[WFC] Created " << cellCount << " Voronoi territories. Preparing climate heuristics..." << std::endl;
+    std::vector<float> tempHeuristics(cellCount, 0.0f);
+    std::vector<float> moistureHeuristics(cellCount, 0.0f);
+
+    for (size_t cIdx = 0; cIdx < cellCount; ++cIdx) {
+        const auto& cell = graph.cells()[cIdx];
+        if (cell.gridIndices.empty())
+            continue;
+
+        float tSum = 0.0f;
+        float mSum = 0.0f;
+        for (size_t gIdx : cell.gridIndices) {
+            tSum += fields.temperature[gIdx];
+            mSum += fields.moisture[gIdx];
+        }
+        tempHeuristics[cIdx] = tSum / static_cast<float>(cell.gridIndices.size());
+        moistureHeuristics[cIdx] = mSum / static_cast<float>(cell.gridIndices.size());
+    }
+
+    // 3. Solve WFC
+    std::cout << "[WFC] Starting Wave Function Collapse solver..." << std::endl;
+    BiomeConstraintGraph constraints;
+    WFCBiomeSolver solver(graph, constraints, settings.seed);
+
+    // We'll pass heuristics to help selection (though current solver doesn't use them yet,
+    // it's ready for that expansion)
+    if (!solver.solve(tempHeuristics, moistureHeuristics)) {
+        // Fallback to standard generation if WFC fails
+        std::cout << "[WFC] WARNING: Solver hit a contradiction it couldn't resolve! Falling back to standard noise generation." << std::endl;
+        computeBiomeFields(fields);
+        return;
+    }
+
+    std::cout << "[WFC] SUCCESS! Map solved using constraint propagation and backtracking." << std::endl;
+    std::cout << "[WFC] Mapping regional biomes back to high-res pixel grid..." << std::endl;
+    // 4. Map results back to grid
+    for (size_t cIdx = 0; cIdx < cellCount; ++cIdx) {
+        const auto& cell = graph.cells()[cIdx];
+        BiomeId result = solver.getResult(static_cast<uint32_t>(cIdx));
+
+        for (size_t gIdx : cell.gridIndices) {
+            fields.primaryBiomeIds[gIdx] = static_cast<uint8_t>(result);
+            fields.secondaryBiomeIds[gIdx] = static_cast<uint8_t>(result);
+            fields.primaryBiomeWeights[gIdx] = 1.0f;
+            fields.secondaryBiomeWeights[gIdx] = 0.0f;
+        }
+    }
+
+    // 5. Final smoothing pass to blend boundaries slightly
+    smoothSurfaceBiomeWeights(fields);
 }
 
 } // namespace terrain

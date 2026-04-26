@@ -15,18 +15,16 @@ if(WIN32)
   set(GRAPH_VIEW_SRC src/graph/graph_view_stub.cpp)
   set(THIRD_PARTY_LIBS nlohmann_json::nlohmann_json)
 elseif(APPLE)
-    find_package(SDL2 REQUIRED)
-    find_package(OpenGL REQUIRED)
-    find_package(imgui CONFIG REQUIRED)
-    find_package(imnodes CONFIG REQUIRED)
-    find_package(nlohmann_json CONFIG REQUIRED)
-
-    include_directories(${SDL2_INCLUDE_DIRS})
-
-    set(SDL2_LIBS ${SDL2_LIBRARIES})
-    set(OPENGL_LIBS OpenGL::GL)
-    set(IMGUI_SRC_DIR "$ENV{IMGUI_SRC}")
-    set(THIRD_PARTY_LIBS imgui::imgui imnodes::imnodes nlohmann_json::nlohmann_json)
+  find_package(SDL2 REQUIRED)
+  find_package(OpenGL REQUIRED)
+  find_package(imgui CONFIG REQUIRED)
+  find_package(imnodes CONFIG REQUIRED)
+  find_package(nlohmann_json CONFIG REQUIRED)
+  include_directories(${SDL2_INCLUDE_DIRS})
+  set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
+  set(OPENGL_LIBRARIES OpenGL::GL)
+  set(IMGUI_SRC_DIR "$ENV{IMGUI_SRC}")
+  set(THIRD_PARTY_LIBS imgui::imgui imnodes::imnodes nlohmann_json::nlohmann_json)
 else()
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(SDL2 REQUIRED sdl2)
@@ -50,6 +48,7 @@ endif()
 if(NOT GRAPH_VIEW_SRC)
   set(GRAPH_VIEW_SRC src/graph/graph_view.cpp)
 endif()
+
 set(IMGUI_BACKEND_SOURCES)
 set(IMGUI_BACKEND_INCLUDES)
 if(IMGUI_SRC_DIR)
@@ -61,49 +60,52 @@ if(IMGUI_SRC_DIR)
 endif()
 
 add_executable(terrain_demo
-    src/main.cpp
-    src/terrain.cpp
-    src/terrain.h
-    src/terrain/plains.cpp
-    src/terrain/plains.h
-    src/terrain/plateaus.cpp
-    src/terrain/plateaus.h
-    src/terrain/mountains.cpp
-    src/terrain/mountains.h
-    src/terrain/valleys.cpp
-    src/terrain/valleys.h
-    src/terrain/blending.cpp
-    src/terrain/blending.h
-    src/terrain/biomes.cpp
-    src/terrain/biomes.h
-    src/terrain/climate.cpp
-    src/terrain/climate.h
-    src/terrain/fields.h
-    src/terrain/landforms.cpp
-    src/terrain/landforms.h
-    src/terrain/util.h
-    src/terrain/terrain_noise.cpp
-    src/terrain/terrain_noise.h
-    src/terrain/rivers.cpp
-    src/terrain/rivers.h
-    src/renderer/core.cpp
-    src/renderer/core.h
-    src/renderer/demo.cpp
-    src/renderer/support.cpp
-    src/renderer/internal.h
-    src/renderer/shaders.h
-    ${GRAPH_VIEW_SRC}
-    src/graph/graph.cpp
-    src/graph/graph_compile.cpp
-    src/graph/graph_execute.cpp
-    src/graph/graph_serialize.cpp
-    ${IMGUI_BACKEND_SOURCES}
- )
+  src/main.cpp
+  src/terrain.cpp
+  src/terrain.h
+  src/terrain/plains.cpp
+  src/terrain/plains.h
+  src/terrain/plateaus.cpp
+  src/terrain/plateaus.h
+  src/terrain/mountains.cpp
+  src/terrain/mountains.h
+  src/terrain/valleys.cpp
+  src/terrain/valleys.h
+  src/terrain/blending.cpp
+  src/terrain/blending.h
+  src/terrain/biomes.cpp
+  src/terrain/biomes.h
+  src/terrain/climate.cpp
+  src/terrain/fields.h
+  src/terrain/landforms.cpp
+  src/terrain/landforms.h
+  src/terrain/util.h
+  src/terrain/terrain_noise.cpp
+  src/terrain/terrain_noise.h
+  src/terrain/rivers.cpp
+  src/terrain/rivers.h
+  src/terrain/voronoi.cpp
+  src/terrain/voronoi.h
+  src/terrain/wfc.cpp
+  src/terrain/wfc.h
+  src/renderer/core.cpp
+  src/renderer/core.h
+  src/renderer/demo.cpp
+  src/renderer/support.cpp
+  src/renderer/internal.h
+  src/renderer/shaders.h
+  ${GRAPH_VIEW_SRC}
+  src/graph/graph.cpp
+  src/graph/graph_compile.cpp
+  src/graph/graph_execute.cpp
+  src/graph/graph_serialize.cpp
+  ${IMGUI_BACKEND_SOURCES}
+)
 
 target_include_directories(terrain_demo PRIVATE src ${IMGUI_BACKEND_INCLUDES})
 
 target_link_libraries(terrain_demo
-    ${SDL2_LIBRARIES}
-    ${OPENGL_LIBRARIES}
-    ${THIRD_PARTY_LIBS}
+  ${SDL2_LIBRARIES}
+  ${OPENGL_LIBRARIES}
+  ${THIRD_PARTY_LIBS}
 )

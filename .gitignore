@@ -3,6 +3,7 @@
 /result-dev
 /.direnv/
 /.cache/
+/graphs/
 
 # CMake / tooling extras
 /CMakeUserPresets.json

@@ -15,6 +15,7 @@ struct BiomeColor {
 };
 
 void computeBiomeFields(TerrainFields& fields);
+void computeBiomeFieldsWFC(TerrainFields& fields, const TerrainSettings& settings);
 
 const char* biomeName(BiomeId biome);
 BiomeColor biomeColor(BiomeId biome);
