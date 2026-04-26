@@ -16,6 +16,9 @@ const char* kindToString(NodeKind kind) {
     switch (kind) {
     case NodeKind::Fbm:               return "Fbm";
     case NodeKind::RidgedFbm:         return "RidgedFbm";
+    case NodeKind::FractalPerlin:     return "FractalPerlin";
+    case NodeKind::Perlin:            return "Perlin";
+    case NodeKind::Simplex:           return "Simplex";
     case NodeKind::TerrainSynthesis:  return "TerrainSynthesis";
     }
     throw std::runtime_error("Unknown NodeKind");
@@ -24,6 +27,9 @@ const char* kindToString(NodeKind kind) {
 NodeKind kindFromString(const std::string& s) {
     if (s == "Fbm")               return NodeKind::Fbm;
     if (s == "RidgedFbm")         return NodeKind::RidgedFbm;
+    if (s == "FractalPerlin")     return NodeKind::FractalPerlin;
+    if (s == "Perlin")            return NodeKind::Perlin;
+    if (s == "Simplex")           return NodeKind::Simplex;
     if (s == "TerrainSynthesis")  return NodeKind::TerrainSynthesis;
     throw std::runtime_error("Unknown NodeKind string: " + s);
 }
@@ -68,6 +74,9 @@ static json paramsToJson(NodeKind kind, const NodeParams& params) {
     switch (kind) {
     case NodeKind::Fbm:
     case NodeKind::RidgedFbm:
+    case NodeKind::FractalPerlin:
+    case NodeKind::Perlin:
+    case NodeKind::Simplex:
         return noiseParamsToJson(std::get<NoiseParams>(params));
     case NodeKind::TerrainSynthesis:
         return terrainSynthesisParamsToJson(std::get<TerrainSynthesisParams>(params));
@@ -79,6 +88,9 @@ static NodeParams paramsFromJson(NodeKind kind, const json& j) {
     switch (kind) {
     case NodeKind::Fbm:
     case NodeKind::RidgedFbm:
+    case NodeKind::FractalPerlin:
+    case NodeKind::Perlin:
+    case NodeKind::Simplex:
         return noiseParamsFromJson(j);
     case NodeKind::TerrainSynthesis:
         return terrainSynthesisParamsFromJson(j);

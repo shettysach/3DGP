@@ -85,14 +85,10 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
             eval(src);
         }
 
-        if (cn.kind == NodeKind::Fbm || cn.kind == NodeKind::RidgedFbm) {
+        if (cn.kind == NodeKind::Fbm || cn.kind == NodeKind::RidgedFbm ||
+            cn.kind == NodeKind::FractalPerlin || cn.kind == NodeKind::Perlin ||
+            cn.kind == NodeKind::Simplex) {
             const auto& np = std::get<NoiseParams>(cn.params);
-            const float freq = np.frequency;
-            const int oct = np.octaves;
-            const float lac = np.lacunarity;
-            const float gn = np.gain;
-            const float sharp = np.sharpness;
-            const float xOff = np.xOffset;
             auto& out = nodeOutputs[ni];
             out.assign(cellCount, 0.0f);
 
@@ -104,8 +100,14 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
 
                     if (cn.kind == NodeKind::Fbm) {
                         out[idx] = noiseContext.fbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.frequency);
-                    } else {
+                    } else if (cn.kind == NodeKind::RidgedFbm) {
                         out[idx] = noiseContext.ridgedFbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.sharpness, np.frequency);
+                    } else if (cn.kind == NodeKind::FractalPerlin) {
+                        out[idx] = noiseContext.perlinFbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.frequency);
+                    } else if (cn.kind == NodeKind::Perlin) {
+                        out[idx] = noiseContext.perlin2D(wx * np.frequency, wz * np.frequency);
+                    } else { // Simplex
+                        out[idx] = noiseContext.simplex2D(wx * np.frequency, wz * np.frequency);
                     }
 
                     out[idx] = 0.5f * (out[idx] + 1.0f);

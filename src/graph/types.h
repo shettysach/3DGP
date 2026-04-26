@@ -17,6 +17,9 @@ using LinkId = int32_t;
 enum class NodeKind : uint8_t {
     Fbm,
     RidgedFbm,
+    FractalPerlin,
+    Perlin,
+    Simplex,
     TerrainSynthesis,
 };
 

@@ -206,6 +206,12 @@ static void drawToolbar() {
             addNode(NodeKind::Fbm);
         if (ImGui::Button("+ Ridged"))
             addNode(NodeKind::RidgedFbm);
+        if (ImGui::Button("+ Fractal Perlin"))
+            addNode(NodeKind::FractalPerlin);
+        if (ImGui::Button("+ Perlin"))
+            addNode(NodeKind::Perlin);
+        if (ImGui::Button("+ Simplex"))
+            addNode(NodeKind::Simplex);
         if (ImGui::Button("+ Synthesis"))
             addNode(NodeKind::TerrainSynthesis);
 
@@ -357,12 +363,17 @@ static void drawInspector() {
         ImGui::Separator();
         ImGui::Text("Kind: %s", kindToString(node->kind));
 
-        if (node->kind == NodeKind::Fbm || node->kind == NodeKind::RidgedFbm) {
+        if (node->kind == NodeKind::Fbm || node->kind == NodeKind::RidgedFbm ||
+            node->kind == NodeKind::FractalPerlin || node->kind == NodeKind::Perlin ||
+            node->kind == NodeKind::Simplex) {
             auto& np = std::get<NoiseParams>(node->params);
             ImGui::DragFloat("Frequency", &np.frequency, 0.0001f, 0.0001f, 0.1f, "%.4f");
-            ImGui::SliderInt("Octaves", &np.octaves, 1, 10);
-            ImGui::DragFloat("Lacunarity", &np.lacunarity, 0.01f, 1.0f, 5.0f);
-            ImGui::DragFloat("Gain", &np.gain, 0.01f, 0.1f, 1.0f);
+            if (node->kind == NodeKind::Fbm || node->kind == NodeKind::RidgedFbm ||
+                node->kind == NodeKind::FractalPerlin) {
+                ImGui::SliderInt("Octaves", &np.octaves, 1, 10);
+                ImGui::DragFloat("Lacunarity", &np.lacunarity, 0.01f, 1.0f, 5.0f);
+                ImGui::DragFloat("Gain", &np.gain, 0.01f, 0.1f, 1.0f);
+            }
             ImGui::DragFloat("X Offset", &np.xOffset, 1.0f);
             ImGui::DragFloat("Z Offset", &np.zOffset, 1.0f);
             if (node->kind == NodeKind::RidgedFbm) {
