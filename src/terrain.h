@@ -158,10 +158,8 @@ class TerrainGenerator {
     explicit TerrainGenerator(TerrainSettings settings = {});
 
     void setSettings(const TerrainSettings& settings);
-    const TerrainSettings& settings() const;
 
     void setBaseGraph(std::shared_ptr<const graph::CompiledGraph> graph);
-    const graph::CompiledGraph* baseGraph() const;
 
     TerrainMesh generateMesh() const;
 

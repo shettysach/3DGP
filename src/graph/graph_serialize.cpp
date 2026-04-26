@@ -57,20 +57,12 @@ static NoiseParams noiseParamsFromJson(const json& j) {
 }
 
 static json terrainSynthesisParamsToJson(const TerrainSynthesisParams& p) {
-    return {
-        {"verticalScale", p.verticalScale},
-        {"islandFalloff", p.islandFalloff},
-        {"falloffRadius", p.falloffRadius},
-        {"falloffPower",  p.falloffPower},
-    };
+    return {{"verticalScale", p.verticalScale}};
 }
 
 static TerrainSynthesisParams terrainSynthesisParamsFromJson(const json& j) {
     TerrainSynthesisParams p;
     if (j.contains("verticalScale")) p.verticalScale = j["verticalScale"].get<float>();
-    if (j.contains("islandFalloff")) p.islandFalloff = j["islandFalloff"].get<bool>();
-    if (j.contains("falloffRadius")) p.falloffRadius = j["falloffRadius"].get<float>();
-    if (j.contains("falloffPower"))  p.falloffPower  = j["falloffPower"].get<float>();
     return p;
 }
 

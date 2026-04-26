@@ -154,16 +154,8 @@ void TerrainGenerator::setSettings(const TerrainSettings& settings) {
     reseed(settings_.seed);
 }
 
-const TerrainSettings& TerrainGenerator::settings() const {
-    return settings_;
-}
-
 void TerrainGenerator::setBaseGraph(std::shared_ptr<const graph::CompiledGraph> graph) {
     baseGraph_ = std::move(graph);
-}
-
-const graph::CompiledGraph* TerrainGenerator::baseGraph() const {
-    return baseGraph_.get();
 }
 
 void TerrainGenerator::reseed(uint32_t seed) {

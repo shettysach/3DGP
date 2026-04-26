@@ -2,7 +2,6 @@
 #define GRAPH_TYPES_H
 
 #include <cstdint>
-#include <string>
 #include <variant>
 #include <vector>
 
@@ -42,10 +41,7 @@ struct NoiseParams {
 };
 
 struct TerrainSynthesisParams {
-    float verticalScale  = 80.0f;
-    bool  islandFalloff  = true;
-    float falloffRadius  = 0.9f;
-    float falloffPower   = 2.2f;
+    float verticalScale = 80.0f;
 };
 
 using NodeParams = std::variant<NoiseParams, TerrainSynthesisParams>;

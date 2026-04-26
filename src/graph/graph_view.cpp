@@ -12,7 +12,6 @@
 #include <SDL2/SDL_opengl.h>
 
 #include <algorithm>
-#include <cstring>
 #include <fstream>
 #include <string>
 #include <sys/stat.h>
@@ -364,9 +363,6 @@ static void drawInspector() {
         } else if (node->kind == NodeKind::TerrainSynthesis) {
             auto& tp = std::get<TerrainSynthesisParams>(node->params);
             ImGui::DragFloat("Vertical Scale", &tp.verticalScale, 1.0f, 1.0f, 500.0f);
-            ImGui::Checkbox("Island Falloff", &tp.islandFalloff);
-            ImGui::DragFloat("Falloff Radius", &tp.falloffRadius, 0.01f, 0.1f, 1.0f);
-            ImGui::DragFloat("Falloff Power", &tp.falloffPower, 0.1f, 0.5f, 5.0f);
         }
     } else {
         ImGui::Text("%d nodes selected", selCount);

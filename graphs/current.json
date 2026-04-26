@@ -2,13 +2,13 @@
   "links": [
     {
       "from": {
-        "nodeId": 4,
+        "nodeId": 6,
         "slot": 0
       },
-      "id": 2,
+      "id": 3,
       "to": {
         "nodeId": 3,
-        "slot": 1
+        "slot": 0
       }
     },
     {
@@ -16,10 +16,10 @@
         "nodeId": 5,
         "slot": 0
       },
-      "id": 3,
+      "id": 4,
       "to": {
         "nodeId": 3,
-        "slot": 0
+        "slot": 1
       }
     }
   ],
@@ -39,39 +39,39 @@
       ]
     },
     {
-      "id": 4,
-      "kind": "Fbm",
-      "params": {
-        "frequency": 0.007000000216066837,
-        "gain": 0.5,
-        "lacunarity": 2.0,
-        "octaves": 10,
-        "remapToUnit": true,
-        "sharpness": 2.0,
-        "xOffset": 0.0,
-        "zOffset": 0.0
-      },
-      "pos": [
-        471.0,
-        729.0
-      ]
-    },
-    {
       "id": 5,
       "kind": "RidgedFbm",
       "params": {
         "frequency": 0.007000000216066837,
         "gain": 0.5,
         "lacunarity": 2.0,
-        "octaves": 4,
+        "octaves": 6,
         "remapToUnit": true,
         "sharpness": 2.0,
         "xOffset": 0.0,
         "zOffset": 0.0
       },
       "pos": [
-        452.0,
-        457.0
+        529.0,
+        630.0
+      ]
+    },
+    {
+      "id": 6,
+      "kind": "Fbm",
+      "params": {
+        "frequency": 0.007000000216066837,
+        "gain": 0.5,
+        "lacunarity": 2.0,
+        "octaves": 6,
+        "remapToUnit": true,
+        "sharpness": 2.0,
+        "xOffset": 0.0,
+        "zOffset": 0.0
+      },
+      "pos": [
+        655.0,
+        242.0
       ]
     }
   ]
