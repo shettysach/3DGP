@@ -217,6 +217,22 @@ static void drawToolbar() {
         if (ImGui::Button("+ Synthesis"))
             addNode(NodeKind::TerrainSynthesis);
 
+        ImGui::Separator();
+
+        if (ImGui::Button("Default")) {
+            gGraph = defaultGraph();
+            gNextNodeId = 1;
+            gNextLinkId = 1;
+            for (const auto& n : gGraph.nodes) {
+                if (n.id >= gNextNodeId) gNextNodeId = n.id + 1;
+            }
+            for (const auto& l : gGraph.links) {
+                if (l.id >= gNextLinkId) gNextLinkId = l.id + 1;
+            }
+            gErrorMsg.clear();
+            saveToFile();
+        }
+
         if (ImNodes::NumSelectedNodes() > 0) {
             if (ImGui::Button("Delete"))
                 handleDeleteSelected();
@@ -356,7 +372,6 @@ static void drawInspector() {
             ImGui::DragFloat("Gain", &np.gain, 0.01f, 0.1f, 1.0f);
             ImGui::DragFloat("X Offset", &np.xOffset, 1.0f);
             ImGui::DragFloat("Z Offset", &np.zOffset, 1.0f);
-            ImGui::Checkbox("Remap to Unit", &np.remapToUnit);
             if (node->kind == NodeKind::RidgedFbm) {
                 ImGui::DragFloat("Sharpness", &np.sharpness, 0.1f, 0.5f, 5.0f);
             }

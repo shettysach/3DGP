@@ -32,27 +32,25 @@ NodeKind kindFromString(const std::string& s) {
 
 static json noiseParamsToJson(const NoiseParams& p) {
     return {
-        {"frequency",   p.frequency},
-        {"octaves",     p.octaves},
-        {"lacunarity",  p.lacunarity},
-        {"gain",        p.gain},
-        {"sharpness",   p.sharpness},
-        {"xOffset",     p.xOffset},
-        {"zOffset",     p.zOffset},
-        {"remapToUnit", p.remapToUnit},
+        {"frequency",  p.frequency},
+        {"octaves",    p.octaves},
+        {"lacunarity", p.lacunarity},
+        {"gain",       p.gain},
+        {"sharpness",  p.sharpness},
+        {"xOffset",    p.xOffset},
+        {"zOffset",    p.zOffset},
     };
 }
 
 static NoiseParams noiseParamsFromJson(const json& j) {
     NoiseParams p;
-    if (j.contains("frequency"))   p.frequency   = j["frequency"].get<float>();
-    if (j.contains("octaves"))     p.octaves     = j["octaves"].get<int>();
-    if (j.contains("lacunarity"))  p.lacunarity  = j["lacunarity"].get<float>();
-    if (j.contains("gain"))        p.gain        = j["gain"].get<float>();
-    if (j.contains("sharpness"))   p.sharpness   = j["sharpness"].get<float>();
-    if (j.contains("xOffset"))     p.xOffset     = j["xOffset"].get<float>();
-    if (j.contains("zOffset"))     p.zOffset     = j["zOffset"].get<float>();
-    if (j.contains("remapToUnit")) p.remapToUnit = j["remapToUnit"].get<bool>();
+    if (j.contains("frequency"))  p.frequency  = j["frequency"].get<float>();
+    if (j.contains("octaves"))    p.octaves    = j["octaves"].get<int>();
+    if (j.contains("lacunarity")) p.lacunarity = j["lacunarity"].get<float>();
+    if (j.contains("gain"))       p.gain       = j["gain"].get<float>();
+    if (j.contains("sharpness"))  p.sharpness  = j["sharpness"].get<float>();
+    if (j.contains("xOffset"))    p.xOffset    = j["xOffset"].get<float>();
+    if (j.contains("zOffset"))    p.zOffset    = j["zOffset"].get<float>();
     return p;
 }
 

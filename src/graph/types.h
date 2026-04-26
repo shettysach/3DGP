@@ -35,9 +35,8 @@ struct NoiseParams {
     float lacunarity  = 2.0f;
     float gain        = 0.5f;
     float sharpness   = 2.0f;
-    float xOffset     = 0.0f;
-    float zOffset     = 0.0f;
-    bool  remapToUnit = true;
+    float xOffset = 0.0f;
+    float zOffset = 0.0f;
 };
 
 struct TerrainSynthesisParams {

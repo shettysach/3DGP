@@ -93,35 +93,40 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
             const float gn = np.gain;
             const float sharp = np.sharpness;
             const float xOff = np.xOffset;
-            const float zOff = np.zOffset;
-            const bool remap = np.remapToUnit;
-
             auto& out = nodeOutputs[ni];
             out.assign(cellCount, 0.0f);
 
             for (int z = 0; z < d; ++z) {
                 for (int x = 0; x < w; ++x) {
                     const size_t idx = fieldIndex(x, z, w);
-                    const float wx = static_cast<float>(x) * hScale + xOff;
-                    const float wz = static_cast<float>(z) * hScale + zOff;
+                    const float wx = static_cast<float>(x) * hScale + np.xOffset;
+                    const float wz = static_cast<float>(z) * hScale + np.zOffset;
 
                     if (cn.kind == NodeKind::Fbm) {
-                        out[idx] = noiseContext.fbm(wx, wz, oct, lac, gn, freq);
+                        out[idx] = noiseContext.fbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.frequency);
                     } else {
-                        out[idx] = noiseContext.ridgedFbm(wx, wz, oct, lac, gn, sharp, freq);
+                        out[idx] = noiseContext.ridgedFbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.sharpness, np.frequency);
                     }
 
-                    if (remap) {
-                        out[idx] = 0.5f * (out[idx] + 1.0f);
-                    }
+                    out[idx] = 0.5f * (out[idx] + 1.0f);
                 }
             }
         } else if (cn.kind == NodeKind::TerrainSynthesis) {
             const auto& tsp = std::get<TerrainSynthesisParams>(cn.params);
             const float vertScale = tsp.verticalScale;
 
-            const std::vector<float>& continental = nodeOutputs[cn.inputs[0]];
-            const std::vector<float>& ridges = nodeOutputs[cn.inputs[1]];
+            const std::vector<float>& continental  = nodeOutputs[cn.inputs[0]];
+            const std::vector<float>& ridges       = nodeOutputs[cn.inputs[1]];
+            const std::vector<float>& detailIn     = nodeOutputs[cn.inputs[2]];
+            const std::vector<float>& rangeMaskIn  = nodeOutputs[cn.inputs[3]];
+            const std::vector<float>& basinIn      = nodeOutputs[cn.inputs[4]];
+            const std::vector<float>& detailBandIn = nodeOutputs[cn.inputs[5]];
+            const std::vector<float>& rimMaskIn    = nodeOutputs[cn.inputs[6]];
+            const std::vector<float>& plainsBaseIn = nodeOutputs[cn.inputs[7]];
+            const std::vector<float>& macroReliefIn= nodeOutputs[cn.inputs[8]];
+            const std::vector<float>& hillinessIn  = nodeOutputs[cn.inputs[9]];
+            const std::vector<float>& basinNoiseIn = nodeOutputs[cn.inputs[10]];
+            const std::vector<float>& plateauMaskIn= nodeOutputs[cn.inputs[11]];
 
             fields.heights.assign(cellCount, 0.0f);
             fields.mountainWeights.assign(cellCount, 0.0f);
@@ -136,6 +141,8 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
                     const float worldX = static_cast<float>(x) * hScale;
                     const float worldZ = static_cast<float>(z) * hScale;
 
+                    // Warp is kept so that climate post-processing still
+                    // sees a coherent warped coordinate space.
                     const float warpX =
                         noiseContext.fbm(worldX * warpFreqScale + 31.7f,
                                          worldZ * warpFreqScale - 18.2f, 3,
@@ -152,15 +159,16 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
                     fields.sampleXs[idx] = sampleX;
                     fields.sampleZs[idx] = sampleZ;
 
-                    const float detail = 0.5f * (noiseContext.fbm(sampleX * 2.7f, sampleZ * 2.7f, 4,
-                                                                  2.0f, 0.5f, baseFreq) +
-                                                 1.0f);
-
-                    const float rangeMask = smoothstep(
-                        0.42f, 0.72f,
-                        0.5f * (noiseContext.fbm(sampleX * 0.3f + 400.0f, sampleZ * 0.3f - 250.0f,
-                                                 3, settings.noise.lacunarity, 0.45f, baseFreq) +
-                                1.0f));
+                    const float detail      = detailIn[idx];
+                    const float rangeMask   = smoothstep(0.42f, 0.72f, rangeMaskIn[idx]);
+                    const float basin       = basinIn[idx];
+                    const float detailBand  = detailBandIn[idx];
+                    const float rimMask     = smoothstep(0.38f, 0.74f, rimMaskIn[idx]);
+                    const float plainsBase  = plainsBaseIn[idx];
+                    const float macroRelief = macroReliefIn[idx];
+                    const float hilliness   = hillinessIn[idx];
+                    const float basinNoise  = basinNoiseIn[idx];
+                    const float plateauMask = plateauMaskIn[idx];
 
                     const float slopeHint =
                         std::clamp((ridges[idx] - 0.35f) * 1.55f + detail * 0.2f, 0.0f, 1.0f);
@@ -168,56 +176,16 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
                     const MountainResult mountain = computeMountain(
                         {continental[idx], ridges[idx], detail, slopeHint, rangeMask, vertScale});
 
-                    const float basin =
-                        0.5f * (noiseContext.fbm(sampleX * 0.28f - 191.7f, sampleZ * 0.28f + 83.4f,
-                                                 3, settings.noise.lacunarity, 0.52f, baseFreq) +
-                                1.0f);
-                    const float detailBand =
-                        0.5f * (noiseContext.fbm(sampleX * 1.9f + 52.3f, sampleZ * 1.9f - 61.8f,
-                                                 std::max(3, settings.noise.octaves - 2),
-                                                 settings.noise.lacunarity, settings.noise.gain,
-                                                 baseFreq) +
-                                1.0f);
-                    const float rimMask = smoothstep(
-                        0.38f, 0.74f,
-                        0.5f * (noiseContext.fbm(sampleX * 0.17f + 420.0f, sampleZ * 0.17f - 301.0f,
-                                                 3, settings.noise.lacunarity, 0.45f, baseFreq) +
-                                1.0f));
                     const float valleySlopeHint =
                         std::clamp((0.62f - basin) * 1.35f + detail * 0.22f, 0.0f, 1.0f);
 
                     const ValleyResult valley = computeValley(
                         {continental[idx], basin, detailBand, valleySlopeHint, rimMask, vertScale});
 
-                    const int plainsOctaves = std::max(3, settings.noise.octaves - 2);
-                    const float plainsBase =
-                        0.5f * (noiseContext.fbm(sampleX - 63.2f, sampleZ + 41.8f, plainsOctaves,
-                                                 settings.noise.lacunarity, settings.noise.gain,
-                                                 baseFreq) +
-                                1.0f);
-                    const float macroRelief =
-                        0.5f * (noiseContext.fbm(sampleX * 0.30f + 219.4f, sampleZ * 0.30f - 174.6f,
-                                                 3, settings.noise.lacunarity, 0.48f, baseFreq) +
-                                1.0f);
-                    const float hilliness =
-                        0.5f * (noiseContext.fbm(sampleX * 0.82f - 141.5f, sampleZ * 0.82f + 96.8f,
-                                                 std::max(3, settings.noise.octaves - 1),
-                                                 settings.noise.lacunarity, settings.noise.gain,
-                                                 baseFreq) +
-                                1.0f);
-                    const float basinNoise =
-                        0.5f * (noiseContext.fbm(sampleX * 0.18f - 331.7f, sampleZ * 0.18f + 271.4f,
-                                                 2, settings.noise.lacunarity, 0.55f, baseFreq) +
-                                1.0f);
                     const float plainsHeight =
                         computePlainsHeight({continental[idx], plainsBase, macroRelief, hilliness,
                                              basinNoise, detail, vertScale});
 
-                    const float plateauMask =
-                        0.5f * (noiseContext.fbm(sampleX * settings.plateaus.frequency,
-                                                 sampleZ * settings.plateaus.frequency, 3,
-                                                 settings.noise.lacunarity, 0.52f, baseFreq) +
-                                1.0f);
                     const PlateauResult plateau =
                         computePlateau({continental[idx], plateauMask, detail, vertScale});
 
