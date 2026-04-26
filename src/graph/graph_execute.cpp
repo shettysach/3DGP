@@ -54,26 +54,35 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
     const float hScale = settings.horizontalScale;
     const size_t cellCount = static_cast<size_t>(w) * static_cast<size_t>(d);
 
-    std::vector<std::vector<std::vector<float>>> nodeOutputs(N);
+    // Find TerrainSynthesis root
+    size_t rootIdx = 0;
+    for (size_t i = 0; i < N; ++i) {
+        if (compiled.nodes[i].kind == NodeKind::TerrainSynthesis) {
+            rootIdx = i;
+            break;
+        }
+    }
+
+    std::vector<std::vector<float>> nodeOutputs(N);
     std::vector<bool> visited(N, false);
+    terrain::TerrainFields fields(w, d);
+
+    const float centerX = static_cast<float>(w - 1) * 0.5f * hScale;
+    const float centerZ = static_cast<float>(d - 1) * 0.5f * hScale;
+    const float maxRadius =
+        std::min(static_cast<float>(w - 1), static_cast<float>(d - 1)) * 0.5f * hScale;
+    const float baseFreq = std::max(0.00001f, settings.noise.frequency);
+    const float warpFreqScale = settings.noise.warpFrequency / baseFreq;
 
     std::function<void(size_t)> eval = [&](size_t ni) {
         if (visited[ni])
             return;
 
         const CompiledNode& cn = compiled.nodes[ni];
-        const NodeDef& nd = nodeDefinition(cn.kind);
 
         // Evaluate inputs first
-        for (const auto& ib : cn.inputs) {
-            eval(ib.sourceNodeIndex);
-        }
-
-        // Allocate output buffers
-        const size_t numOuts = nd.outputs.size();
-        nodeOutputs[ni].resize(numOuts);
-        for (size_t s = 0; s < numOuts; ++s) {
-            nodeOutputs[ni][s].assign(cellCount, 0.0f);
+        for (uint16_t src : cn.inputs) {
+            eval(src);
         }
 
         if (cn.kind == NodeKind::Fbm || cn.kind == NodeKind::RidgedFbm) {
@@ -87,7 +96,8 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
             const float zOff = np.zOffset;
             const bool remap = np.remapToUnit;
 
-            auto& out = nodeOutputs[ni][0];
+            auto& out = nodeOutputs[ni];
+            out.assign(cellCount, 0.0f);
 
             for (int z = 0; z < d; ++z) {
                 for (int x = 0; x < w; ++x) {
@@ -110,48 +120,15 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
             const auto& tsp = std::get<TerrainSynthesisParams>(cn.params);
             const float vertScale = tsp.verticalScale;
 
-            const std::vector<float>* continentalPtr = nullptr;
-            const std::vector<float>* ridgesPtr = nullptr;
+            const std::vector<float>& continental = nodeOutputs[cn.inputs[0]];
+            const std::vector<float>& ridges = nodeOutputs[cn.inputs[1]];
 
-            for (size_t is = 0; is < cn.inputs.size(); ++is) {
-                const InputBinding& ib = cn.inputs[is];
-                const std::vector<float>& src =
-                    nodeOutputs[ib.sourceNodeIndex][ib.sourceOutputSlot];
-                if (is == 0)
-                    continentalPtr = &src;
-                if (is == 1)
-                    ridgesPtr = &src;
-            }
-
-            std::vector<float> defaultConstant;
-            if (!continentalPtr) {
-                defaultConstant.assign(cellCount, 0.5f);
-                continentalPtr = &defaultConstant;
-            }
-            if (!ridgesPtr) {
-                static std::vector<float> ridgedDefault;
-                if (ridgedDefault.empty()) {
-                    ridgedDefault.assign(cellCount, 0.5f);
-                }
-                ridgesPtr = &ridgedDefault;
-            }
-
-            const std::vector<float>& continental = *continentalPtr;
-            const std::vector<float>& ridges = *ridgesPtr;
-
-            auto& outHeight = nodeOutputs[ni][0];
-            auto& outMountainWt = nodeOutputs[ni][1];
-            auto& outValleyWt = nodeOutputs[ni][2];
-            auto& outPlateauWt = nodeOutputs[ni][3];
-            auto& outSampleX = nodeOutputs[ni][4];
-            auto& outSampleZ = nodeOutputs[ni][5];
-
-            const float centerX = static_cast<float>(w - 1) * 0.5f * hScale;
-            const float centerZ = static_cast<float>(d - 1) * 0.5f * hScale;
-            const float maxRadius =
-                std::min(static_cast<float>(w - 1), static_cast<float>(d - 1)) * 0.5f * hScale;
-            const float baseFreq = std::max(0.00001f, settings.noise.frequency);
-            const float warpFreqScale = settings.noise.warpFrequency / baseFreq;
+            fields.heights.assign(cellCount, 0.0f);
+            fields.mountainWeights.assign(cellCount, 0.0f);
+            fields.valleyWeights.assign(cellCount, 0.0f);
+            fields.plateauWeights.assign(cellCount, 0.0f);
+            fields.sampleXs.assign(cellCount, 0.0f);
+            fields.sampleZs.assign(cellCount, 0.0f);
 
             for (int z = 0; z < d; ++z) {
                 for (int x = 0; x < w; ++x) {
@@ -172,8 +149,8 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
 
                     const float sampleX = worldX + warpX;
                     const float sampleZ = worldZ + warpZ;
-                    outSampleX[idx] = sampleX;
-                    outSampleZ[idx] = sampleZ;
+                    fields.sampleXs[idx] = sampleX;
+                    fields.sampleZs[idx] = sampleZ;
 
                     const float detail = 0.5f * (noiseContext.fbm(sampleX * 2.7f, sampleZ * 2.7f, 4,
                                                                   2.0f, 0.5f, baseFreq) +
@@ -184,6 +161,7 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
                         0.5f * (noiseContext.fbm(sampleX * 0.3f + 400.0f, sampleZ * 0.3f - 250.0f,
                                                  3, settings.noise.lacunarity, 0.45f, baseFreq) +
                                 1.0f));
+
                     const float slopeHint =
                         std::clamp((ridges[idx] - 0.35f) * 1.55f + detail * 0.2f, 0.0f, 1.0f);
 
@@ -249,48 +227,17 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
                         {mountain.height, mountain.weight, plainsHeight, plateau.height,
                          plateau.weight, valley.depth, detail, falloff, vertScale});
 
-                    outHeight[idx] = blend.height;
-                    outMountainWt[idx] = blend.mountainWeight;
-                    outValleyWt[idx] = valley.weight;
-                    outPlateauWt[idx] = plateau.weight;
+                    fields.heights[idx] = blend.height;
+                    fields.mountainWeights[idx] = blend.mountainWeight;
+                    fields.valleyWeights[idx] = valley.weight;
+                    fields.plateauWeights[idx] = plateau.weight;
                 }
             }
         }
         visited[ni] = true;
     };
 
-    // Evaluate from output roots
-    for (const auto& ob : compiled.outputs) {
-        eval(ob.sourceNodeIndex);
-    }
-
-    // Wire outputs into TerrainFields
-    terrain::TerrainFields fields(w, d);
-    for (const auto& ob : compiled.outputs) {
-        const std::vector<float>& src = nodeOutputs[ob.sourceNodeIndex][ob.sourceOutputSlot];
-
-        switch (ob.slot) {
-        case FieldSlot::Height:
-            fields.heights = src;
-            break;
-        case FieldSlot::MountainWeight:
-            fields.mountainWeights = src;
-            break;
-        case FieldSlot::ValleyWeight:
-            fields.valleyWeights = src;
-            break;
-        case FieldSlot::PlateauWeight:
-            fields.plateauWeights = src;
-            break;
-        case FieldSlot::SampleX:
-            fields.sampleXs = src;
-            break;
-        case FieldSlot::SampleZ:
-            fields.sampleZs = src;
-            break;
-        }
-    }
-
+    eval(rootIdx);
     return fields;
 }
 

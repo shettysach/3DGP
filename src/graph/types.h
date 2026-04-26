@@ -73,35 +73,14 @@ struct EditorGraph {
 
 // === Compiled Graph ===
 
-struct InputBinding {
-    uint16_t sourceNodeIndex   = 0;
-    uint8_t  sourceOutputSlot  = 0;
-};
-
 struct CompiledNode {
     NodeKind kind;
     NodeParams params;
-    std::vector<InputBinding> inputs;
-};
-
-enum class FieldSlot : uint8_t {
-    Height,
-    MountainWeight,
-    ValleyWeight,
-    PlateauWeight,
-    SampleX,
-    SampleZ,
-};
-
-struct OutputBinding {
-    FieldSlot slot;
-    uint16_t  sourceNodeIndex  = 0;
-    uint8_t   sourceOutputSlot = 0;
+    std::vector<uint16_t> inputs;       // source node index per input slot
 };
 
 struct CompiledGraph {
-    std::vector<CompiledNode>  nodes;
-    std::vector<OutputBinding> outputs;
+    std::vector<CompiledNode> nodes;
 };
 
 // === Node Definition Table ===

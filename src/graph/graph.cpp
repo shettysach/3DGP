@@ -28,14 +28,7 @@ const NodeDef kNodeDefs[] = {
             {"continental"},
             {"ridges"},
         },
-        {
-            {"height"},
-            {"mountainWeight"},
-            {"valleyWeight"},
-            {"plateauWeight"},
-            {"sampleX"},
-            {"sampleZ"},
-        },
+        {/* no outputs — final sink */},
     },
 };
 
