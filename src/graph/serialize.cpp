@@ -1,4 +1,4 @@
-#include "graph/graph_serialize.h"
+#include "graph/serialize.h"
 #include "graph/types.h"
 
 #include <nlohmann/json.hpp>

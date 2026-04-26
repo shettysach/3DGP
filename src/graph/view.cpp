@@ -1,6 +1,6 @@
-#include "graph/graph_view.h"
-#include "graph/graph_compile.h"
-#include "graph/graph_serialize.h"
+#include "graph/view.h"
+#include "graph/compile.h"
+#include "graph/serialize.h"
 #include "graph/types.h"
 
 #include "imgui.h"

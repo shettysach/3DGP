@@ -1,7 +1,7 @@
 #include "renderer/core.h"
 
-#include "graph/graph_compile.h"
-#include "graph/graph_serialize.h"
+#include "graph/compile.h"
+#include "graph/serialize.h"
 #include "graph/types.h"
 #include "terrain/biomes.h"
 

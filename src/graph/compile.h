@@ -1,5 +1,5 @@
-#ifndef GRAPH_COMPILE_H
-#define GRAPH_COMPILE_H
+#ifndef COMPILE_H
+#define COMPILE_H
 
 #include "graph/types.h"
 
@@ -11,4 +11,4 @@ CompiledGraph compile(const EditorGraph& editorGraph);
 
 } // namespace graph
 
-#endif // GRAPH_COMPILE_H
+#endif // COMPILE_H

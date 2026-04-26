@@ -1,4 +1,4 @@
-#include "graph/graph_compile.h"
+#include "graph/compile.h"
 
 #include <stdexcept>
 #include <unordered_map>

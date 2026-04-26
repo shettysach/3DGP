@@ -1,6 +1,6 @@
 #include "terrain.h"
-#include "graph/graph_compile.h"
-#include "graph/graph_execute.h"
+#include "graph/compile.h"
+#include "graph/execute.h"
 #include "graph/types.h"
 #include "terrain/biomes.h"
 #include "terrain/blending.h"

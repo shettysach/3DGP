@@ -1,5 +1,5 @@
-#ifndef GRAPH_SERIALIZE_H
-#define GRAPH_SERIALIZE_H
+#ifndef SERIALIZE_H
+#define SERIALIZE_H
 
 #include "graph/types.h"
 
@@ -19,4 +19,4 @@ NodeKind kindFromString(const std::string& s);
 
 } // namespace graph
 
-#endif // GRAPH_SERIALIZE_H
+#endif // SERIALIZE_H

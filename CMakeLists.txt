@@ -69,11 +69,11 @@ add_executable(terrain_demo
     src/renderer/support.cpp
     src/renderer/internal.h
     src/renderer/shaders.h
-    src/graph/graph_view.cpp
+    src/graph/view.cpp
     src/graph/graph.cpp
-    src/graph/graph_compile.cpp
-    src/graph/graph_execute.cpp
-    src/graph/graph_serialize.cpp
+    src/graph/compile.cpp
+    src/graph/execute.cpp
+    src/graph/serialize.cpp
     ${IMGUI_SRC_DIR}/backends/imgui_impl_sdl2.cpp
     ${IMGUI_SRC_DIR}/backends/imgui_impl_opengl3.cpp
  )
