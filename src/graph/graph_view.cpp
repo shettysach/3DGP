@@ -101,8 +101,8 @@ static void initImGui() {
     ImGui::StyleColorsDark();
 
     ImGuiIO& io = ImGui::GetIO();
-    io.FontGlobalScale = 1.5f;
-    ImGui::GetStyle().ScaleAllSizes(1.5f);
+    io.FontGlobalScale = 3.0f;
+    ImGui::GetStyle().ScaleAllSizes(3.0f);
 
     ImNodesStyle& ns = ImNodes::GetStyle();
     ns.Flags |= ImNodesStyleFlags_GridLines;
@@ -153,103 +153,79 @@ static void loadFromFile() {
 
 // ---------- UI ----------
 
-static void drawMenuBar() {
-    if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Save", "Ctrl+S")) {
-                saveToFile();
-            }
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
+static bool handleDeleteSelected() {
+    std::vector<NodeId> toRemove;
+    int count = ImNodes::NumSelectedNodes();
+    if (count > 0) {
+        std::vector<int> ids(static_cast<size_t>(count));
+        ImNodes::GetSelectedNodes(ids.data());
+        for (int id : ids) toRemove.push_back(static_cast<NodeId>(id));
+    }
+    if (toRemove.empty()) return false;
+
+    gGraph.nodes.erase(
+        std::remove_if(gGraph.nodes.begin(), gGraph.nodes.end(),
+                       [&](const EditorNode& n) {
+                           return std::find(toRemove.begin(), toRemove.end(), n.id) != toRemove.end();
+                       }),
+        gGraph.nodes.end());
+    gGraph.links.erase(
+        std::remove_if(gGraph.links.begin(), gGraph.links.end(),
+                       [&](const EditorLink& l) {
+                           return std::find(toRemove.begin(), toRemove.end(), l.from.nodeId) != toRemove.end() ||
+                                  std::find(toRemove.begin(), toRemove.end(), l.to.nodeId) != toRemove.end();
+                       }),
+        gGraph.links.end());
+    ImNodes::ClearNodeSelection();
+    return true;
+}
+
+static void addNode(NodeKind kind, const char* name) {
+    NodeId id = nextNodeId();
+    if (kind == NodeKind::TerrainSynthesis) {
+        gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f,
+                                name, TerrainSynthesisParams{}});
+    } else {
+        gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f,
+                                name + std::to_string(id), NoiseParams{}});
     }
 }
 
 static void drawToolbar() {
-    ImGui::Begin("Toolbar");
-
-    // Compile button
-    if (ImGui::Button("Compile")) {
-        // Validate: compile to check for errors
-        try {
-            graph::compile(gGraph);
-            gErrorMsg.clear();
-            // Write JSON so the terrain viewer picks it up
-            saveToFile();
-        } catch (const std::exception& e) {
-            gErrorMsg = e.what();
-        }
-    }
-
-    ImGui::SameLine();
-
-    // Add node buttons
-    if (ImGui::Button("+ FBm")) {
-        NodeId id = nextNodeId();
-        gGraph.nodes.push_back({id, NodeKind::Fbm, 200.0f, 100.0f + id * 30.0f,
-                                "Fbm " + std::to_string(id), NoiseParams{}});
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("+ Ridged")) {
-        NodeId id = nextNodeId();
-        gGraph.nodes.push_back({id, NodeKind::RidgedFbm, 200.0f, 100.0f + id * 30.0f,
-                                "Ridged " + std::to_string(id), NoiseParams{}});
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("+ Synthesis")) {
-        NodeId id = nextNodeId();
-        gGraph.nodes.push_back({id, NodeKind::TerrainSynthesis, 200.0f, 100.0f + id * 30.0f,
-                                "Synthesis", TerrainSynthesisParams{}});
-    }
-
-    if (ImNodes::NumSelectedNodes() > 0) {
-        ImGui::SameLine();
-        if (ImGui::Button("Delete Selected")) {
-            // Collect selected node ids
-            std::vector<NodeId> toRemove;
-            int count = ImNodes::NumSelectedNodes();
-            if (count > 0) {
-                std::vector<int> ids(static_cast<size_t>(count));
-                ImNodes::GetSelectedNodes(ids.data());
-                for (int id : ids) {
-                    toRemove.push_back(static_cast<NodeId>(id));
-                }
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::Button("Compile")) {
+            try {
+                graph::compile(gGraph);
+                gErrorMsg.clear();
+                saveToFile();
+            } catch (const std::exception& e) {
+                gErrorMsg = e.what();
             }
-
-            // Remove nodes
-            gGraph.nodes.erase(
-                std::remove_if(gGraph.nodes.begin(), gGraph.nodes.end(),
-                               [&](const EditorNode& n) {
-                                   return std::find(toRemove.begin(), toRemove.end(), n.id) != toRemove.end();
-                               }),
-                gGraph.nodes.end());
-
-            // Remove links that reference deleted nodes
-            gGraph.links.erase(
-                std::remove_if(gGraph.links.begin(), gGraph.links.end(),
-                               [&](const EditorLink& l) {
-                                   return std::find(toRemove.begin(), toRemove.end(), l.from.nodeId) != toRemove.end() ||
-                                          std::find(toRemove.begin(), toRemove.end(), l.to.nodeId) != toRemove.end();
-                               }),
-                gGraph.links.end());
-
-            ImNodes::ClearNodeSelection();
         }
-    }
 
-    // Error display
-    if (!gErrorMsg.empty()) {
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Error: %s", gErrorMsg.c_str());
-    }
+        ImGui::Separator();
 
-    ImGui::End();
+        if (ImGui::Button("+ FBm"))    addNode(NodeKind::Fbm, "Fbm ");
+        if (ImGui::Button("+ Ridged")) addNode(NodeKind::RidgedFbm, "Ridged ");
+        if (ImGui::Button("+ Synthesis")) addNode(NodeKind::TerrainSynthesis, "Synthesis");
+
+        if (ImNodes::NumSelectedNodes() > 0) {
+            if (ImGui::Button("Delete")) handleDeleteSelected();
+        }
+
+        if (!gErrorMsg.empty()) {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Error: %s", gErrorMsg.c_str());
+        }
+
+        ImGui::EndMainMenuBar();
+    }
 }
 
 static void drawNodeEditor() {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + 200, vp->WorkPos.y + 80));
-    ImGui::SetNextWindowSize(ImVec2(vp->WorkSize.x - 200, vp->WorkSize.y - 80));
+    ImGui::SetNextWindowPos(vp->WorkPos);
+    ImGui::SetNextWindowSize(vp->WorkSize);
     ImGui::Begin("Graph", nullptr,
                  ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus);
@@ -362,7 +338,6 @@ static void drawInspector() {
 
     int selCount = ImNodes::NumSelectedNodes();
     if (selCount == 0) {
-        ImGui::Text("Select a node to edit parameters");
     } else if (selCount == 1) {
         std::vector<int> ids(1);
         ImNodes::GetSelectedNodes(ids.data());
@@ -423,12 +398,7 @@ static void processEvents() {
         if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
             gRunning = false;
         }
-        // Ctrl+S to save
-        if (event.type == SDL_KEYDOWN &&
-            event.key.keysym.sym == SDLK_s &&
-            (event.key.keysym.mod & KMOD_CTRL)) {
-            saveToFile();
-        }
+
     }
 }
 
@@ -454,7 +424,6 @@ void run() {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        drawMenuBar();
         drawToolbar();
         drawNodeEditor();
         drawInspector();
