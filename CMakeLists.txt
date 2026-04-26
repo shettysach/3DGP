@@ -8,17 +8,25 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 if(WIN32)
   find_package(SDL2 REQUIRED)
   find_package(OpenGL REQUIRED)
+  find_package(nlohmann_json CONFIG REQUIRED)
   include_directories(${SDL2_INCLUDE_DIRS})
   set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
   set(OPENGL_LIBRARIES ${OPENGL_LIBRARIES})
+  set(GRAPH_VIEW_SRC src/graph/graph_view_stub.cpp)
+  set(THIRD_PARTY_LIBS nlohmann_json::nlohmann_json)
 elseif(APPLE)
     find_package(SDL2 REQUIRED)
     find_package(OpenGL REQUIRED)
+    find_package(imgui CONFIG REQUIRED)
+    find_package(imnodes CONFIG REQUIRED)
+    find_package(nlohmann_json CONFIG REQUIRED)
 
     include_directories(${SDL2_INCLUDE_DIRS})
 
     set(SDL2_LIBS ${SDL2_LIBRARIES})
     set(OPENGL_LIBS OpenGL::GL)
+    set(IMGUI_SRC_DIR "$ENV{IMGUI_SRC}")
+    set(THIRD_PARTY_LIBS imgui::imgui imnodes::imnodes nlohmann_json::nlohmann_json)
 else()
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(SDL2 REQUIRED sdl2)
@@ -36,6 +44,20 @@ else()
   if(NOT IMGUI_SRC_DIR)
     message(FATAL_ERROR "IMGUI_SRC environment variable not set. Run nix develop first.")
   endif()
+  set(THIRD_PARTY_LIBS imgui::imgui imnodes::imnodes nlohmann_json::nlohmann_json)
+endif()
+
+if(NOT GRAPH_VIEW_SRC)
+  set(GRAPH_VIEW_SRC src/graph/graph_view.cpp)
+endif()
+set(IMGUI_BACKEND_SOURCES)
+set(IMGUI_BACKEND_INCLUDES)
+if(IMGUI_SRC_DIR)
+  list(APPEND IMGUI_BACKEND_SOURCES
+    ${IMGUI_SRC_DIR}/backends/imgui_impl_sdl2.cpp
+    ${IMGUI_SRC_DIR}/backends/imgui_impl_opengl3.cpp
+  )
+  list(APPEND IMGUI_BACKEND_INCLUDES ${IMGUI_SRC_DIR}/backends)
 endif()
 
 add_executable(terrain_demo
@@ -70,21 +92,18 @@ add_executable(terrain_demo
     src/renderer/support.cpp
     src/renderer/internal.h
     src/renderer/shaders.h
-    src/graph/graph_view.cpp
+    ${GRAPH_VIEW_SRC}
     src/graph/graph.cpp
     src/graph/graph_compile.cpp
     src/graph/graph_execute.cpp
     src/graph/graph_serialize.cpp
-    ${IMGUI_SRC_DIR}/backends/imgui_impl_sdl2.cpp
-    ${IMGUI_SRC_DIR}/backends/imgui_impl_opengl3.cpp
+    ${IMGUI_BACKEND_SOURCES}
  )
 
-target_include_directories(terrain_demo PRIVATE src ${IMGUI_SRC_DIR}/backends)
+target_include_directories(terrain_demo PRIVATE src ${IMGUI_BACKEND_INCLUDES})
 
 target_link_libraries(terrain_demo
     ${SDL2_LIBRARIES}
     ${OPENGL_LIBRARIES}
-    imgui::imgui
-    imnodes::imnodes
-    nlohmann_json::nlohmann_json
+    ${THIRD_PARTY_LIBS}
 )
