@@ -109,6 +109,9 @@ class Renderer {
     void setTarget(float x, float y, float z);
     void setMode(Mode mode);
     Mode mode() const;
+    SDL_Window* window() const { return window_; }
+    SDL_GLContext glContext() const { return glContext_; }
+
     void invalidateMeshCache();
     bool captureScreenshot(const std::string& filepath) const;
 

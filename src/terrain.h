@@ -1,8 +1,15 @@
 #ifndef TERRAIN_H
 #define TERRAIN_H
 
+#include "terrain/terrain_noise.h"
+
 #include <cstdint>
+#include <memory>
 #include <vector>
+
+namespace graph {
+struct CompiledGraph;
+}
 
 namespace terrain {
 
@@ -153,41 +160,20 @@ class TerrainGenerator {
     void setSettings(const TerrainSettings& settings);
     const TerrainSettings& settings() const;
 
+    void setBaseGraph(std::shared_ptr<const graph::CompiledGraph> graph);
+    const graph::CompiledGraph* baseGraph() const;
+
     TerrainMesh generateMesh() const;
 
   private:
     TerrainSettings settings_;
-    std::vector<int> permutation_;
+    NoiseContext noiseContext_;
+    std::shared_ptr<const graph::CompiledGraph> baseGraph_;
 
     TerrainFields buildBaseTerrainFields() const;
     void computeClimateFields(TerrainFields& fields) const;
 
     void reseed(uint32_t seed);
-    float simplexNoise2D(float x, float y) const;
-    float fractalBrownianMotion(float x, float y, int octaves, float lacunarity, float gain) const;
-    float ridgedFbm(
-        float x,
-        float y,
-        int octaves,
-        float lacunarity,
-        float gain,
-        float sharpness) const;
-
-    template <typename F>
-    float octaveNoise(float x, float y, int octaves, float lacunarity, float gain, F transform) const {
-        float value = 0.0f;
-        float amplitude = 1.0f;
-        float frequency = settings_.noise.frequency;
-        float amplitudeSum = 0.0f;
-        for (int octave = 0; octave < octaves; ++octave) {
-            const float n = simplexNoise2D(x * frequency, y * frequency);
-            value += amplitude * transform(n);
-            amplitudeSum += amplitude;
-            amplitude *= gain;
-            frequency *= lacunarity;
-        }
-        return amplitudeSum > 0.0f ? value / amplitudeSum : 0.0f;
-    }
 };
 
 } // namespace terrain

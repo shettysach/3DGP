@@ -30,6 +30,7 @@ else()
 
   find_package(imgui CONFIG REQUIRED)
   find_package(imnodes CONFIG REQUIRED)
+  find_package(nlohmann_json CONFIG REQUIRED)
 
   set(IMGUI_SRC_DIR "$ENV{IMGUI_SRC}")
   if(NOT IMGUI_SRC_DIR)
@@ -70,6 +71,10 @@ add_executable(terrain_demo
     src/renderer/internal.h
     src/renderer/shaders.h
     src/graph/graph_view.cpp
+    src/graph/graph.cpp
+    src/graph/graph_compile.cpp
+    src/graph/graph_execute.cpp
+    src/graph/graph_serialize.cpp
     ${IMGUI_SRC_DIR}/backends/imgui_impl_sdl2.cpp
     ${IMGUI_SRC_DIR}/backends/imgui_impl_opengl3.cpp
  )
@@ -81,4 +86,5 @@ target_link_libraries(terrain_demo
     ${OPENGL_LIBRARIES}
     imgui::imgui
     imnodes::imnodes
+    nlohmann_json::nlohmann_json
 )

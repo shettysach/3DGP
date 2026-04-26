@@ -43,6 +43,7 @@
         pkgs.imgui
         pkgs.imnodes
         pkgs.glfw
+        pkgs.nlohmann_json
       ];
 
       shellHook = ''
@@ -62,7 +63,7 @@
 
         export CMAKE_PREFIX_PATH=${pkgs.imgui}:${
           pkgs.imnodes.dev
-        }:${pkgs.glfw}:$CMAKE_PREFIX_PATH
+        }:${pkgs.glfw}:${pkgs.nlohmann_json}:$CMAKE_PREFIX_PATH
         export IMGUI_SRC=${pkgs.imgui.src}
       '';
     };

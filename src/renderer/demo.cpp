@@ -1,13 +1,20 @@
 #include "renderer/core.h"
 
+#include "graph/graph_compile.h"
+#include "graph/graph_serialize.h"
+#include "graph/types.h"
 #include "terrain/biomes.h"
 
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <ctime>
+#include <fstream>
 #include <iostream>
+#include <memory>
+#include <sstream>
 #include <string>
+#include <sys/stat.h>
 
 namespace renderer {
 
@@ -58,6 +65,49 @@ void runDemo() {
     }
 
     terrain::TerrainGenerator generator(settings);
+
+    // Watch graphs/current.json for changes
+    std::string graphPath = "graphs/current.json";
+    time_t lastMtime = 0;
+    auto loadGraph = [&]() -> bool {
+        struct stat st;
+        if (stat(graphPath.c_str(), &st) != 0) return false;
+        if (st.st_mtime == lastMtime) return false;
+        lastMtime = st.st_mtime;
+
+        std::ifstream in(graphPath);
+        if (!in) return false;
+        std::stringstream ss;
+        ss << in.rdbuf();
+
+        try {
+            graph::EditorGraph eg = graph::fromJson(ss.str());
+            auto cg = std::make_shared<graph::CompiledGraph>(graph::compile(eg));
+            generator.setBaseGraph(cg);
+            std::cout << "Reloaded graph: " << cg->nodes.size() << " nodes, "
+                      << cg->outputs.size() << " outputs\n";
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Graph error: " << e.what() << '\n';
+            return false;
+        }
+    };
+
+    bool graphLoaded = loadGraph();
+    if (!graphLoaded) {
+        std::cout << "Waiting for " << graphPath
+                  << " — run './build/terrain_demo graph' to create one\n";
+        // Fall back to default graph so we have something to show
+        try {
+            graph::EditorGraph eg = graph::defaultGraph();
+            auto cg = std::make_shared<graph::CompiledGraph>(graph::compile(eg));
+            generator.setBaseGraph(cg);
+            std::cout << "Using default graph fallback\n";
+        } catch (const std::exception& e) {
+            std::cerr << "Default graph error: " << e.what() << '\n';
+            return;
+        }
+    }
     std::cout << "Generating initial terrain at " << settings.width << 'x' << settings.depth << "...\n";
     terrain::TerrainMesh mesh = generator.generateMesh();
 
@@ -207,6 +257,13 @@ void runDemo() {
         }
         if (keys[SDL_SCANCODE_E]) {
             renderer.pan(0.0f, moveSpeed);
+        }
+
+        // Reload terrain if graph file changed
+        if (loadGraph()) {
+            mesh = generator.generateMesh();
+            renderer.invalidateMeshCache();
+            printBiomeStats(mesh);
         }
 
         renderer.render(mesh);

@@ -1,0 +1,101 @@
+{
+  "links": [
+    {
+      "from": {
+        "nodeId": 1,
+        "slot": 0
+      },
+      "id": 1,
+      "to": {
+        "nodeId": 3,
+        "slot": 0
+      }
+    },
+    {
+      "from": {
+        "nodeId": 2,
+        "slot": 0
+      },
+      "id": 2,
+      "to": {
+        "nodeId": 3,
+        "slot": 1
+      }
+    }
+  ],
+  "nodes": [
+    {
+      "id": 1,
+      "kind": "Fbm",
+      "params": {
+        "frequency": 0.007000000216066837,
+        "gain": 0.5,
+        "lacunarity": 2.0,
+        "octaves": 6,
+        "remapToUnit": true,
+        "sharpness": 2.0,
+        "xOffset": 0.0,
+        "zOffset": 0.0
+      },
+      "pos": [
+        200.0,
+        200.0
+      ],
+      "title": "Continental"
+    },
+    {
+      "id": 2,
+      "kind": "RidgedFbm",
+      "params": {
+        "frequency": 0.007000000216066837,
+        "gain": 0.5,
+        "lacunarity": 2.0,
+        "octaves": 6,
+        "remapToUnit": true,
+        "sharpness": 2.0,
+        "xOffset": 0.0,
+        "zOffset": 0.0
+      },
+      "pos": [
+        600.0,
+        200.0
+      ],
+      "title": "Ridges"
+    },
+    {
+      "id": 3,
+      "kind": "TerrainSynthesis",
+      "params": {
+        "falloffPower": 2.200000047683716,
+        "falloffRadius": 0.8999999761581421,
+        "islandFalloff": true,
+        "verticalScale": 80.0
+      },
+      "pos": [
+        756.0,
+        555.0
+      ],
+      "title": "Terrain"
+    },
+    {
+      "id": 4,
+      "kind": "RidgedFbm",
+      "params": {
+        "frequency": 0.007000000216066837,
+        "gain": 0.5,
+        "lacunarity": 2.0,
+        "octaves": 6,
+        "remapToUnit": true,
+        "sharpness": 2.0,
+        "xOffset": 0.0,
+        "zOffset": 0.0
+      },
+      "pos": [
+        214.0,
+        379.0
+      ],
+      "title": "Ridged 4"
+    }
+  ],
+  "version": 1
+}

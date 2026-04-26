@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
 #include <queue>
 
 namespace terrain {
@@ -87,31 +86,34 @@ void TerrainGenerator::computeClimateFields(TerrainFields& fields) const {
             const float mountainWeight = std::clamp(fields.mountainWeights[idx], 0.0f, 1.0f);
             const float latitudeWarmth = 1.0f - std::fabs(latitude * 2.0f - 1.0f);
 
-            const float temperatureNoise = 0.5f * (fractalBrownianMotion(
+            const float temperatureNoise = 0.5f * (noiseContext_.fbm(
                                                        sampleX * temperatureScale + 181.4f,
                                                        sampleZ * temperatureScale - 93.7f,
                                                        settings_.climate.temperatureOctaves,
                                                        settings_.noise.lacunarity,
-                                                       settings_.noise.gain) +
+                                                       settings_.noise.gain,
+                                                       baseFrequency) +
                                                    1.0f);
             float temperature =
                 temperatureNoise * (1.0f - settings_.climate.latitudeStrength) + latitudeWarmth * settings_.climate.latitudeStrength;
             temperature -= elevationNorm * settings_.climate.temperatureLapseRate;
             temperature = std::clamp(temperature, 0.0f, 1.0f);
 
-            const float precipitationNoise = 0.5f * (fractalBrownianMotion(
+            const float precipitationNoise = 0.5f * (noiseContext_.fbm(
                                                          sampleX * precipitationScale - 211.8f,
                                                          sampleZ * precipitationScale + 75.3f,
                                                          settings_.climate.precipitationOctaves,
                                                          settings_.noise.lacunarity,
-                                                         settings_.noise.gain) +
+                                                         settings_.noise.gain,
+                                                         baseFrequency) +
                                                      1.0f);
-            const float precipitationBands = 0.5f * (fractalBrownianMotion(
+            const float precipitationBands = 0.5f * (noiseContext_.fbm(
                                                          sampleX * precipitationScale * 0.55f - 517.0f,
                                                          sampleZ * precipitationScale * 0.55f + 142.0f,
                                                          std::max(2, settings_.climate.precipitationOctaves - 1),
                                                          settings_.noise.lacunarity,
-                                                         settings_.noise.gain) +
+                                                         settings_.noise.gain,
+                                                         baseFrequency) +
                                                      1.0f);
             float precipitation = precipitationNoise * 0.72f + precipitationBands * 0.20f;
             precipitation += mountainWeight * settings_.climate.orographicPrecipitationStrength * smoothstep(0.05f, 0.7f, slope);
@@ -119,13 +121,14 @@ void TerrainGenerator::computeClimateFields(TerrainFields& fields) const {
             precipitation -= elevationNorm * 0.06f;
             precipitation = std::clamp(precipitation, 0.0f, 1.0f);
 
-            const float localMoistureNoise = 0.5f * (fractalBrownianMotion(
-                                                          sampleX * moistureScale + 63.5f,
-                                                          sampleZ * moistureScale + 194.8f,
-                                                          settings_.climate.moistureOctaves,
-                                                          settings_.noise.lacunarity,
-                                                          settings_.noise.gain) +
-                                                      1.0f);
+            const float localMoistureNoise = 0.5f * (noiseContext_.fbm(
+                                                         sampleX * moistureScale + 63.5f,
+                                                         sampleZ * moistureScale + 194.8f,
+                                                         settings_.climate.moistureOctaves,
+                                                         settings_.noise.lacunarity,
+                                                         settings_.noise.gain,
+                                                         baseFrequency) +
+                                                     1.0f);
             const float riverRadius = static_cast<float>(std::max(1, settings_.climate.riverMoistureRadius));
             const float riverInfluence = 1.0f - smoothstep(0.0f, riverRadius, riverDist);
             const float flatness = 1.0f - std::clamp(slope / 1.25f, 0.0f, 1.0f);
