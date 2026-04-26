@@ -16,6 +16,9 @@ const char* kindToString(NodeKind kind) {
     switch (kind) {
     case NodeKind::Fbm:               return "Fbm";
     case NodeKind::RidgedFbm:         return "RidgedFbm";
+    case NodeKind::FractalPerlin:     return "FractalPerlin";
+    case NodeKind::Perlin:            return "Perlin";
+    case NodeKind::Simplex:           return "Simplex";
     case NodeKind::TerrainSynthesis:  return "TerrainSynthesis";
     }
     throw std::runtime_error("Unknown NodeKind");
@@ -24,6 +27,9 @@ const char* kindToString(NodeKind kind) {
 NodeKind kindFromString(const std::string& s) {
     if (s == "Fbm")               return NodeKind::Fbm;
     if (s == "RidgedFbm")         return NodeKind::RidgedFbm;
+    if (s == "FractalPerlin")     return NodeKind::FractalPerlin;
+    if (s == "Perlin")            return NodeKind::Perlin;
+    if (s == "Simplex")           return NodeKind::Simplex;
     if (s == "TerrainSynthesis")  return NodeKind::TerrainSynthesis;
     throw std::runtime_error("Unknown NodeKind string: " + s);
 }
@@ -32,45 +38,35 @@ NodeKind kindFromString(const std::string& s) {
 
 static json noiseParamsToJson(const NoiseParams& p) {
     return {
-        {"frequency",   p.frequency},
-        {"octaves",     p.octaves},
-        {"lacunarity",  p.lacunarity},
-        {"gain",        p.gain},
-        {"sharpness",   p.sharpness},
-        {"xOffset",     p.xOffset},
-        {"zOffset",     p.zOffset},
-        {"remapToUnit", p.remapToUnit},
+        {"frequency",  p.frequency},
+        {"octaves",    p.octaves},
+        {"lacunarity", p.lacunarity},
+        {"gain",       p.gain},
+        {"sharpness",  p.sharpness},
+        {"xOffset",    p.xOffset},
+        {"zOffset",    p.zOffset},
     };
 }
 
 static NoiseParams noiseParamsFromJson(const json& j) {
     NoiseParams p;
-    if (j.contains("frequency"))   p.frequency   = j["frequency"].get<float>();
-    if (j.contains("octaves"))     p.octaves     = j["octaves"].get<int>();
-    if (j.contains("lacunarity"))  p.lacunarity  = j["lacunarity"].get<float>();
-    if (j.contains("gain"))        p.gain        = j["gain"].get<float>();
-    if (j.contains("sharpness"))   p.sharpness   = j["sharpness"].get<float>();
-    if (j.contains("xOffset"))     p.xOffset     = j["xOffset"].get<float>();
-    if (j.contains("zOffset"))     p.zOffset     = j["zOffset"].get<float>();
-    if (j.contains("remapToUnit")) p.remapToUnit = j["remapToUnit"].get<bool>();
+    if (j.contains("frequency"))  p.frequency  = j["frequency"].get<float>();
+    if (j.contains("octaves"))    p.octaves    = j["octaves"].get<int>();
+    if (j.contains("lacunarity")) p.lacunarity = j["lacunarity"].get<float>();
+    if (j.contains("gain"))       p.gain       = j["gain"].get<float>();
+    if (j.contains("sharpness"))  p.sharpness  = j["sharpness"].get<float>();
+    if (j.contains("xOffset"))    p.xOffset    = j["xOffset"].get<float>();
+    if (j.contains("zOffset"))    p.zOffset    = j["zOffset"].get<float>();
     return p;
 }
 
 static json terrainSynthesisParamsToJson(const TerrainSynthesisParams& p) {
-    return {
-        {"verticalScale", p.verticalScale},
-        {"islandFalloff", p.islandFalloff},
-        {"falloffRadius", p.falloffRadius},
-        {"falloffPower",  p.falloffPower},
-    };
+    return {{"verticalScale", p.verticalScale}};
 }
 
 static TerrainSynthesisParams terrainSynthesisParamsFromJson(const json& j) {
     TerrainSynthesisParams p;
     if (j.contains("verticalScale")) p.verticalScale = j["verticalScale"].get<float>();
-    if (j.contains("islandFalloff")) p.islandFalloff = j["islandFalloff"].get<bool>();
-    if (j.contains("falloffRadius")) p.falloffRadius = j["falloffRadius"].get<float>();
-    if (j.contains("falloffPower"))  p.falloffPower  = j["falloffPower"].get<float>();
     return p;
 }
 
@@ -78,6 +74,9 @@ static json paramsToJson(NodeKind kind, const NodeParams& params) {
     switch (kind) {
     case NodeKind::Fbm:
     case NodeKind::RidgedFbm:
+    case NodeKind::FractalPerlin:
+    case NodeKind::Perlin:
+    case NodeKind::Simplex:
         return noiseParamsToJson(std::get<NoiseParams>(params));
     case NodeKind::TerrainSynthesis:
         return terrainSynthesisParamsToJson(std::get<TerrainSynthesisParams>(params));
@@ -89,6 +88,9 @@ static NodeParams paramsFromJson(NodeKind kind, const json& j) {
     switch (kind) {
     case NodeKind::Fbm:
     case NodeKind::RidgedFbm:
+    case NodeKind::FractalPerlin:
+    case NodeKind::Perlin:
+    case NodeKind::Simplex:
         return noiseParamsFromJson(j);
     case NodeKind::TerrainSynthesis:
         return terrainSynthesisParamsFromJson(j);
@@ -101,14 +103,11 @@ static NodeParams paramsFromJson(NodeKind kind, const json& j) {
 std::string toJson(const EditorGraph& g) {
     json j;
 
-    j["version"] = g.version;
-
     json nodesArr = json::array();
     for (const auto& node : g.nodes) {
         json nj;
         nj["id"]    = node.id;
         nj["kind"]  = kindToString(node.kind);
-        nj["title"] = node.title;
         nj["pos"]   = {node.posX, node.posY};
         nj["params"] = paramsToJson(node.kind, node.params);
         nodesArr.push_back(nj);
@@ -134,13 +133,11 @@ EditorGraph fromJson(const std::string& text) {
     json j = json::parse(text);
 
     EditorGraph g;
-    g.version = j.value("version", 1);
 
     for (const auto& nj : j.at("nodes")) {
         EditorNode node;
         node.id    = nj.at("id").get<NodeId>();
         node.kind  = kindFromString(nj.at("kind").get<std::string>());
-        node.title = nj.value("title", "");
         if (nj.contains("pos") && nj["pos"].is_array() && nj["pos"].size() == 2) {
             node.posX = nj["pos"][0].get<float>();
             node.posY = nj["pos"][1].get<float>();
