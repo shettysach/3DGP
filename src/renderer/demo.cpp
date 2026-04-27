@@ -26,7 +26,6 @@ void runDemo() {
     settings.depth = 720;
     settings.horizontalScale = 1.0f;
     settings.verticalScale = 96.0f;
-    settings.islandFalloff = false;
     settings.seed = 2026u;
     settings.noise.frequency = 0.0052f;
     settings.noise.octaves = 6;

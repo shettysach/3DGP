@@ -32,30 +32,6 @@ using terrain::ValleyResult;
 using NodeOutput =
     std::variant<std::monostate, std::vector<float>, std::vector<Vec2>>;
 
-namespace {
-
-    float islandFalloff(
-        const terrain::TerrainSettings& settings,
-        float worldX,
-        float worldZ,
-        float centerX,
-        float centerZ,
-        float maxRadius
-    ) {
-        if (!settings.islandFalloff)
-            return 1.0f;
-        const float dx = worldX - centerX;
-        const float dz = worldZ - centerZ;
-        const float radius = std::sqrt(dx * dx + dz * dz);
-        const float scaled =
-            std::max(0.0001f, maxRadius * settings.falloffRadius);
-        float t = 1.0f - radius / scaled;
-        t = std::clamp(t, 0.0f, 1.0f);
-        return std::pow(t, settings.falloffPower);
-    }
-
-} // namespace
-
 terrain::TerrainFields execute(
     const CompiledGraph& compiled,
     const terrain::TerrainSettings& settings,
@@ -331,14 +307,6 @@ terrain::TerrainFields execute(
                             {continental[idx], plateauMask, detail, vertScale}
                         );
 
-                        const float falloff = islandFalloff(
-                            settings,
-                            worldX,
-                            worldZ,
-                            centerX,
-                            centerZ,
-                            maxRadius
-                        );
                         const BlendResult blend = blendTerrain(
                             {mountain.height,
                              mountain.weight,
@@ -347,7 +315,6 @@ terrain::TerrainFields execute(
                              plateau.weight,
                              valley.depth,
                              detail,
-                             falloff,
                              vertScale}
                         );
 

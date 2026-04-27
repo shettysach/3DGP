@@ -112,10 +112,7 @@ struct TerrainSettings {
     int depth = 512;
     float horizontalScale = 2.0f;
     float verticalScale = 80.0f;
-    bool islandFalloff = true;
     bool enableVoronoi = true;
-    float falloffRadius = 0.9f;
-    float falloffPower = 2.2f;
     uint32_t seed = 1234u;
     bool useWFC = true;
     float voronoiCellSize = 24.0f;
