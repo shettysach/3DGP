@@ -37,12 +37,8 @@ using terrain::ValleyResult;
 using NodeOutput =
     std::variant<std::monostate, std::vector<float>, std::vector<Vec2>>;
 
-// Internal noise frequencies (match the old external noise nodes exactly)
 namespace {
-    constexpr float kDetailFreq = 0.0189f;   // baseFreq * 2.7 — fine micro detail
-    constexpr float kRangeMaskFreq = 0.0021f; // baseFreq * 0.3 — mountain range placement
-    constexpr float kRimMaskFreq = 0.00119f;  // baseFreq * 0.17 — valley rim
-    constexpr float kPlateauMaskFreq = 0.000196f; // 0.028 * baseFreq
+    constexpr float kDetailFreq = 0.0189f;
     constexpr float kMacroReliefFreq = 0.0021f;
     constexpr float kHillinessFreq = 0.00574f;
     constexpr float kBasinNoiseFreq = 0.00126f;
@@ -70,6 +66,21 @@ terrain::TerrainFields execute(
     std::vector<NodeOutput> nodeOutputs(N);
     std::vector<bool> visited(N, false);
     terrain::TerrainFields fields(w, d);
+
+    const std::vector<float> zeroFloat(cellCount, 0.0f);
+    const std::vector<Vec2> zeroVec2(cellCount, Vec2{0.0f, 0.0f});
+
+    auto getFloat = [&](const CompiledNode& cn, size_t slot) -> const std::vector<float>& {
+        if (slot < cn.inputs.size() && cn.inputs[slot].has_value())
+            return std::get<std::vector<float>>(nodeOutputs[*cn.inputs[slot]]);
+        return zeroFloat;
+    };
+
+    auto getVec2 = [&](const CompiledNode& cn, size_t slot) -> const std::vector<Vec2>& {
+        if (slot < cn.inputs.size() && cn.inputs[slot].has_value())
+            return std::get<std::vector<Vec2>>(nodeOutputs[*cn.inputs[slot]]);
+        return zeroVec2;
+    };
 
     std::function<void(size_t)> eval = [&](size_t ni) {
         if (visited[ni])
@@ -178,10 +189,8 @@ terrain::TerrainFields execute(
             }
 
             case NodeKind::Add2: {
-                const auto& a =
-                    std::get<std::vector<Vec2>>(nodeOutputs[*cn.inputs[0]]);
-                const auto& b =
-                    std::get<std::vector<Vec2>>(nodeOutputs[*cn.inputs[1]]);
+                const auto& a = getVec2(cn, 0);
+                const auto& b = getVec2(cn, 1);
                 nodeOutputs[ni] = std::vector<Vec2>(cellCount);
                 auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
                 for (size_t i = 0; i < cellCount; ++i) {
@@ -194,10 +203,9 @@ terrain::TerrainFields execute(
                 const auto& mp = std::get<MountainParams>(cn.params);
                 const float vertScale = settings.verticalScale;
 
-                const auto& continental =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[0]]);
-                const auto& ridges =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[1]]);
+                const auto& continental = getFloat(cn, 0);
+                const auto& ridges = getFloat(cn, 1);
+                const auto& rangeMaskIn = getFloat(cn, 2);
 
                 nodeOutputs[ni] = std::vector<Vec2>(cellCount);
                 auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
@@ -211,10 +219,7 @@ terrain::TerrainFields execute(
                         const float detail =
                             0.5f * (noiseContext.simplex2D(wx * kDetailFreq, wz * kDetailFreq) + 1.0f);
 
-                        const float rawMask = noiseContext.perlin2D(
-                            wx * kRangeMaskFreq + 400.0f * kRangeMaskFreq,
-                            wz * kRangeMaskFreq - 250.0f * kRangeMaskFreq);
-                        const float rangeMask = smoothstep(0.42f, 0.72f, 0.5f * (rawMask + 1.0f));
+                        const float rangeMask = smoothstep(0.42f, 0.72f, rangeMaskIn[idx]);
 
                         MountainInput mtnIn{continental[idx], ridges[idx], detail, rangeMask,
                                               vertScale, mp};
@@ -230,10 +235,9 @@ terrain::TerrainFields execute(
                 const auto& vp = std::get<ValleyParams>(cn.params);
                 const float vertScale = settings.verticalScale;
 
-                const auto& continental =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[0]]);
-                const auto& basin =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[1]]);
+                const auto& continental = getFloat(cn, 0);
+                const auto& basin = getFloat(cn, 1);
+                const auto& rimMaskIn = getFloat(cn, 2);
 
                 nodeOutputs[ni] = std::vector<Vec2>(cellCount);
                 auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
@@ -247,10 +251,7 @@ terrain::TerrainFields execute(
                         const float detail =
                             0.5f * (noiseContext.simplex2D(wx * kDetailFreq, wz * kDetailFreq) + 1.0f);
 
-                        const float rawRim = noiseContext.perlin2D(
-                            wx * kRimMaskFreq + 420.0f * kRimMaskFreq,
-                            wz * kRimMaskFreq - 301.0f * kRimMaskFreq);
-                        const float rimMask = smoothstep(0.38f, 0.74f, 0.5f * (rawRim + 1.0f));
+                        const float rimMask = smoothstep(0.38f, 0.74f, rimMaskIn[idx]);
 
                         ValleyInput vIn{continental[idx], basin[idx], detail, rimMask,
                                         vertScale, vp};
@@ -266,10 +267,8 @@ terrain::TerrainFields execute(
                 const auto& pp = std::get<PlainsParams>(cn.params);
                 const float vertScale = settings.verticalScale;
 
-                const auto& continental =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[0]]);
-                const auto& plainsBase =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[1]]);
+                const auto& continental = getFloat(cn, 0);
+                const auto& plainsBase = getFloat(cn, 1);
 
                 nodeOutputs[ni] = std::vector<float>(cellCount);
                 auto& out = std::get<std::vector<float>>(nodeOutputs[ni]);
@@ -312,10 +311,9 @@ terrain::TerrainFields execute(
                 const auto& tp = std::get<PlateauParams>(cn.params);
                 const float vertScale = settings.verticalScale;
 
-                const auto& continental =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[0]]);
-                const auto& plateauFeature =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[1]]);
+                const auto& continental = getFloat(cn, 0);
+                const auto& plateauFeature = getFloat(cn, 1);
+                const auto& plateauMaskIn = getFloat(cn, 2);
 
                 nodeOutputs[ni] = std::vector<Vec2>(cellCount);
                 auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
@@ -329,11 +327,9 @@ terrain::TerrainFields execute(
                         const float detail =
                             0.5f * (noiseContext.simplex2D(wx * kDetailFreq, wz * kDetailFreq) + 1.0f);
 
-                        const float rawPMask = noiseContext.perlin2D(
-                            wx * kPlateauMaskFreq, wz * kPlateauMaskFreq);
-                        const float plateauMask = 0.5f * (rawPMask + 1.0f);
+                        const float combinedMask = plateauMaskIn[idx] * 0.5f + plateauFeature[idx] * 0.5f;
 
-                        PlateauInput platIn{continental[idx], plateauMask, detail, vertScale, tp};
+                        PlateauInput platIn{continental[idx], combinedMask, detail, vertScale, tp};
                         const PlateauResult r = computePlateau(platIn);
 
                         out[idx] = Vec2{r.height, r.weight};
@@ -345,17 +341,10 @@ terrain::TerrainFields execute(
             case NodeKind::Blend: {
                 const float vertScale = settings.verticalScale;
 
-                const auto& mountain =
-                    std::get<std::vector<Vec2>>(nodeOutputs[*cn.inputs[0]]);
-                const auto& valley =
-                    std::get<std::vector<Vec2>>(nodeOutputs[*cn.inputs[1]]);
-                const auto& plains =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[2]]);
-                const auto& plateau =
-                    std::get<std::vector<Vec2>>(nodeOutputs[*cn.inputs[3]]);
-
-                nodeOutputs[ni] = std::vector<Vec2>(cellCount);
-                auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
+                const auto& mountain = getVec2(cn, 0);
+                const auto& valley = getVec2(cn, 1);
+                const auto& plains = getFloat(cn, 2);
+                const auto& plateau = getVec2(cn, 3);
 
                 fields.heights.assign(cellCount, 0.0f);
                 fields.mountainWeights.assign(cellCount, 0.0f);
@@ -385,8 +374,6 @@ terrain::TerrainFields execute(
                         fields.mountainWeights[idx] = blend.mountainWeight;
                         fields.valleyWeights[idx] = valley[idx].y;
                         fields.plateauWeights[idx] = plateau[idx].y;
-
-                        out[idx] = Vec2{blend.height, blend.mountainWeight};
                     }
                 }
                 break;

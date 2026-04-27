@@ -60,8 +60,8 @@ struct NoiseParams {
 };
 
 struct MountainParams {
-    float heightScale = 0.95f;
-    float coverage = 0.48f;
+    float heightScale = 1.15f;
+    float coverage = 0.55f;
     float sharpness = 1.35f;
 };
 
