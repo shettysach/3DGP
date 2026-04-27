@@ -1,4 +1,4 @@
-#include "graph/graph_compile.h"
+#include "graph/compile.h"
 
 #include <stdexcept>
 #include <unordered_map>
@@ -26,8 +26,14 @@ CompiledGraph compile(const EditorGraph& editorGraph) {
     }
 
     for (const auto& link : editorGraph.links) {
-        compiled.nodes[idToIndex.at(link.to.nodeId)].inputs[link.to.slot] =
-            static_cast<uint16_t>(idToIndex.at(link.from.nodeId));
+        const size_t srcIdx = idToIndex.at(link.from.nodeId);
+        const size_t dstIdx = idToIndex.at(link.to.nodeId);
+
+        const NodeDef& srcDef = nodeDefinition(compiled.nodes[srcIdx].kind);
+        const NodeDef& dstDef = nodeDefinition(compiled.nodes[dstIdx].kind);
+
+        compiled.nodes[dstIdx].inputs[link.to.slot] =
+            static_cast<uint16_t>(srcIdx);
     }
 
     return compiled;

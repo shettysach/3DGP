@@ -4,6 +4,7 @@
 /.direnv/
 /.cache/
 /graphs/
+imgui.ini
 
 # CMake / tooling extras
 /CMakeUserPresets.json

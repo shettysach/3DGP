@@ -82,7 +82,7 @@ else()
 endif()
 
 if(NOT GRAPH_VIEW_SRC)
-  set(GRAPH_VIEW_SRC src/graph/graph_view.cpp)
+  set(GRAPH_VIEW_SRC src/graph/view.cpp)
 endif()
 
 set(IMGUI_BACKEND_SOURCES)
@@ -132,9 +132,9 @@ add_executable(terrain_demo
   src/renderer/shaders.h
   ${GRAPH_VIEW_SRC}
   src/graph/graph.cpp
-  src/graph/graph_compile.cpp
-  src/graph/graph_execute.cpp
-  src/graph/graph_serialize.cpp
+  src/graph/compile.cpp
+  src/graph/execute.cpp
+  src/graph/serialize.cpp
   ${IMGUI_BACKEND_SOURCES}
 )
 

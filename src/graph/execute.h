@@ -1,5 +1,5 @@
-#ifndef GRAPH_EXECUTE_H
-#define GRAPH_EXECUTE_H
+#ifndef EXECUTE_H
+#define EXECUTE_H
 
 #include "graph/types.h"
 #include "../terrain.h"
@@ -14,4 +14,4 @@ terrain::TerrainFields execute(
 
 } // namespace graph
 
-#endif // GRAPH_EXECUTE_H
+#endif // EXECUTE_H
