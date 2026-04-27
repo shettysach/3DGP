@@ -199,6 +199,17 @@ terrain::TerrainFields execute(
                 break;
             }
 
+            case NodeKind::Scale2: {
+                const auto& sp = std::get<Scale2Params>(cn.params);
+                const auto& in = getVec2(cn, 0);
+                nodeOutputs[ni] = std::vector<Vec2>(cellCount);
+                auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
+                for (size_t i = 0; i < cellCount; ++i) {
+                    out[i] = Vec2{in[i].x * sp.scale, in[i].y * sp.scale};
+                }
+                break;
+            }
+
             case NodeKind::Mountain: {
                 const auto& mp = std::get<MountainParams>(cn.params);
                 const float vertScale = settings.verticalScale;

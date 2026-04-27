@@ -38,6 +38,7 @@ enum class NodeKind : uint8_t {
     Position,
     CreateVec2,
     Add2,
+    Scale2,
 };
 
 // === Pin References ===
@@ -90,6 +91,10 @@ struct CreateVec2Params {
     float y = 0.0f;
 };
 
+struct Scale2Params {
+    float scale = 8.0f;
+};
+
 using NodeParams = std::variant<
     NoiseParams,
     MountainParams,
@@ -98,6 +103,7 @@ using NodeParams = std::variant<
     PlateauParams,
     BlendParams,
     CreateVec2Params,
+    Scale2Params,
     std::monostate>;
 
 // === Editor Graph Model ===

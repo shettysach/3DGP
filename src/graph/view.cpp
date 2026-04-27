@@ -265,6 +265,8 @@ static float drawToolbar() {
             addNode(NodeKind::CreateVec2);
         if (ImGui::Selectable("Add2"))
             addNode(NodeKind::Add2);
+        if (ImGui::Selectable("Scale2"))
+            addNode(NodeKind::Scale2);
         ImGui::EndPopup();
     }
 
@@ -498,6 +500,9 @@ static void drawInspector() {
             auto& cp = std::get<CreateVec2Params>(node->params);
             ImGui::DragFloat("X", &cp.x, 0.0f);
             ImGui::DragFloat("Y", &cp.y, 0.0f);
+        } else if (node->kind == NodeKind::Scale2) {
+            auto& sp = std::get<Scale2Params>(node->params);
+            ImGui::DragFloat("Scale", &sp.scale, 0.1f, 0.1f, 100.0f, "%.1f");
         }
     } else {
         ImGui::Text("%d nodes selected", selCount);

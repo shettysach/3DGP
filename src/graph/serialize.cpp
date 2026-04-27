@@ -38,6 +38,8 @@ const char* kindToString(NodeKind kind) {
             return "CreateVec2";
         case NodeKind::Add2:
             return "Add2";
+        case NodeKind::Scale2:
+            return "Scale2";
     }
     throw std::runtime_error("Unknown NodeKind");
 }
@@ -69,6 +71,8 @@ NodeKind kindFromString(const std::string& s) {
         return NodeKind::CreateVec2;
     if (s == "Add2")
         return NodeKind::Add2;
+    if (s == "Scale2")
+        return NodeKind::Scale2;
     throw std::runtime_error("Unknown NodeKind string: " + s);
 }
 
@@ -186,6 +190,17 @@ static CreateVec2Params createVec2ParamsFromJson(const json& j) {
     return p;
 }
 
+static json scale2ParamsToJson(const Scale2Params& p) {
+    return {{"scale", p.scale}};
+}
+
+static Scale2Params scale2ParamsFromJson(const json& j) {
+    Scale2Params p;
+    if (j.contains("scale"))
+        p.scale = j["scale"].get<float>();
+    return p;
+}
+
 static json paramsToJson(NodeKind kind, const NodeParams& params) {
     switch (kind) {
         case NodeKind::Fbm:
@@ -206,6 +221,8 @@ static json paramsToJson(NodeKind kind, const NodeParams& params) {
             return json::object();
         case NodeKind::CreateVec2:
             return createVec2ParamsToJson(std::get<CreateVec2Params>(params));
+        case NodeKind::Scale2:
+            return scale2ParamsToJson(std::get<Scale2Params>(params));
         default:
             break;
     }
@@ -232,6 +249,8 @@ static NodeParams paramsFromJson(NodeKind kind, const json& j) {
             return BlendParams{};
         case NodeKind::CreateVec2:
             return createVec2ParamsFromJson(j);
+        case NodeKind::Scale2:
+            return scale2ParamsFromJson(j);
         default:
             break;
     }
