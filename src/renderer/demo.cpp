@@ -1,9 +1,4 @@
-#include "renderer/core.h"
-
-#include "graph/compile.h"
-#include "graph/serialize.h"
-#include "graph/types.h"
-#include "terrain/biomes.h"
+#include <sys/stat.h>
 
 #include <algorithm>
 #include <array>
@@ -14,7 +9,12 @@
 #include <memory>
 #include <sstream>
 #include <string>
-#include <sys/stat.h>
+
+#include "graph/compile.h"
+#include "graph/serialize.h"
+#include "graph/types.h"
+#include "renderer/core.h"
+#include "terrain/biomes.h"
 
 namespace renderer {
 
@@ -41,19 +41,23 @@ void runDemo() {
     settings.rivers.minSourceSeparation = 28;
 
     auto printBiomeStats = [](const terrain::TerrainMesh& mesh) {
-        std::array<size_t, static_cast<size_t>(terrain::BiomeId::Count)> counts{};
+        std::array<size_t, static_cast<size_t>(terrain::BiomeId::Count)>
+            counts {};
         for (const terrain::TerrainVertex& v : mesh.vertices) {
             ++counts[static_cast<size_t>(v.primaryBiome)];
         }
 
         std::cout << "Surface coverage:";
-        const float invTotal = mesh.vertices.empty() ? 0.0f : 100.0f / static_cast<float>(mesh.vertices.size());
+        const float invTotal = mesh.vertices.empty()
+            ? 0.0f
+            : 100.0f / static_cast<float>(mesh.vertices.size());
         for (size_t idx = 0; idx < counts.size(); ++idx) {
             if (counts[idx] == 0) {
                 continue;
             }
-            std::cout << ' ' << terrain::biomeName(static_cast<terrain::BiomeId>(idx)) << ' '
-                      << counts[idx] * invTotal << '%';
+            std::cout << ' '
+                      << terrain::biomeName(static_cast<terrain::BiomeId>(idx))
+                      << ' ' << counts[idx] * invTotal << '%';
         }
         std::cout << '\n';
     };
@@ -71,18 +75,22 @@ void runDemo() {
     time_t lastMtime = 0;
     auto loadGraph = [&]() -> bool {
         struct stat st;
-        if (stat(graphPath.c_str(), &st) != 0) return false;
-        if (st.st_mtime == lastMtime) return false;
+        if (stat(graphPath.c_str(), &st) != 0)
+            return false;
+        if (st.st_mtime == lastMtime)
+            return false;
         lastMtime = st.st_mtime;
 
         std::ifstream in(graphPath);
-        if (!in) return false;
+        if (!in)
+            return false;
         std::stringstream ss;
         ss << in.rdbuf();
 
         try {
             graph::EditorGraph eg = graph::fromJson(ss.str());
-            auto cg = std::make_shared<graph::CompiledGraph>(graph::compile(eg));
+            auto cg =
+                std::make_shared<graph::CompiledGraph>(graph::compile(eg));
             generator.setBaseGraph(cg);
             std::cout << "Reloaded graph: " << cg->nodes.size() << " nodes\n";
             return true;
@@ -96,18 +104,9 @@ void runDemo() {
     if (!graphLoaded) {
         std::cout << "Waiting for " << graphPath
                   << " — run './build/terrain_demo graph' to create one\n";
-        // Fall back to default graph so we have something to show
-        try {
-            graph::EditorGraph eg = graph::defaultGraph();
-            auto cg = std::make_shared<graph::CompiledGraph>(graph::compile(eg));
-            generator.setBaseGraph(cg);
-            std::cout << "Using default graph fallback\n";
-        } catch (const std::exception& e) {
-            std::cerr << "Default graph error: " << e.what() << '\n';
-            return;
-        }
     }
-    std::cout << "Generating initial terrain at " << settings.width << 'x' << settings.depth << "...\n";
+    std::cout << "Generating initial terrain at " << settings.width << 'x'
+              << settings.depth << "...\n";
     terrain::TerrainMesh mesh = generator.generateMesh();
 
     auto setMode = [&renderer](Mode mode) {
@@ -117,9 +116,14 @@ void runDemo() {
 
     Mode currentMode = renderer.mode();
 
-    const float centerX = (static_cast<float>(settings.width - 1) * settings.horizontalScale) * 0.5f;
-    const float centerZ = (static_cast<float>(settings.depth - 1) * settings.horizontalScale) * 0.5f;
-    renderer.setTarget(centerX, (mesh.minHeight + mesh.maxHeight) * 0.30f, centerZ);
+    const float centerX =
+        (static_cast<float>(settings.width - 1) * settings.horizontalScale)
+        * 0.5f;
+    const float centerZ =
+        (static_cast<float>(settings.depth - 1) * settings.horizontalScale)
+        * 0.5f;
+    renderer
+        .setTarget(centerX, (mesh.minHeight + mesh.maxHeight) * 0.30f, centerZ);
     renderer.zoom(220.0f);
 
     std::cout << "Controls:\n";
@@ -148,7 +152,8 @@ void runDemo() {
         const float deltaSeconds = std::clamp(
             std::chrono::duration<float>(frameTime - lastFrameTime).count(),
             0.0f,
-            0.1f);
+            0.1f
+        );
         lastFrameTime = frameTime;
 
         while (SDL_PollEvent(&event)) {
@@ -158,61 +163,73 @@ void runDemo() {
 
             if (event.type == SDL_KEYDOWN) {
                 switch (event.key.keysym.sym) {
-                case SDLK_ESCAPE:
-                    return;
-                case SDLK_r:
-                    settings.seed += 1u;
-                    generator.setSettings(settings);
-                    mesh = generator.generateMesh();
-                    renderer.invalidateMeshCache();
-                    std::cout << "Regenerated terrain with seed " << settings.seed << '\n';
-                    printBiomeStats(mesh);
-                    break;
-                case SDLK_v:
-                    if (event.key.keysym.mod & KMOD_SHIFT) {
-                        if (static_cast<int>(currentMode) == 0) {
-                            currentMode = Mode::Slope;
+                    case SDLK_ESCAPE:
+                        return;
+                    case SDLK_r:
+                        settings.seed += 1u;
+                        generator.setSettings(settings);
+                        mesh = generator.generateMesh();
+                        renderer.invalidateMeshCache();
+                        std::cout << "Regenerated terrain with seed "
+                                  << settings.seed << '\n';
+                        printBiomeStats(mesh);
+                        break;
+                    case SDLK_v:
+                        if (event.key.keysym.mod & KMOD_SHIFT) {
+                            if (static_cast<int>(currentMode) == 0) {
+                                currentMode = Mode::Slope;
+                            } else {
+                                currentMode = static_cast<Mode>(
+                                    static_cast<int>(currentMode) - 1
+                                );
+                            }
                         } else {
-                            currentMode = static_cast<Mode>(static_cast<int>(currentMode) - 1);
+                            currentMode = static_cast<Mode>(
+                                (static_cast<int>(currentMode) + 1)
+                                % (static_cast<int>(Mode::Slope) + 1)
+                            );
                         }
-                    } else {
-                        currentMode = static_cast<Mode>(
-                            (static_cast<int>(currentMode) + 1) % (static_cast<int>(Mode::Slope) + 1));
+                        renderer.setMode(currentMode);
+                        std::cout << "Render mode: " << modeName(currentMode)
+                                  << '\n';
+                        break;
+                    case SDLK_p: {
+                        const std::time_t now = std::time(nullptr);
+                        const std::string screenshotPath = "screenshot_"
+                            + std::to_string(static_cast<long long>(now))
+                            + ".bmp";
+                        if (renderer.captureScreenshot(screenshotPath)) {
+                            std::cout << "Saved screenshot to "
+                                      << screenshotPath << '\n';
+                        } else {
+                            std::cout << "Failed to save screenshot\n";
+                        }
+                        break;
                     }
-                    renderer.setMode(currentMode);
-                    std::cout << "Render mode: " << modeName(currentMode) << '\n';
-                    break;
-                case SDLK_p: {
-                    const std::time_t now = std::time(nullptr);
-                    const std::string screenshotPath =
-                        "screenshot_" + std::to_string(static_cast<long long>(now)) + ".bmp";
-                    if (renderer.captureScreenshot(screenshotPath)) {
-                        std::cout << "Saved screenshot to " << screenshotPath << '\n';
-                    } else {
-                        std::cout << "Failed to save screenshot\n";
-                    }
-                    break;
-                }
-                default:
-                    break;
+                    default:
+                        break;
                 }
             }
 
-            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+            if (event.type == SDL_MOUSEBUTTONDOWN
+                && event.button.button == SDL_BUTTON_LEFT) {
                 orbiting = true;
                 prevMouseX = event.button.x;
                 prevMouseY = event.button.y;
             }
-            if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_LEFT) {
+            if (event.type == SDL_MOUSEBUTTONUP
+                && event.button.button == SDL_BUTTON_LEFT) {
                 orbiting = false;
             }
 
-            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_RIGHT) {
+            if (event.type == SDL_MOUSEBUTTONDOWN
+                && event.button.button == SDL_BUTTON_RIGHT) {
                 panning = true;
                 prevMouseX = event.button.x;
                 prevMouseY = event.button.y;
             }
-            if (event.type == SDL_MOUSEBUTTONUP && event.button.button == SDL_BUTTON_RIGHT) {
+            if (event.type == SDL_MOUSEBUTTONUP
+                && event.button.button == SDL_BUTTON_RIGHT) {
                 panning = false;
             }
 
@@ -221,11 +238,18 @@ void runDemo() {
                 const int dy = event.motion.y - prevMouseY;
 
                 if (orbiting) {
-                    renderer.orbit(static_cast<float>(dx) * 0.28f, static_cast<float>(-dy) * 0.28f);
+                    renderer.orbit(
+                        static_cast<float>(dx) * 0.28f,
+                        static_cast<float>(-dy) * 0.28f
+                    );
                 }
                 if (panning) {
-                    const float panScale = std::max(0.3f, 0.005f * mesh.horizontalScale * 300.0f);
-                    renderer.pan(static_cast<float>(-dx) * panScale, static_cast<float>(dy) * panScale);
+                    const float panScale =
+                        std::max(0.3f, 0.005f * mesh.horizontalScale * 300.0f);
+                    renderer.pan(
+                        static_cast<float>(-dx) * panScale,
+                        static_cast<float>(dy) * panScale
+                    );
                 }
 
                 prevMouseX = event.motion.x;

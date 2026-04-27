@@ -20,9 +20,8 @@
 
 namespace graph {
 
-// ---------- Pin ID encoding ----------
-// Output: nodeId * 1000 + slot         (slot range 0..99)
-// Input:  nodeId * 1000 + 200 + slot   (slot range 0..99)
+// op id * 1000 + slot (slot 0..99)
+// ip id * 1000 + 200 + slot (slot 0..99)
 
 static int outPinId(NodeId nid, uint8_t slot) {
     return static_cast<int>(nid) * 1000 + static_cast<int>(slot);
@@ -44,7 +43,7 @@ static void decodePin(int pinId, NodeId& nid, uint8_t& slot, bool& isOutput) {
     }
 }
 
-// ---------- App state ----------
+// App state
 
 static SDL_Window* gWindow = nullptr;
 static SDL_GLContext gGlCtx = nullptr;
@@ -52,8 +51,6 @@ static bool gRunning = true;
 
 static EditorGraph gGraph;
 static std::string gFilePath = "graphs/current.json";
-
-// ---------- Id generators ----------
 
 static NodeId gNextNodeId = 0;
 static LinkId gNextLinkId = 0;
@@ -66,7 +63,7 @@ static LinkId nextLinkId() {
     return gNextLinkId++;
 }
 
-// ---------- SDL + ImGui init / shutdown ----------
+// SDL + imgui init and end
 
 static void initSDL() {
     SDL_Init(SDL_INIT_VIDEO);
@@ -123,14 +120,10 @@ static void shutdown() {
     SDL_Quit();
 }
 
-// ---------- IO ----------
-
-static void ensureGraphDir() {
-    mkdir("graphs", 0755);
-}
+// Saving graph json
 
 static void saveToFile() {
-    ensureGraphDir();
+    mkdir("graphs", 0755); // Ensure output dir
     std::ofstream out(gFilePath);
     if (!out)
         return;
@@ -138,24 +131,23 @@ static void saveToFile() {
 }
 
 static void syncIdsFromGraph(const EditorGraph& graph) {
-    for (const auto& n : graph.nodes) {
+    for (const auto& n : graph.nodes)
         if (n.id >= gNextNodeId)
             gNextNodeId = n.id + 1;
-    }
-    for (const auto& l : graph.links) {
+
+    for (const auto& l : graph.links)
         if (l.id >= gNextLinkId)
             gNextLinkId = l.id + 1;
-    }
 }
 
 static void loadFromFile() {
     std::ifstream in(gFilePath);
     if (!in)
         return;
-    std::string text(
-        (std::istreambuf_iterator<char>(in)),
+    std::string text {
+        std::istreambuf_iterator<char>(in),
         std::istreambuf_iterator<char>()
-    );
+    };
     try {
         gGraph = fromJson(text);
         syncIdsFromGraph(gGraph);
@@ -164,60 +156,58 @@ static void loadFromFile() {
     }
 }
 
-// ---------- UI ----------
+// UI
 
 static void handleDeleteSelected() {
-    // Delete selected links first
-    int linkCount = ImNodes::NumSelectedLinks();
-    if (linkCount > 0) {
-        std::vector<int> ids(static_cast<size_t>(linkCount));
-        ImNodes::GetSelectedLinks(ids.data());
-        std::unordered_set<int> toRemove(ids.begin(), ids.end());
-        gGraph.links.erase(
-            std::remove_if(
-                gGraph.links.begin(),
-                gGraph.links.end(),
-                [&](const EditorLink& l) { return toRemove.count(l.id); }
-            ),
-            gGraph.links.end()
-        );
-        ImNodes::ClearLinkSelection();
-    }
-
-    // Delete selected nodes
     int nodeCount = ImNodes::NumSelectedNodes();
+    int linkCount = ImNodes::NumSelectedLinks();
+
+    std::unordered_set<NodeId> rmNodes;
+    std::unordered_set<int> rmLinks;
+
     if (nodeCount > 0) {
-        std::vector<int> ids(static_cast<size_t>(nodeCount));
+        std::vector<int> ids(nodeCount);
         ImNodes::GetSelectedNodes(ids.data());
-        std::unordered_set<NodeId> toRemove(ids.begin(), ids.end());
+        rmNodes.insert(ids.begin(), ids.end());
 
         gGraph.nodes.erase(
             std::remove_if(
                 gGraph.nodes.begin(),
                 gGraph.nodes.end(),
-                [&](const EditorNode& n) { return toRemove.count(n.id); }
+                [&](const EditorNode& n) { return rmNodes.count(n.id); }
             ),
             gGraph.nodes.end()
         );
+        ImNodes::ClearNodeSelection();
+    }
+
+    if (linkCount > 0) {
+        std::vector<int> ids(linkCount);
+        ImNodes::GetSelectedLinks(ids.data());
+        rmLinks.insert(ids.begin(), ids.end());
+    }
+
+    if (nodeCount > 0 || linkCount > 0) {
         gGraph.links.erase(
             std::remove_if(
                 gGraph.links.begin(),
                 gGraph.links.end(),
                 [&](const EditorLink& l) {
-                    return toRemove.count(l.from.nodeId)
-                        || toRemove.count(l.to.nodeId);
+                    return rmLinks.count(l.id) || rmNodes.count(l.from.nodeId)
+                        || rmNodes.count(l.to.nodeId);
                 }
             ),
             gGraph.links.end()
         );
-        ImNodes::ClearNodeSelection();
+        ImNodes::ClearLinkSelection();
     }
 }
 
 static void addNode(NodeKind kind) {
     NodeId id = nextNodeId();
     gGraph.nodes.push_back(
-        {id, kind, 200.0f, 100.0f + id * 30.0f, defaultParams(kind)});
+        {id, kind, 200.0f, 100.0f + id * 30.0f, defaultParams(kind)}
+    );
 }
 
 static float drawToolbar() {
@@ -232,7 +222,6 @@ static float drawToolbar() {
             | ImGuiWindowFlags_NoBringToFrontOnFocus
     );
 
-    // Row 1: Compile, Default, Delete
     if (ImGui::Button("Compile")) {
         graph::compile(gGraph);
         saveToFile();
@@ -247,22 +236,21 @@ static float drawToolbar() {
         saveToFile();
     }
 
-    if (ImNodes::NumSelectedNodes() > 0 || ImNodes::NumSelectedLinks() > 0) {
-        ImGui::SameLine();
-        if (ImGui::Button("Delete"))
-            handleDeleteSelected();
-    }
-
     ImGui::SameLine();
     if (ImGui::Button("Noise v")) {
         ImGui::OpenPopup("NoisePopup");
     }
     if (ImGui::BeginPopup("NoisePopup")) {
-        if (ImGui::Selectable("FBm"))            addNode(NodeKind::Fbm);
-        if (ImGui::Selectable("Ridged"))         addNode(NodeKind::RidgedFbm);
-        if (ImGui::Selectable("Fractal Perlin")) addNode(NodeKind::FractalPerlin);
-        if (ImGui::Selectable("Perlin"))         addNode(NodeKind::Perlin);
-        if (ImGui::Selectable("Simplex"))        addNode(NodeKind::Simplex);
+        if (ImGui::Selectable("FBm"))
+            addNode(NodeKind::Fbm);
+        if (ImGui::Selectable("Ridged"))
+            addNode(NodeKind::RidgedFbm);
+        if (ImGui::Selectable("Fractal Perlin"))
+            addNode(NodeKind::FractalPerlin);
+        if (ImGui::Selectable("Perlin"))
+            addNode(NodeKind::Perlin);
+        if (ImGui::Selectable("Simplex"))
+            addNode(NodeKind::Simplex);
         ImGui::EndPopup();
     }
 
@@ -271,9 +259,12 @@ static float drawToolbar() {
         ImGui::OpenPopup("Vec2Popup");
     }
     if (ImGui::BeginPopup("Vec2Popup")) {
-        if (ImGui::Selectable("Position"))   addNode(NodeKind::Position);
-        if (ImGui::Selectable("CreateVec2")) addNode(NodeKind::CreateVec2);
-        if (ImGui::Selectable("Add2"))       addNode(NodeKind::Add2);
+        if (ImGui::Selectable("Position"))
+            addNode(NodeKind::Position);
+        if (ImGui::Selectable("CreateVec2"))
+            addNode(NodeKind::CreateVec2);
+        if (ImGui::Selectable("Add2"))
+            addNode(NodeKind::Add2);
         ImGui::EndPopup();
     }
 
@@ -282,8 +273,15 @@ static float drawToolbar() {
         ImGui::OpenPopup("OutputPopup");
     }
     if (ImGui::BeginPopup("OutputPopup")) {
-        if (ImGui::Selectable("Terrain Synthesis")) addNode(NodeKind::TerrainSynthesis);
+        if (ImGui::Selectable("Terrain Synthesis"))
+            addNode(NodeKind::TerrainSynthesis);
         ImGui::EndPopup();
+    }
+
+    if (ImNodes::NumSelectedNodes() > 0 || ImNodes::NumSelectedLinks() > 0) {
+        ImGui::SameLine();
+        if (ImGui::Button("Delete"))
+            handleDeleteSelected();
     }
 
     float height = ImGui::GetWindowSize().y;
@@ -308,11 +306,11 @@ static void drawNodeEditor(float toolbarHeight) {
     ImNodes::BeginNodeEditor();
 
     // Set node positions
-    for (const auto& node : gGraph.nodes) {
+    for (const auto& node : gGraph.nodes)
         ImNodes::SetNodeGridSpacePos(node.id, ImVec2(node.posX, node.posY));
-    }
 
     // Draw nodes
+
     for (const auto& node : gGraph.nodes) {
         const NodeDef& def = nodeDefinition(node.kind);
 
@@ -341,6 +339,7 @@ static void drawNodeEditor(float toolbarHeight) {
     }
 
     // Draw links
+
     for (const auto& link : gGraph.links) {
         ImNodes::Link(
             link.id,
@@ -351,48 +350,56 @@ static void drawNodeEditor(float toolbarHeight) {
 
     ImNodes::EndNodeEditor();
 
-    // ----- Handle new links -----
-    {
-        int startPin, endPin;
-        if (ImNodes::IsLinkCreated(&startPin, &endPin)) {
-            NodeId fromNid, toNid;
-            uint8_t fromSlot, toSlot;
-            bool startOut, endOut;
-            decodePin(startPin, fromNid, fromSlot, startOut);
-            decodePin(endPin, toNid, toSlot, endOut);
+    // Handle new links
+    int startPin, endPin;
+    if (ImNodes::IsLinkCreated(&startPin, &endPin)) {
+        NodeId fromNid, toNid;
+        uint8_t fromSlot, toSlot;
+        bool startOut, endOut;
+        decodePin(startPin, fromNid, fromSlot, startOut);
+        decodePin(endPin, toNid, toSlot, endOut);
 
-            // Ensure direction: output → input
-            if (!startOut && endOut) {
-                std::swap(fromNid, toNid);
-                std::swap(fromSlot, toSlot);
-            }
-
-            if (startOut && !endOut) {
-                gGraph.links.push_back(
-                    {nextLinkId(), {fromNid, fromSlot}, {toNid, toSlot}}
-                );
-            }
+        // Ensure direction output → input
+        if (!startOut && endOut) {
+            std::swap(fromNid, toNid);
+            std::swap(fromSlot, toSlot);
         }
-    }
 
-    // ----- Handle deleted links -----
-    {
-        int destroyedId;
-        while (ImNodes::IsLinkDestroyed(&destroyedId)) {
-            gGraph.links.erase(
-                std::remove_if(
+        if (startOut && !endOut) {
+            const EditorNode* fromNode = nullptr;
+            const EditorNode* toNode = nullptr;
+
+            for (const auto& n : gGraph.nodes) {
+                if (n.id == fromNid)
+                    fromNode = &n;
+                if (n.id == toNid)
+                    toNode = &n;
+            }
+
+            if (fromNode && toNode) {
+                const NodeDef& srcDef = nodeDefinition(fromNode->kind);
+                const NodeDef& dstDef = nodeDefinition(toNode->kind);
+
+                bool typeCheck =
+                    srcDef.outputs[fromSlot].type == dstDef.inputs[toSlot].type;
+                bool preconnected = std::any_of(
                     gGraph.links.begin(),
                     gGraph.links.end(),
-                    [destroyedId](const EditorLink& l) {
-                        return l.id == destroyedId;
+                    [&](const EditorLink& l) {
+                        return l.to.nodeId == toNid && l.to.slot == toSlot;
                     }
-                ),
-                gGraph.links.end()
-            );
+                );
+
+                if (typeCheck && !preconnected) {
+                    gGraph.links.push_back(
+                        {nextLinkId(), {fromNid, fromSlot}, {toNid, toSlot}}
+                    );
+                }
+            }
         }
     }
 
-    // ----- Update node positions -----
+    // Update node positions
     for (auto& node : gGraph.nodes) {
         ImVec2 pos = ImNodes::GetNodeGridSpacePos(node.id);
         node.posX = pos.x;
@@ -467,8 +474,8 @@ static void drawInspector() {
             );
         } else if (node->kind == NodeKind::CreateVec2) {
             auto& cp = std::get<CreateVec2Params>(node->params);
-            ImGui::DragFloat("X", &cp.x, 0.1f);
-            ImGui::DragFloat("Y", &cp.y, 0.1f);
+            ImGui::DragFloat("X", &cp.x, 0.0f);
+            ImGui::DragFloat("Y", &cp.y, 0.0f);
         }
     } else {
         ImGui::Text("%d nodes selected", selCount);
@@ -477,23 +484,21 @@ static void drawInspector() {
     ImGui::End();
 }
 
-// ---------- Event loop ----------
+// Event loop
 
 static void processEvents() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         ImGui_ImplSDL2_ProcessEvent(&event);
 
-        if (event.type == SDL_QUIT) {
+        if (event.type == SDL_QUIT)
             gRunning = false;
-        }
-        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+        if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE)
             gRunning = false;
-        }
     }
 }
 
-// ---------- Main ----------
+// Main
 
 void run() {
     initSDL();

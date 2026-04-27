@@ -2,6 +2,7 @@
 #define GRAPH_TYPES_H
 
 #include <cstdint>
+#include <optional>
 #include <variant>
 #include <vector>
 
@@ -14,7 +15,10 @@ using LinkId = int32_t;
 
 // === Data Types ===
 
-struct Vec2 { float x = 0.0f; float y = 0.0f; };
+struct Vec2 {
+    float x = 0.0f;
+    float y = 0.0f;
+};
 
 enum class PinType : uint8_t { Float, Vec2 };
 
@@ -36,17 +40,17 @@ enum class NodeKind : uint8_t {
 
 struct PinRef {
     NodeId nodeId = 0;
-    uint8_t slot  = 0;
+    uint8_t slot = 0;
 };
 
 // === Params ===
 
 struct NoiseParams {
-    float frequency   = 0.007f;
-    int   octaves     = 6;
-    float lacunarity  = 2.0f;
-    float gain        = 0.5f;
-    float sharpness   = 2.0f;
+    float frequency = 0.007f;
+    int octaves = 6;
+    float lacunarity = 2.0f;
+    float gain = 0.5f;
+    float sharpness = 2.0f;
     float xOffset = 0.0f;
     float zOffset = 0.0f;
 };
@@ -60,15 +64,19 @@ struct CreateVec2Params {
     float y = 0.0f;
 };
 
-using NodeParams = std::variant<NoiseParams, TerrainSynthesisParams, CreateVec2Params, std::monostate>;
+using NodeParams = std::variant<
+    NoiseParams,
+    TerrainSynthesisParams,
+    CreateVec2Params,
+    std::monostate>;
 
 // === Editor Graph Model ===
 
 struct EditorNode {
-    NodeId   id    = 0;
-    NodeKind kind  = NodeKind::Fbm;
-    float    posX  = 0.0f;
-    float    posY  = 0.0f;
+    NodeId id = 0;
+    NodeKind kind = NodeKind::Fbm;
+    float posX = 0.0f;
+    float posY = 0.0f;
     NodeParams params;
 };
 
@@ -88,8 +96,7 @@ struct EditorGraph {
 struct CompiledNode {
     NodeKind kind;
     NodeParams params;
-    std::vector<uint16_t> inputs;       // source node index per input slot, UINT16_MAX = unconnected
-    bool      hasCoordInput = false;    // for noise nodes: is the optional Vec2 coord connected?
+    std::vector<std::optional<uint16_t>> inputs;
 };
 
 struct CompiledGraph {
@@ -100,8 +107,8 @@ struct CompiledGraph {
 
 struct PinDef {
     const char* label;
-    bool        isInput = false;
-    PinType     type    = PinType::Float;
+    bool isInput = false;
+    PinType type = PinType::Float;
 };
 
 struct NodeDef {
