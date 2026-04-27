@@ -1,39 +1,39 @@
 #ifndef CORE_H
 #define CORE_H
 
-#include "terrain.h"
-
 #include <cstddef>
 #include <string>
 #include <vector>
 
+#include "terrain.h"
+
 #ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#ifndef SDL_MAIN_HANDLED
-#define SDL_MAIN_HANDLED
-#endif
-#include <SDL.h>
-#include <SDL_opengl.h>
-#include <SDL_opengl_glext.h>
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #include <windows.h>
+    #ifndef SDL_MAIN_HANDLED
+        #define SDL_MAIN_HANDLED
+    #endif
+    #include <SDL.h>
+    #include <SDL_opengl.h>
+    #include <SDL_opengl_glext.h>
 
 #elif defined(__APPLE__)
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_opengl.h>
-#include <SDL2/SDL_opengl_glext.h>
+    #include <SDL2/SDL.h>
+    #include <SDL2/SDL_opengl.h>
+    #include <SDL2/SDL_opengl_glext.h>
 
 #elif defined(__linux__)
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_opengl.h>
-#include <SDL2/SDL_opengl_glext.h>
+    #include <SDL2/SDL.h>
+    #include <SDL2/SDL_opengl.h>
+    #include <SDL2/SDL_opengl_glext.h>
 
 #else
-#error "Unknown platform"
+    #error "Unknown platform"
 #endif
 
 namespace renderer {
@@ -109,8 +109,14 @@ class Renderer {
     void setTarget(float x, float y, float z);
     void setMode(Mode mode);
     Mode mode() const;
-    SDL_Window* window() const { return window_; }
-    SDL_GLContext glContext() const { return glContext_; }
+
+    SDL_Window* window() const {
+        return window_;
+    }
+
+    SDL_GLContext glContext() const {
+        return glContext_;
+    }
 
     void invalidateMeshCache();
     bool captureScreenshot(const std::string& filepath) const;

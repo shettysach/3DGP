@@ -1,21 +1,22 @@
 #include "graph/view.h"
-#include "graph/compile.h"
-#include "graph/serialize.h"
-#include "graph/types.h"
-
-#include "imgui.h"
-#include "imgui_impl_opengl3.h"
-#include "imgui_impl_sdl2.h"
-#include "imnodes.h"
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_opengl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include <algorithm>
 #include <fstream>
 #include <string>
-#include <sys/stat.h>
-#include <sys/types.h>
+#include <unordered_set>
+
+#include "graph/compile.h"
+#include "graph/serialize.h"
+#include "graph/types.h"
+#include "imgui.h"
+#include "imgui_impl_opengl3.h"
+#include "imgui_impl_sdl2.h"
+#include "imnodes.h"
 
 namespace graph {
 
@@ -31,7 +32,7 @@ static int inPinId(NodeId nid, uint8_t slot) {
     return static_cast<int>(nid) * 1000 + 200 + static_cast<int>(slot);
 }
 
-static bool decodePin(int pinId, NodeId& nid, uint8_t& slot, bool& isOutput) {
+static void decodePin(int pinId, NodeId& nid, uint8_t& slot, bool& isOutput) {
     nid = static_cast<NodeId>(pinId / 1000);
     int r = pinId % 1000;
     if (r >= 200) {
@@ -41,7 +42,6 @@ static bool decodePin(int pinId, NodeId& nid, uint8_t& slot, bool& isOutput) {
         isOutput = true;
         slot = static_cast<uint8_t>(r);
     }
-    return true;
 }
 
 // ---------- App state ----------
@@ -51,7 +51,6 @@ static SDL_GLContext gGlCtx = nullptr;
 static bool gRunning = true;
 
 static EditorGraph gGraph;
-static std::string gErrorMsg;
 static std::string gFilePath = "graphs/current.json";
 
 // ---------- Id generators ----------
@@ -59,9 +58,13 @@ static std::string gFilePath = "graphs/current.json";
 static NodeId gNextNodeId = 0;
 static LinkId gNextLinkId = 0;
 
-static NodeId nextNodeId() { return gNextNodeId++; }
+static NodeId nextNodeId() {
+    return gNextNodeId++;
+}
 
-static LinkId nextLinkId() { return gNextLinkId++; }
+static LinkId nextLinkId() {
+    return gNextLinkId++;
+}
 
 // ---------- SDL + ImGui init / shutdown ----------
 
@@ -70,12 +73,21 @@ static void initSDL() {
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(
+        SDL_GL_CONTEXT_PROFILE_MASK,
+        SDL_GL_CONTEXT_PROFILE_CORE
+    );
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
-    gWindow = SDL_CreateWindow("Graph Editor", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280,
-                               800, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+    gWindow = SDL_CreateWindow(
+        "Graph Editor",
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
+        1280,
+        800,
+        SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE
+    );
 
     gGlCtx = SDL_GL_CreateContext(gWindow);
     SDL_GL_SetSwapInterval(1);
@@ -113,35 +125,40 @@ static void shutdown() {
 
 // ---------- IO ----------
 
-static void ensureGraphDir() { mkdir("graphs", 0755); }
+static void ensureGraphDir() {
+    mkdir("graphs", 0755);
+}
 
 static void saveToFile() {
     ensureGraphDir();
     std::ofstream out(gFilePath);
-    if (!out) {
-        gErrorMsg = "Failed to open " + gFilePath + " for writing";
+    if (!out)
         return;
-    }
     out << toJson(gGraph);
-    gErrorMsg.clear();
+}
+
+static void syncIdsFromGraph(const EditorGraph& graph) {
+    for (const auto& n : graph.nodes) {
+        if (n.id >= gNextNodeId)
+            gNextNodeId = n.id + 1;
+    }
+    for (const auto& l : graph.links) {
+        if (l.id >= gNextLinkId)
+            gNextLinkId = l.id + 1;
+    }
 }
 
 static void loadFromFile() {
     std::ifstream in(gFilePath);
     if (!in)
         return;
-    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string text(
+        (std::istreambuf_iterator<char>(in)),
+        std::istreambuf_iterator<char>()
+    );
     try {
         gGraph = fromJson(text);
-        // Sync ID counters past loaded graph
-        for (const auto& n : gGraph.nodes) {
-            if (n.id >= gNextNodeId)
-                gNextNodeId = n.id + 1;
-        }
-        for (const auto& l : gGraph.links) {
-            if (l.id >= gNextLinkId)
-                gNextLinkId = l.id + 1;
-        }
+        syncIdsFromGraph(gGraph);
     } catch (const std::exception&) {
         // keep default graph
     }
@@ -149,111 +166,138 @@ static void loadFromFile() {
 
 // ---------- UI ----------
 
-static bool handleDeleteSelected() {
-    std::vector<NodeId> toRemove;
-    int count = ImNodes::NumSelectedNodes();
-    if (count > 0) {
-        std::vector<int> ids(static_cast<size_t>(count));
-        ImNodes::GetSelectedNodes(ids.data());
-        for (int id : ids)
-            toRemove.push_back(static_cast<NodeId>(id));
+static void handleDeleteSelected() {
+    // Delete selected links first
+    int linkCount = ImNodes::NumSelectedLinks();
+    if (linkCount > 0) {
+        std::vector<int> ids(static_cast<size_t>(linkCount));
+        ImNodes::GetSelectedLinks(ids.data());
+        std::unordered_set<int> toRemove(ids.begin(), ids.end());
+        gGraph.links.erase(
+            std::remove_if(
+                gGraph.links.begin(),
+                gGraph.links.end(),
+                [&](const EditorLink& l) { return toRemove.count(l.id); }
+            ),
+            gGraph.links.end()
+        );
+        ImNodes::ClearLinkSelection();
     }
-    if (toRemove.empty())
-        return false;
 
-    gGraph.nodes.erase(std::remove_if(gGraph.nodes.begin(), gGraph.nodes.end(),
-                                      [&](const EditorNode& n) {
-                                          return std::find(toRemove.begin(), toRemove.end(),
-                                                           n.id) != toRemove.end();
-                                      }),
-                       gGraph.nodes.end());
-    gGraph.links.erase(std::remove_if(gGraph.links.begin(), gGraph.links.end(),
-                                      [&](const EditorLink& l) {
-                                          return std::find(toRemove.begin(), toRemove.end(),
-                                                           l.from.nodeId) != toRemove.end() ||
-                                                 std::find(toRemove.begin(), toRemove.end(),
-                                                           l.to.nodeId) != toRemove.end();
-                                      }),
-                       gGraph.links.end());
-    ImNodes::ClearNodeSelection();
-    return true;
+    // Delete selected nodes
+    int nodeCount = ImNodes::NumSelectedNodes();
+    if (nodeCount > 0) {
+        std::vector<int> ids(static_cast<size_t>(nodeCount));
+        ImNodes::GetSelectedNodes(ids.data());
+        std::unordered_set<NodeId> toRemove(ids.begin(), ids.end());
+
+        gGraph.nodes.erase(
+            std::remove_if(
+                gGraph.nodes.begin(),
+                gGraph.nodes.end(),
+                [&](const EditorNode& n) { return toRemove.count(n.id); }
+            ),
+            gGraph.nodes.end()
+        );
+        gGraph.links.erase(
+            std::remove_if(
+                gGraph.links.begin(),
+                gGraph.links.end(),
+                [&](const EditorLink& l) {
+                    return toRemove.count(l.from.nodeId)
+                        || toRemove.count(l.to.nodeId);
+                }
+            ),
+            gGraph.links.end()
+        );
+        ImNodes::ClearNodeSelection();
+    }
 }
 
 static void addNode(NodeKind kind) {
     NodeId id = nextNodeId();
     if (kind == NodeKind::TerrainSynthesis) {
-        gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f, TerrainSynthesisParams{}});
+        gGraph.nodes.push_back(
+            {id, kind, 200.0f, 100.0f + id * 30.0f, TerrainSynthesisParams {}}
+        );
     } else {
-        gGraph.nodes.push_back({id, kind, 200.0f, 100.0f + id * 30.0f, NoiseParams{}});
+        gGraph.nodes.push_back(
+            {id, kind, 200.0f, 100.0f + id * 30.0f, NoiseParams {}}
+        );
     }
 }
 
-static void drawToolbar() {
-    if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::Button("Compile")) {
-            try {
-                graph::compile(gGraph);
-                gErrorMsg.clear();
-                saveToFile();
-            } catch (const std::exception& e) {
-                gErrorMsg = e.what();
-            }
-        }
-
-        ImGui::Separator();
-
-        if (ImGui::Button("+ FBm"))
-            addNode(NodeKind::Fbm);
-        if (ImGui::Button("+ Ridged"))
-            addNode(NodeKind::RidgedFbm);
-        if (ImGui::Button("+ Fractal Perlin"))
-            addNode(NodeKind::FractalPerlin);
-        if (ImGui::Button("+ Perlin"))
-            addNode(NodeKind::Perlin);
-        if (ImGui::Button("+ Simplex"))
-            addNode(NodeKind::Simplex);
-        if (ImGui::Button("+ Synthesis"))
-            addNode(NodeKind::TerrainSynthesis);
-
-        ImGui::Separator();
-
-        if (ImGui::Button("Default")) {
-            gGraph = defaultGraph();
-            gNextNodeId = 0;
-            gNextLinkId = 0;
-            for (const auto& n : gGraph.nodes) {
-                if (n.id >= gNextNodeId)
-                    gNextNodeId = n.id + 1;
-            }
-            for (const auto& l : gGraph.links) {
-                if (l.id >= gNextLinkId)
-                    gNextLinkId = l.id + 1;
-            }
-            gErrorMsg.clear();
-            saveToFile();
-        }
-
-        if (ImNodes::NumSelectedNodes() > 0) {
-            if (ImGui::Button("Delete"))
-                handleDeleteSelected();
-        }
-
-        if (!gErrorMsg.empty()) {
-            ImGui::SameLine();
-            ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "Error: %s", gErrorMsg.c_str());
-        }
-
-        ImGui::EndMainMenuBar();
-    }
-}
-
-static void drawNodeEditor() {
+static float drawToolbar() {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(vp->WorkPos);
-    ImGui::SetNextWindowSize(vp->WorkSize);
-    ImGui::Begin("Graph", nullptr,
-                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                     ImGuiWindowFlags_NoBringToFrontOnFocus);
+    ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x, vp->WorkPos.y));
+    ImGui::SetNextWindowSize(ImVec2(vp->WorkSize.x, 0.0f));
+    ImGui::Begin(
+        "Toolbar",
+        nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
+            | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar
+            | ImGuiWindowFlags_NoBringToFrontOnFocus
+    );
+
+    // Row 1: Compile, Default, Delete
+    if (ImGui::Button("Compile")) {
+        graph::compile(gGraph);
+        saveToFile();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Default")) {
+        gGraph = defaultGraph();
+        gNextNodeId = 0;
+        gNextLinkId = 0;
+        syncIdsFromGraph(gGraph);
+        saveToFile();
+    }
+
+    if (ImNodes::NumSelectedNodes() > 0 || ImNodes::NumSelectedLinks() > 0) {
+        ImGui::SameLine();
+        if (ImGui::Button("Delete"))
+            handleDeleteSelected();
+    }
+
+    // Row 2: Nodes
+    struct NodeButton {
+        const char* label;
+        NodeKind kind;
+    };
+
+    static const NodeButton buttons[] = {
+        {"+ FBm", NodeKind::Fbm},
+        {"+ Ridged", NodeKind::RidgedFbm},
+        {"+ Fractal Perlin", NodeKind::FractalPerlin},
+        {"+ Perlin", NodeKind::Perlin},
+        {"+ Simplex", NodeKind::Simplex},
+        {"+ Synthesis", NodeKind::TerrainSynthesis},
+    };
+    for (const auto& b : buttons) {
+        if (ImGui::Button(b.label))
+            addNode(b.kind);
+        ImGui::SameLine();
+    }
+
+    float height = ImGui::GetWindowSize().y;
+    ImGui::End();
+    return height;
+}
+
+static void drawNodeEditor(float toolbarHeight) {
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    float top = vp->WorkPos.y + toolbarHeight;
+    ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x, top));
+    ImGui::SetNextWindowSize(
+        ImVec2(vp->WorkSize.x, vp->WorkPos.y + vp->WorkSize.y - top)
+    );
+    ImGui::Begin(
+        "Graph",
+        nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize
+            | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus
+    );
 
     ImNodes::BeginNodeEditor();
 
@@ -272,13 +316,17 @@ static void drawNodeEditor() {
         ImNodes::EndNodeTitleBar();
 
         for (size_t i = 0; i < def.inputs.size(); ++i) {
-            ImNodes::BeginInputAttribute(inPinId(node.id, static_cast<uint8_t>(i)));
+            ImNodes::BeginInputAttribute(
+                inPinId(node.id, static_cast<uint8_t>(i))
+            );
             ImGui::Text("%s", def.inputs[i].label);
             ImNodes::EndInputAttribute();
         }
 
         for (size_t i = 0; i < def.outputs.size(); ++i) {
-            ImNodes::BeginOutputAttribute(outPinId(node.id, static_cast<uint8_t>(i)));
+            ImNodes::BeginOutputAttribute(
+                outPinId(node.id, static_cast<uint8_t>(i))
+            );
             ImGui::Text("%s", def.outputs[i].label);
             ImNodes::EndOutputAttribute();
         }
@@ -288,8 +336,11 @@ static void drawNodeEditor() {
 
     // Draw links
     for (const auto& link : gGraph.links) {
-        ImNodes::Link(link.id, outPinId(link.from.nodeId, link.from.slot),
-                      inPinId(link.to.nodeId, link.to.slot));
+        ImNodes::Link(
+            link.id,
+            outPinId(link.from.nodeId, link.from.slot),
+            inPinId(link.to.nodeId, link.to.slot)
+        );
     }
 
     ImNodes::EndNodeEditor();
@@ -311,8 +362,9 @@ static void drawNodeEditor() {
             }
 
             if (startOut && !endOut) {
-                gGraph.links.push_back({nextLinkId(), {fromNid, fromSlot}, {toNid, toSlot}});
-                gErrorMsg.clear();
+                gGraph.links.push_back(
+                    {nextLinkId(), {fromNid, fromSlot}, {toNid, toSlot}}
+                );
             }
         }
     }
@@ -322,9 +374,15 @@ static void drawNodeEditor() {
         int destroyedId;
         while (ImNodes::IsLinkDestroyed(&destroyedId)) {
             gGraph.links.erase(
-                std::remove_if(gGraph.links.begin(), gGraph.links.end(),
-                               [destroyedId](const EditorLink& l) { return l.id == destroyedId; }),
-                gGraph.links.end());
+                std::remove_if(
+                    gGraph.links.begin(),
+                    gGraph.links.end(),
+                    [destroyedId](const EditorLink& l) {
+                        return l.id == destroyedId;
+                    }
+                ),
+                gGraph.links.end()
+            );
         }
     }
 
@@ -342,8 +400,7 @@ static void drawInspector() {
     ImGui::Begin("Inspector");
 
     int selCount = ImNodes::NumSelectedNodes();
-    if (selCount == 0) {
-    } else if (selCount == 1) {
+    if (selCount == 1) {
         std::vector<int> ids(1);
         ImNodes::GetSelectedNodes(ids.data());
         NodeId selId = static_cast<NodeId>(ids[0]);
@@ -363,15 +420,29 @@ static void drawInspector() {
         ImGui::Separator();
         ImGui::Text("Kind: %s", kindToString(node->kind));
 
-        if (node->kind == NodeKind::Fbm || node->kind == NodeKind::RidgedFbm ||
-            node->kind == NodeKind::FractalPerlin || node->kind == NodeKind::Perlin ||
-            node->kind == NodeKind::Simplex) {
+        if (node->kind == NodeKind::Fbm || node->kind == NodeKind::RidgedFbm
+            || node->kind == NodeKind::FractalPerlin
+            || node->kind == NodeKind::Perlin
+            || node->kind == NodeKind::Simplex) {
             auto& np = std::get<NoiseParams>(node->params);
-            ImGui::DragFloat("Frequency", &np.frequency, 0.0001f, 0.0001f, 0.1f, "%.4f");
-            if (node->kind == NodeKind::Fbm || node->kind == NodeKind::RidgedFbm ||
-                node->kind == NodeKind::FractalPerlin) {
+            ImGui::DragFloat(
+                "Frequency",
+                &np.frequency,
+                0.0001f,
+                0.0001f,
+                0.1f,
+                "%.4f"
+            );
+            if (node->kind == NodeKind::Fbm || node->kind == NodeKind::RidgedFbm
+                || node->kind == NodeKind::FractalPerlin) {
                 ImGui::SliderInt("Octaves", &np.octaves, 1, 10);
-                ImGui::DragFloat("Lacunarity", &np.lacunarity, 0.01f, 1.0f, 5.0f);
+                ImGui::DragFloat(
+                    "Lacunarity",
+                    &np.lacunarity,
+                    0.01f,
+                    1.0f,
+                    5.0f
+                );
                 ImGui::DragFloat("Gain", &np.gain, 0.01f, 0.1f, 1.0f);
             }
             ImGui::DragFloat("X Offset", &np.xOffset, 1.0f);
@@ -381,7 +452,13 @@ static void drawInspector() {
             }
         } else if (node->kind == NodeKind::TerrainSynthesis) {
             auto& tp = std::get<TerrainSynthesisParams>(node->params);
-            ImGui::DragFloat("Vertical Scale", &tp.verticalScale, 1.0f, 1.0f, 500.0f);
+            ImGui::DragFloat(
+                "Vertical Scale",
+                &tp.verticalScale,
+                1.0f,
+                1.0f,
+                500.0f
+            );
         }
     } else {
         ImGui::Text("%d nodes selected", selCount);
@@ -428,8 +505,8 @@ void run() {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        drawToolbar();
-        drawNodeEditor();
+        float h = drawToolbar();
+        drawNodeEditor(h);
         drawInspector();
 
         ImGui::Render();
