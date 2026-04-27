@@ -114,8 +114,16 @@ void runDemo() {
         renderer.setMode(mode);
         std::cout << "Render mode: " << modeName(mode) << '\n';
     };
+    auto updateVoronoiHint = [&renderer, &settings]() {
+        const std::string title =
+            std::string("Terrain Generator Demo  |  Voronoi: ") +
+            (settings.enableVoronoi ? "ON" : "OFF") +
+            "  (Press B to toggle)";
+        SDL_SetWindowTitle(renderer.window(), title.c_str());
+    };
 
     Mode currentMode = renderer.mode();
+    updateVoronoiHint();
 
     const float centerX = (static_cast<float>(settings.width - 1) * settings.horizontalScale) * 0.5f;
     const float centerZ = (static_cast<float>(settings.depth - 1) * settings.horizontalScale) * 0.5f;
@@ -129,6 +137,7 @@ void runDemo() {
     std::cout << "  WASD: move\n";
     std::cout << "  Q/E: move down/up\n";
     std::cout << "  R: regenerate terrain\n";
+    std::cout << "  B: toggle Voronoi on/off (same seed)\n";
     std::cout << "  V: cycle forward through modes\n";
     std::cout << "  P: save screenshot\n";
     std::cout << "  ESC: quit\n";
@@ -166,6 +175,16 @@ void runDemo() {
                     mesh = generator.generateMesh();
                     renderer.invalidateMeshCache();
                     std::cout << "Regenerated terrain with seed " << settings.seed << '\n';
+                    printBiomeStats(mesh);
+                    break;
+                case SDLK_b:
+                    settings.enableVoronoi = !settings.enableVoronoi;
+                    generator.setSettings(settings);
+                    mesh = generator.generateMesh();
+                    renderer.invalidateMeshCache();
+                    updateVoronoiHint();
+                    std::cout << "Voronoi: " << (settings.enableVoronoi ? "ON" : "OFF")
+                              << " (seed " << settings.seed << ")\n";
                     printBiomeStats(mesh);
                     break;
                 case SDLK_v:

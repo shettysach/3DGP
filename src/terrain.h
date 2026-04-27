@@ -113,6 +113,7 @@ struct TerrainSettings {
     float horizontalScale = 2.0f;
     float verticalScale = 80.0f;
     bool islandFalloff = true;
+    bool enableVoronoi = true;
     float falloffRadius = 0.9f;
     float falloffPower = 2.2f;
     uint32_t seed = 1234u;
