@@ -2,32 +2,30 @@
 #include "util.h"
 
 #include <algorithm>
-#include <cmath>
 
 namespace terrain {
 
 PlateauResult computePlateau(const PlateauInput& in) {
-    // Broad region where plateaus can exist
-    const float regionSignal = std::clamp(
-        in.plateauMask * 0.80f + in.continental * 0.20f,
-        0.0f, 1.0f);
+    const auto& p = in.params;
 
-    // Tabletop mask — top portion of noise becomes plateau
-    const float tableTop = smoothstep(0.54f, 0.64f, regionSignal);
+    const float regionSignal = std::clamp(in.plateauMask * 0.80f + in.continental * 0.20f, 0.0f, 1.0f);
 
-    // Weight follows the tabletop directly for sharp cliffs
+    const float bandHalf = 0.05f * (0.53f / p.coverage);
+    const float center = 0.59f;
+    const float tableTop = smoothstep(center - bandHalf, center + bandHalf, regionSignal);
+
     const float weight = std::clamp(tableTop, 0.0f, 1.0f);
 
-    // Mesa height: clearly above plains but well below mountain peaks
-    const float baseHeight = tableTop * in.verticalScale * 0.42f;
+    const float baseHeight = tableTop * in.verticalScale * p.heightScale;
 
-    // Subtle surface detail so the top isn't perfectly flat
     const float surfaceDetail = (in.detail - 0.5f) * in.verticalScale * 0.025f;
 
-    // Small rim boost right at the cliff edge for sharper visual cliffs
-    const float rim = smoothstep(0.52f, 0.60f, regionSignal) *
-                      (1.0f - smoothstep(0.60f, 0.68f, regionSignal));
-    const float rimBoost = rim * in.verticalScale * 0.06f;
+    const float rimLo = center - bandHalf * 1.4f;
+    const float rimMid = center;
+    const float rimHi = center + bandHalf * 1.8f;
+    const float rim = smoothstep(rimLo, rimMid, regionSignal) *
+                      (1.0f - smoothstep(rimMid, rimHi, regionSignal));
+    const float rimBoost = rim * in.verticalScale * p.cliffness * 0.06f;
 
     float height = baseHeight + surfaceDetail + rimBoost;
     height = std::max(0.0f, height);

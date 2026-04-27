@@ -269,13 +269,24 @@ static float drawToolbar() {
     }
 
     ImGui::SameLine();
-    if (ImGui::Button("Output v")) {
-        ImGui::OpenPopup("OutputPopup");
+    if (ImGui::Button("Terrain v")) {
+        ImGui::OpenPopup("TerrainPopup");
     }
-    if (ImGui::BeginPopup("OutputPopup")) {
-        if (ImGui::Selectable("Terrain Synthesis"))
-            addNode(NodeKind::TerrainSynthesis);
+    if (ImGui::BeginPopup("TerrainPopup")) {
+        if (ImGui::Selectable("Mountain"))
+            addNode(NodeKind::Mountain);
+        if (ImGui::Selectable("Valley"))
+            addNode(NodeKind::Valley);
+        if (ImGui::Selectable("Plains"))
+            addNode(NodeKind::Plains);
+        if (ImGui::Selectable("Plateau"))
+            addNode(NodeKind::Plateau);
         ImGui::EndPopup();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Blend")) {
+        addNode(NodeKind::Blend);
     }
 
     if (ImNodes::NumSelectedNodes() > 0 || ImNodes::NumSelectedLinks() > 0) {
@@ -463,15 +474,26 @@ static void drawInspector() {
             if (node->kind == NodeKind::RidgedFbm) {
                 ImGui::DragFloat("Sharpness", &np.sharpness, 0.1f, 0.5f, 5.0f);
             }
-        } else if (node->kind == NodeKind::TerrainSynthesis) {
-            auto& tp = std::get<TerrainSynthesisParams>(node->params);
-            ImGui::DragFloat(
-                "Vertical Scale",
-                &tp.verticalScale,
-                1.0f,
-                1.0f,
-                500.0f
-            );
+        } else if (node->kind == NodeKind::Mountain) {
+            auto& mp = std::get<MountainParams>(node->params);
+            ImGui::DragFloat("Height Scale", &mp.heightScale, 0.01f, 0.1f, 3.0f, "%.2f");
+            ImGui::DragFloat("Coverage", &mp.coverage, 0.01f, 0.1f, 1.0f, "%.2f");
+            ImGui::DragFloat("Sharpness", &mp.sharpness, 0.01f, 0.5f, 3.0f, "%.2f");
+        } else if (node->kind == NodeKind::Valley) {
+            auto& vp = std::get<ValleyParams>(node->params);
+            ImGui::DragFloat("Depth Scale", &vp.depthScale, 0.01f, 0.1f, 2.0f, "%.2f");
+            ImGui::DragFloat("Coverage", &vp.coverage, 0.01f, 0.1f, 1.0f, "%.2f");
+        } else if (node->kind == NodeKind::Plains) {
+            auto& pp = std::get<PlainsParams>(node->params);
+            ImGui::DragFloat("Height Scale", &pp.heightScale, 0.01f, 0.1f, 3.0f, "%.2f");
+            ImGui::DragFloat("Relief", &pp.relief, 0.01f, 0.0f, 1.0f, "%.2f");
+        } else if (node->kind == NodeKind::Plateau) {
+            auto& tp = std::get<PlateauParams>(node->params);
+            ImGui::DragFloat("Height Scale", &tp.heightScale, 0.01f, 0.1f, 2.0f, "%.2f");
+            ImGui::DragFloat("Coverage", &tp.coverage, 0.01f, 0.1f, 1.0f, "%.2f");
+            ImGui::DragFloat("Cliffness", &tp.cliffness, 0.01f, 0.1f, 3.0f, "%.2f");
+        } else if (node->kind == NodeKind::Blend) {
+            ImGui::Text("(no tunable params)");
         } else if (node->kind == NodeKind::CreateVec2) {
             auto& cp = std::get<CreateVec2Params>(node->params);
             ImGui::DragFloat("X", &cp.x, 0.0f);

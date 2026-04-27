@@ -1,7 +1,11 @@
 #ifndef TERRAIN_PLAINS_H
 #define TERRAIN_PLAINS_H
 
+#include "../graph/types.h"
+
 namespace terrain {
+
+using PlainsParams = graph::PlainsParams;
 
 struct PlainsInput {
     float continental = 0.0f;
@@ -11,6 +15,7 @@ struct PlainsInput {
     float basinNoise = 0.5f;
     float detail = 0.0f;
     float verticalScale = 1.0f;
+    PlainsParams params;
 };
 
 float computePlainsHeight(const PlainsInput& in);

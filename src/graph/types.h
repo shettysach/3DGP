@@ -30,7 +30,11 @@ enum class NodeKind : uint8_t {
     FractalPerlin,
     Perlin,
     Simplex,
-    TerrainSynthesis,
+    Mountain,
+    Valley,
+    Plains,
+    Plateau,
+    Blend,
     Position,
     CreateVec2,
     Add2,
@@ -55,8 +59,30 @@ struct NoiseParams {
     float zOffset = 0.0f;
 };
 
-struct TerrainSynthesisParams {
-    float verticalScale = 80.0f;
+struct MountainParams {
+    float heightScale = 0.95f;
+    float coverage = 0.48f;
+    float sharpness = 1.35f;
+};
+
+struct ValleyParams {
+    float depthScale = 0.50f;
+    float coverage = 0.58f;
+};
+
+struct PlainsParams {
+    float heightScale = 0.78f;
+    float relief = 0.36f;
+};
+
+struct PlateauParams {
+    float heightScale = 0.42f;
+    float coverage = 0.53f;
+    float cliffness = 1.0f;
+};
+
+struct BlendParams {
+    // no tunables currently
 };
 
 struct CreateVec2Params {
@@ -66,7 +92,11 @@ struct CreateVec2Params {
 
 using NodeParams = std::variant<
     NoiseParams,
-    TerrainSynthesisParams,
+    MountainParams,
+    ValleyParams,
+    PlainsParams,
+    PlateauParams,
+    BlendParams,
     CreateVec2Params,
     std::monostate>;
 
@@ -124,7 +154,7 @@ const NodeDef& nodeDefinition(NodeKind kind);
 // Returns default params for a given node kind.
 NodeParams defaultParams(NodeKind kind);
 
-// Builds the default graph (Fbm + RidgedFbm → TerrainSynthesis).
+// Builds the default graph.
 EditorGraph defaultGraph();
 
 } // namespace graph

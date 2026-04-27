@@ -17,6 +17,7 @@
 
 namespace graph {
 
+using terrain::BlendInput;
 using terrain::BlendResult;
 using terrain::blendTerrain;
 using terrain::computeMountain;
@@ -24,13 +25,28 @@ using terrain::computePlainsHeight;
 using terrain::computePlateau;
 using terrain::computeValley;
 using terrain::fieldIndex;
+using terrain::MountainInput;
 using terrain::MountainResult;
+using terrain::PlainsInput;
+using terrain::PlateauInput;
 using terrain::PlateauResult;
 using terrain::smoothstep;
+using terrain::ValleyInput;
 using terrain::ValleyResult;
 
 using NodeOutput =
     std::variant<std::monostate, std::vector<float>, std::vector<Vec2>>;
+
+// Internal noise frequencies (match the old external noise nodes exactly)
+namespace {
+    constexpr float kDetailFreq = 0.0189f;   // baseFreq * 2.7 — fine micro detail
+    constexpr float kRangeMaskFreq = 0.0021f; // baseFreq * 0.3 — mountain range placement
+    constexpr float kRimMaskFreq = 0.00119f;  // baseFreq * 0.17 — valley rim
+    constexpr float kPlateauMaskFreq = 0.000196f; // 0.028 * baseFreq
+    constexpr float kMacroReliefFreq = 0.0021f;
+    constexpr float kHillinessFreq = 0.00574f;
+    constexpr float kBasinNoiseFreq = 0.00126f;
+}
 
 terrain::TerrainFields execute(
     const CompiledGraph& compiled,
@@ -45,7 +61,7 @@ terrain::TerrainFields execute(
 
     size_t rootIdx = 0;
     for (size_t i = 0; i < N; ++i) {
-        if (compiled.nodes[i].kind == NodeKind::TerrainSynthesis) {
+        if (compiled.nodes[i].kind == NodeKind::Blend) {
             rootIdx = i;
             break;
         }
@@ -55,11 +71,6 @@ terrain::TerrainFields execute(
     std::vector<bool> visited(N, false);
     terrain::TerrainFields fields(w, d);
 
-    const float centerX = static_cast<float>(w - 1) * 0.5f * hScale;
-    const float centerZ = static_cast<float>(d - 1) * 0.5f * hScale;
-    const float maxRadius =
-        std::min(static_cast<float>(w - 1), static_cast<float>(d - 1)) * 0.5f
-        * hScale;
     std::function<void(size_t)> eval = [&](size_t ni) {
         if (visited[ni])
             return;
@@ -83,42 +94,22 @@ terrain::TerrainFields execute(
                     switch (cn.kind) {
                         case NodeKind::Fbm:
                             return noiseContext.fbm(
-                                wx,
-                                wz,
-                                np.octaves,
-                                np.lacunarity,
-                                np.gain,
-                                np.frequency
-                            );
+                                wx, wz, np.octaves, np.lacunarity,
+                                np.gain, np.frequency);
                         case NodeKind::RidgedFbm:
                             return noiseContext.ridgedFbm(
-                                wx,
-                                wz,
-                                np.octaves,
-                                np.lacunarity,
-                                np.gain,
-                                np.sharpness,
-                                np.frequency
-                            );
+                                wx, wz, np.octaves, np.lacunarity,
+                                np.gain, np.sharpness, np.frequency);
                         case NodeKind::FractalPerlin:
                             return noiseContext.perlinFbm(
-                                wx,
-                                wz,
-                                np.octaves,
-                                np.lacunarity,
-                                np.gain,
-                                np.frequency
-                            );
+                                wx, wz, np.octaves, np.lacunarity,
+                                np.gain, np.frequency);
                         case NodeKind::Perlin:
                             return noiseContext.perlin2D(
-                                wx * np.frequency,
-                                wz * np.frequency
-                            );
+                                wx * np.frequency, wz * np.frequency);
                         default: // Simplex
                             return noiseContext.simplex2D(
-                                wx * np.frequency,
-                                wz * np.frequency
-                            );
+                                wx * np.frequency, wz * np.frequency);
                     }
                 };
 
@@ -157,10 +148,9 @@ terrain::TerrainFields execute(
                 for (int z = 0; z < d; ++z) {
                     for (int x = 0; x < w; ++x) {
                         const size_t idx = fieldIndex(x, z, w);
-                        out[idx] = Vec2 {
+                        out[idx] = Vec2{
                             static_cast<float>(x) * hScale,
-                            static_cast<float>(z) * hScale
-                        };
+                            static_cast<float>(z) * hScale};
                     }
                 }
                 break;
@@ -173,21 +163,16 @@ terrain::TerrainFields execute(
                 const float* px = nullptr;
                 const float* py = nullptr;
                 if (hasX)
-                    px =
-                        std::get<std::vector<float>>(nodeOutputs[*cn.inputs[0]])
-                            .data();
+                    px = std::get<std::vector<float>>(nodeOutputs[*cn.inputs[0]]).data();
                 if (hasY)
-                    py =
-                        std::get<std::vector<float>>(nodeOutputs[*cn.inputs[1]])
-                            .data();
+                    py = std::get<std::vector<float>>(nodeOutputs[*cn.inputs[1]]).data();
 
                 nodeOutputs[ni] = std::vector<Vec2>(cellCount);
                 auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
                 for (size_t i = 0; i < cellCount; ++i) {
-                    out[i] = Vec2 {
+                    out[i] = Vec2{
                         px ? px[i] + cp.x : cp.x,
-                        py ? py[i] + cp.y : cp.y
-                    };
+                        py ? py[i] + cp.y : cp.y};
                 }
                 break;
             }
@@ -200,39 +185,177 @@ terrain::TerrainFields execute(
                 nodeOutputs[ni] = std::vector<Vec2>(cellCount);
                 auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
                 for (size_t i = 0; i < cellCount; ++i) {
-                    out[i] = Vec2 {a[i].x + b[i].x, a[i].y + b[i].y};
+                    out[i] = Vec2{a[i].x + b[i].x, a[i].y + b[i].y};
                 }
                 break;
             }
 
-            case NodeKind::TerrainSynthesis: {
-                const auto& tsp = std::get<TerrainSynthesisParams>(cn.params);
-                const float vertScale = tsp.verticalScale;
+            case NodeKind::Mountain: {
+                const auto& mp = std::get<MountainParams>(cn.params);
+                const float vertScale = settings.verticalScale;
 
-                const std::vector<float>& continental =
+                const auto& continental =
                     std::get<std::vector<float>>(nodeOutputs[*cn.inputs[0]]);
-                const std::vector<float>& ridges =
+                const auto& ridges =
                     std::get<std::vector<float>>(nodeOutputs[*cn.inputs[1]]);
-                const std::vector<float>& detailIn =
+
+                nodeOutputs[ni] = std::vector<Vec2>(cellCount);
+                auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
+
+                for (int z = 0; z < d; ++z) {
+                    for (int x = 0; x < w; ++x) {
+                        const size_t idx = fieldIndex(x, z, w);
+                        const float wx = static_cast<float>(x) * hScale;
+                        const float wz = static_cast<float>(z) * hScale;
+
+                        const float detail =
+                            0.5f * (noiseContext.simplex2D(wx * kDetailFreq, wz * kDetailFreq) + 1.0f);
+
+                        const float rawMask = noiseContext.perlin2D(
+                            wx * kRangeMaskFreq + 400.0f * kRangeMaskFreq,
+                            wz * kRangeMaskFreq - 250.0f * kRangeMaskFreq);
+                        const float rangeMask = smoothstep(0.42f, 0.72f, 0.5f * (rawMask + 1.0f));
+
+                        MountainInput mtnIn{continental[idx], ridges[idx], detail, rangeMask,
+                                              vertScale, mp};
+                        const MountainResult r = computeMountain(mtnIn);
+
+                        out[idx] = Vec2{r.height, r.weight};
+                    }
+                }
+                break;
+            }
+
+            case NodeKind::Valley: {
+                const auto& vp = std::get<ValleyParams>(cn.params);
+                const float vertScale = settings.verticalScale;
+
+                const auto& continental =
+                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[0]]);
+                const auto& basin =
+                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[1]]);
+
+                nodeOutputs[ni] = std::vector<Vec2>(cellCount);
+                auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
+
+                for (int z = 0; z < d; ++z) {
+                    for (int x = 0; x < w; ++x) {
+                        const size_t idx = fieldIndex(x, z, w);
+                        const float wx = static_cast<float>(x) * hScale;
+                        const float wz = static_cast<float>(z) * hScale;
+
+                        const float detail =
+                            0.5f * (noiseContext.simplex2D(wx * kDetailFreq, wz * kDetailFreq) + 1.0f);
+
+                        const float rawRim = noiseContext.perlin2D(
+                            wx * kRimMaskFreq + 420.0f * kRimMaskFreq,
+                            wz * kRimMaskFreq - 301.0f * kRimMaskFreq);
+                        const float rimMask = smoothstep(0.38f, 0.74f, 0.5f * (rawRim + 1.0f));
+
+                        ValleyInput vIn{continental[idx], basin[idx], detail, rimMask,
+                                        vertScale, vp};
+                        const ValleyResult r = computeValley(vIn);
+
+                        out[idx] = Vec2{r.depth, r.weight};
+                    }
+                }
+                break;
+            }
+
+            case NodeKind::Plains: {
+                const auto& pp = std::get<PlainsParams>(cn.params);
+                const float vertScale = settings.verticalScale;
+
+                const auto& continental =
+                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[0]]);
+                const auto& plainsBase =
+                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[1]]);
+
+                nodeOutputs[ni] = std::vector<float>(cellCount);
+                auto& out = std::get<std::vector<float>>(nodeOutputs[ni]);
+
+                for (int z = 0; z < d; ++z) {
+                    for (int x = 0; x < w; ++x) {
+                        const size_t idx = fieldIndex(x, z, w);
+                        const float wx = static_cast<float>(x) * hScale;
+                        const float wz = static_cast<float>(z) * hScale;
+
+                        const float detail =
+                            0.5f * (noiseContext.simplex2D(wx * kDetailFreq, wz * kDetailFreq) + 1.0f);
+
+                        const float rawMacro = noiseContext.perlinFbm(
+                            wx * kMacroReliefFreq + 219.4f * kMacroReliefFreq,
+                            wz * kMacroReliefFreq - 174.6f * kMacroReliefFreq,
+                            3, 2.0f, 0.48f, 1.0f);
+                        const float macroRelief = 0.5f * (rawMacro + 1.0f);
+
+                        const float rawHill = noiseContext.fbm(
+                            wx * kHillinessFreq - 141.5f * kHillinessFreq,
+                            wz * kHillinessFreq + 96.8f * kHillinessFreq,
+                            5, 2.0f, 0.50f, 1.0f);
+                        const float hilliness = 0.5f * (rawHill + 1.0f);
+
+                        const float rawBasinN = noiseContext.simplex2D(
+                            wx * kBasinNoiseFreq - 331.7f * kBasinNoiseFreq,
+                            wz * kBasinNoiseFreq + 271.4f * kBasinNoiseFreq);
+                        const float basinNoise = 0.5f * (rawBasinN + 1.0f);
+
+                        PlainsInput pIn{continental[idx], plainsBase[idx], macroRelief,
+                                        hilliness, basinNoise, detail, vertScale, pp};
+                        out[idx] = computePlainsHeight(pIn);
+                    }
+                }
+                break;
+            }
+
+            case NodeKind::Plateau: {
+                const auto& tp = std::get<PlateauParams>(cn.params);
+                const float vertScale = settings.verticalScale;
+
+                const auto& continental =
+                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[0]]);
+                const auto& plateauFeature =
+                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[1]]);
+
+                nodeOutputs[ni] = std::vector<Vec2>(cellCount);
+                auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
+
+                for (int z = 0; z < d; ++z) {
+                    for (int x = 0; x < w; ++x) {
+                        const size_t idx = fieldIndex(x, z, w);
+                        const float wx = static_cast<float>(x) * hScale;
+                        const float wz = static_cast<float>(z) * hScale;
+
+                        const float detail =
+                            0.5f * (noiseContext.simplex2D(wx * kDetailFreq, wz * kDetailFreq) + 1.0f);
+
+                        const float rawPMask = noiseContext.perlin2D(
+                            wx * kPlateauMaskFreq, wz * kPlateauMaskFreq);
+                        const float plateauMask = 0.5f * (rawPMask + 1.0f);
+
+                        PlateauInput platIn{continental[idx], plateauMask, detail, vertScale, tp};
+                        const PlateauResult r = computePlateau(platIn);
+
+                        out[idx] = Vec2{r.height, r.weight};
+                    }
+                }
+                break;
+            }
+
+            case NodeKind::Blend: {
+                const float vertScale = settings.verticalScale;
+
+                const auto& mountain =
+                    std::get<std::vector<Vec2>>(nodeOutputs[*cn.inputs[0]]);
+                const auto& valley =
+                    std::get<std::vector<Vec2>>(nodeOutputs[*cn.inputs[1]]);
+                const auto& plains =
                     std::get<std::vector<float>>(nodeOutputs[*cn.inputs[2]]);
-                const std::vector<float>& rangeMaskIn =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[3]]);
-                const std::vector<float>& basinIn =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[4]]);
-                const std::vector<float>& detailBandIn =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[5]]);
-                const std::vector<float>& rimMaskIn =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[6]]);
-                const std::vector<float>& plainsBaseIn =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[7]]);
-                const std::vector<float>& macroReliefIn =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[8]]);
-                const std::vector<float>& hillinessIn =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[9]]);
-                const std::vector<float>& basinNoiseIn =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[10]]);
-                const std::vector<float>& plateauMaskIn =
-                    std::get<std::vector<float>>(nodeOutputs[*cn.inputs[11]]);
+                const auto& plateau =
+                    std::get<std::vector<Vec2>>(nodeOutputs[*cn.inputs[3]]);
+
+                nodeOutputs[ni] = std::vector<Vec2>(cellCount);
+                auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
 
                 fields.heights.assign(cellCount, 0.0f);
                 fields.mountainWeights.assign(cellCount, 0.0f);
@@ -244,84 +367,26 @@ terrain::TerrainFields execute(
                 for (int z = 0; z < d; ++z) {
                     for (int x = 0; x < w; ++x) {
                         const size_t idx = fieldIndex(x, z, w);
-                        const float worldX = static_cast<float>(x) * hScale;
-                        const float worldZ = static_cast<float>(z) * hScale;
+                        const float wx = static_cast<float>(x) * hScale;
+                        const float wz = static_cast<float>(z) * hScale;
 
-                        fields.sampleXs[idx] = worldX;
-                        fields.sampleZs[idx] = worldZ;
+                        fields.sampleXs[idx] = wx;
+                        fields.sampleZs[idx] = wz;
 
-                        const float detail = detailIn[idx];
-                        const float rangeMask =
-                            smoothstep(0.42f, 0.72f, rangeMaskIn[idx]);
-                        const float basin = basinIn[idx];
-                        const float detailBand = detailBandIn[idx];
-                        const float rimMask =
-                            smoothstep(0.38f, 0.74f, rimMaskIn[idx]);
-                        const float plainsBase = plainsBaseIn[idx];
-                        const float macroRelief = macroReliefIn[idx];
-                        const float hilliness = hillinessIn[idx];
-                        const float basinNoise = basinNoiseIn[idx];
-                        const float plateauMask = plateauMaskIn[idx];
+                        const float detail =
+                            0.5f * (noiseContext.simplex2D(wx * kDetailFreq, wz * kDetailFreq) + 1.0f);
 
-                        const float slopeHint = std::clamp(
-                            (ridges[idx] - 0.35f) * 1.55f + detail * 0.2f,
-                            0.0f,
-                            1.0f
-                        );
-
-                        const MountainResult mountain = computeMountain(
-                            {continental[idx],
-                             ridges[idx],
-                             detail,
-                             slopeHint,
-                             rangeMask,
-                             vertScale}
-                        );
-
-                        const float valleySlopeHint = std::clamp(
-                            (0.62f - basin) * 1.35f + detail * 0.22f,
-                            0.0f,
-                            1.0f
-                        );
-
-                        const ValleyResult valley = computeValley(
-                            {continental[idx],
-                             basin,
-                             detailBand,
-                             valleySlopeHint,
-                             rimMask,
-                             vertScale}
-                        );
-
-                        const float plainsHeight = computePlainsHeight(
-                            {continental[idx],
-                             plainsBase,
-                             macroRelief,
-                             hilliness,
-                             basinNoise,
-                             detail,
-                             vertScale}
-                        );
-
-                        const PlateauResult plateau = computePlateau(
-                            {continental[idx], plateauMask, detail, vertScale}
-                        );
-
-                        const BlendResult blend = blendTerrain(
-                            {mountain.height,
-                             mountain.weight,
-                             plainsHeight,
-                             plateau.height,
-                             plateau.weight,
-                             valley.depth,
-                             detail,
-                             vertScale}
-                        );
+                        BlendInput blIn{mountain[idx].x, mountain[idx].y, plains[idx],
+                                        plateau[idx].x, plateau[idx].y, valley[idx].x,
+                                        detail, vertScale};
+                        const BlendResult blend = blendTerrain(blIn);
 
                         fields.heights[idx] = blend.height;
                         fields.mountainWeights[idx] = blend.mountainWeight;
-                        fields.valleyWeights[idx] = valley.weight;
-                        fields.plateauWeights[idx] = plateau.weight;
+                        fields.valleyWeights[idx] = valley[idx].y;
+                        fields.plateauWeights[idx] = plateau[idx].y;
+
+                        out[idx] = Vec2{blend.height, blend.mountainWeight};
                     }
                 }
                 break;

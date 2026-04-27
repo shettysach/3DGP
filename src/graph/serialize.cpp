@@ -22,8 +22,16 @@ const char* kindToString(NodeKind kind) {
             return "Perlin";
         case NodeKind::Simplex:
             return "Simplex";
-        case NodeKind::TerrainSynthesis:
-            return "TerrainSynthesis";
+        case NodeKind::Mountain:
+            return "Mountain";
+        case NodeKind::Valley:
+            return "Valley";
+        case NodeKind::Plains:
+            return "Plains";
+        case NodeKind::Plateau:
+            return "Plateau";
+        case NodeKind::Blend:
+            return "Blend";
         case NodeKind::Position:
             return "Position";
         case NodeKind::CreateVec2:
@@ -45,8 +53,16 @@ NodeKind kindFromString(const std::string& s) {
         return NodeKind::Perlin;
     if (s == "Simplex")
         return NodeKind::Simplex;
-    if (s == "TerrainSynthesis")
-        return NodeKind::TerrainSynthesis;
+    if (s == "Mountain")
+        return NodeKind::Mountain;
+    if (s == "Valley")
+        return NodeKind::Valley;
+    if (s == "Plains")
+        return NodeKind::Plains;
+    if (s == "Plateau")
+        return NodeKind::Plateau;
+    if (s == "Blend")
+        return NodeKind::Blend;
     if (s == "Position")
         return NodeKind::Position;
     if (s == "CreateVec2")
@@ -87,14 +103,73 @@ static NoiseParams noiseParamsFromJson(const json& j) {
     return p;
 }
 
-static json terrainSynthesisParamsToJson(const TerrainSynthesisParams& p) {
-    return {{"verticalScale", p.verticalScale}};
+static json mountainParamsToJson(const MountainParams& p) {
+    return {
+        {"heightScale", p.heightScale},
+        {"coverage", p.coverage},
+        {"sharpness", p.sharpness},
+    };
 }
 
-static TerrainSynthesisParams terrainSynthesisParamsFromJson(const json& j) {
-    TerrainSynthesisParams p;
-    if (j.contains("verticalScale"))
-        p.verticalScale = j["verticalScale"].get<float>();
+static MountainParams mountainParamsFromJson(const json& j) {
+    MountainParams p;
+    if (j.contains("heightScale"))
+        p.heightScale = j["heightScale"].get<float>();
+    if (j.contains("coverage"))
+        p.coverage = j["coverage"].get<float>();
+    if (j.contains("sharpness"))
+        p.sharpness = j["sharpness"].get<float>();
+    return p;
+}
+
+static json valleyParamsToJson(const ValleyParams& p) {
+    return {
+        {"depthScale", p.depthScale},
+        {"coverage", p.coverage},
+    };
+}
+
+static ValleyParams valleyParamsFromJson(const json& j) {
+    ValleyParams p;
+    if (j.contains("depthScale"))
+        p.depthScale = j["depthScale"].get<float>();
+    if (j.contains("coverage"))
+        p.coverage = j["coverage"].get<float>();
+    return p;
+}
+
+static json plainsParamsToJson(const PlainsParams& p) {
+    return {
+        {"heightScale", p.heightScale},
+        {"relief", p.relief},
+    };
+}
+
+static PlainsParams plainsParamsFromJson(const json& j) {
+    PlainsParams p;
+    if (j.contains("heightScale"))
+        p.heightScale = j["heightScale"].get<float>();
+    if (j.contains("relief"))
+        p.relief = j["relief"].get<float>();
+    return p;
+}
+
+static json plateauParamsToJson(const PlateauParams& p) {
+    return {
+        {"heightScale", p.heightScale},
+        {"coverage", p.coverage},
+        {"cliffness", p.cliffness},
+    };
+}
+
+static PlateauParams plateauParamsFromJson(const json& j) {
+    PlateauParams p;
+    if (j.contains("heightScale"))
+        p.heightScale = j["heightScale"].get<float>();
+    if (j.contains("coverage"))
+        p.coverage = j["coverage"].get<float>();
+    if (j.contains("cliffness"))
+        p.cliffness = j["cliffness"].get<float>();
     return p;
 }
 
@@ -119,10 +194,16 @@ static json paramsToJson(NodeKind kind, const NodeParams& params) {
         case NodeKind::Perlin:
         case NodeKind::Simplex:
             return noiseParamsToJson(std::get<NoiseParams>(params));
-        case NodeKind::TerrainSynthesis:
-            return terrainSynthesisParamsToJson(
-                std::get<TerrainSynthesisParams>(params)
-            );
+        case NodeKind::Mountain:
+            return mountainParamsToJson(std::get<MountainParams>(params));
+        case NodeKind::Valley:
+            return valleyParamsToJson(std::get<ValleyParams>(params));
+        case NodeKind::Plains:
+            return plainsParamsToJson(std::get<PlainsParams>(params));
+        case NodeKind::Plateau:
+            return plateauParamsToJson(std::get<PlateauParams>(params));
+        case NodeKind::Blend:
+            return json::object();
         case NodeKind::CreateVec2:
             return createVec2ParamsToJson(std::get<CreateVec2Params>(params));
         default:
@@ -139,14 +220,22 @@ static NodeParams paramsFromJson(NodeKind kind, const json& j) {
         case NodeKind::Perlin:
         case NodeKind::Simplex:
             return noiseParamsFromJson(j);
-        case NodeKind::TerrainSynthesis:
-            return terrainSynthesisParamsFromJson(j);
+        case NodeKind::Mountain:
+            return mountainParamsFromJson(j);
+        case NodeKind::Valley:
+            return valleyParamsFromJson(j);
+        case NodeKind::Plains:
+            return plainsParamsFromJson(j);
+        case NodeKind::Plateau:
+            return plateauParamsFromJson(j);
+        case NodeKind::Blend:
+            return BlendParams{};
         case NodeKind::CreateVec2:
             return createVec2ParamsFromJson(j);
         default:
             break;
     }
-    return std::monostate {};
+    return std::monostate{};
 }
 
 // Serialize
