@@ -23,53 +23,11 @@ namespace terrain {
 
 namespace {
 
-enum class MacroRegionType : uint8_t {
-    Neutral = 0,
-    Mountain = 1,
-    Dry = 2,
-    Wet = 3,
-    Coastal = 4,
-};
-
-struct VoronoiSeed {
-    float x = 0.0f;
-    float z = 0.0f;
-    MacroRegionType type = MacroRegionType::Neutral;
-};
-
-struct VoronoiGrid {
-    int cellCountX = 0;
-    int cellCountZ = 0;
-    int minCellX = 0;
-    int minCellZ = 0;
-    int spanX = 0;
-    int spanZ = 0;
-    float cellWorldSizeX = 1.0f;
-    float cellWorldSizeZ = 1.0f;
-    std::vector<VoronoiSeed> seeds;
-};
-
 struct HeightGradient {
     float dx = 0.0f;
     float dz = 0.0f;
     float slope = 0.0f;
 };
-
-// for removal
-float computeIslandFalloff(const TerrainSettings& settings, float worldX, float worldZ,
-                           float centerX, float centerZ, float maxRadius) {
-    if (!settings.islandFalloff) {
-        return 1.0f;
-    }
-
-    const float dx = worldX - centerX;
-    const float dz = worldZ - centerZ;
-    const float radius = std::sqrt(dx * dx + dz * dz);
-    const float scaledRadius = std::max(0.0001f, maxRadius * settings.falloffRadius);
-    float t = 1.0f - radius / scaledRadius;
-    t = std::clamp(t, 0.0f, 1.0f);
-    return std::pow(t, settings.falloffPower);
-}
 
 void applyRiverPass(TerrainFields& fields, const TerrainSettings& settings) {
     const RiverPassResult riverPass =
