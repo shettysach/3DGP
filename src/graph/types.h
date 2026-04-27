@@ -12,6 +12,12 @@ namespace graph {
 using NodeId = int32_t;
 using LinkId = int32_t;
 
+// === Data Types ===
+
+struct Vec2 { float x = 0.0f; float y = 0.0f; };
+
+enum class PinType : uint8_t { Float, Vec2 };
+
 // === Node Kinds ===
 
 enum class NodeKind : uint8_t {
@@ -21,6 +27,9 @@ enum class NodeKind : uint8_t {
     Perlin,
     Simplex,
     TerrainSynthesis,
+    Position,
+    CreateVec2,
+    Add2,
 };
 
 // === Pin References ===
@@ -46,7 +55,12 @@ struct TerrainSynthesisParams {
     float verticalScale = 80.0f;
 };
 
-using NodeParams = std::variant<NoiseParams, TerrainSynthesisParams>;
+struct CreateVec2Params {
+    float x = 0.0f;
+    float y = 0.0f;
+};
+
+using NodeParams = std::variant<NoiseParams, TerrainSynthesisParams, CreateVec2Params, std::monostate>;
 
 // === Editor Graph Model ===
 
@@ -74,7 +88,8 @@ struct EditorGraph {
 struct CompiledNode {
     NodeKind kind;
     NodeParams params;
-    std::vector<uint16_t> inputs;       // source node index per input slot
+    std::vector<uint16_t> inputs;       // source node index per input slot, UINT16_MAX = unconnected
+    bool      hasCoordInput = false;    // for noise nodes: is the optional Vec2 coord connected?
 };
 
 struct CompiledGraph {
@@ -86,6 +101,7 @@ struct CompiledGraph {
 struct PinDef {
     const char* label;
     bool        isInput = false;
+    PinType     type    = PinType::Float;
 };
 
 struct NodeDef {

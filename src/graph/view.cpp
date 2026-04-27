@@ -216,15 +216,8 @@ static void handleDeleteSelected() {
 
 static void addNode(NodeKind kind) {
     NodeId id = nextNodeId();
-    if (kind == NodeKind::TerrainSynthesis) {
-        gGraph.nodes.push_back(
-            {id, kind, 200.0f, 100.0f + id * 30.0f, TerrainSynthesisParams {}}
-        );
-    } else {
-        gGraph.nodes.push_back(
-            {id, kind, 200.0f, 100.0f + id * 30.0f, NoiseParams {}}
-        );
-    }
+    gGraph.nodes.push_back(
+        {id, kind, 200.0f, 100.0f + id * 30.0f, defaultParams(kind)});
 }
 
 static float drawToolbar() {
@@ -260,24 +253,37 @@ static float drawToolbar() {
             handleDeleteSelected();
     }
 
-    // Row 2: Nodes
-    struct NodeButton {
-        const char* label;
-        NodeKind kind;
-    };
+    ImGui::SameLine();
+    if (ImGui::Button("Noise v")) {
+        ImGui::OpenPopup("NoisePopup");
+    }
+    if (ImGui::BeginPopup("NoisePopup")) {
+        if (ImGui::Selectable("FBm"))            addNode(NodeKind::Fbm);
+        if (ImGui::Selectable("Ridged"))         addNode(NodeKind::RidgedFbm);
+        if (ImGui::Selectable("Fractal Perlin")) addNode(NodeKind::FractalPerlin);
+        if (ImGui::Selectable("Perlin"))         addNode(NodeKind::Perlin);
+        if (ImGui::Selectable("Simplex"))        addNode(NodeKind::Simplex);
+        ImGui::EndPopup();
+    }
 
-    static const NodeButton buttons[] = {
-        {"+ FBm", NodeKind::Fbm},
-        {"+ Ridged", NodeKind::RidgedFbm},
-        {"+ Fractal Perlin", NodeKind::FractalPerlin},
-        {"+ Perlin", NodeKind::Perlin},
-        {"+ Simplex", NodeKind::Simplex},
-        {"+ Synthesis", NodeKind::TerrainSynthesis},
-    };
-    for (const auto& b : buttons) {
-        if (ImGui::Button(b.label))
-            addNode(b.kind);
-        ImGui::SameLine();
+    ImGui::SameLine();
+    if (ImGui::Button("Vec2 v")) {
+        ImGui::OpenPopup("Vec2Popup");
+    }
+    if (ImGui::BeginPopup("Vec2Popup")) {
+        if (ImGui::Selectable("Position"))   addNode(NodeKind::Position);
+        if (ImGui::Selectable("CreateVec2")) addNode(NodeKind::CreateVec2);
+        if (ImGui::Selectable("Add2"))       addNode(NodeKind::Add2);
+        ImGui::EndPopup();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Output v")) {
+        ImGui::OpenPopup("OutputPopup");
+    }
+    if (ImGui::BeginPopup("OutputPopup")) {
+        if (ImGui::Selectable("Terrain Synthesis")) addNode(NodeKind::TerrainSynthesis);
+        ImGui::EndPopup();
     }
 
     float height = ImGui::GetWindowSize().y;
@@ -459,6 +465,10 @@ static void drawInspector() {
                 1.0f,
                 500.0f
             );
+        } else if (node->kind == NodeKind::CreateVec2) {
+            auto& cp = std::get<CreateVec2Params>(node->params);
+            ImGui::DragFloat("X", &cp.x, 0.1f);
+            ImGui::DragFloat("Y", &cp.y, 0.1f);
         }
     } else {
         ImGui::Text("%d nodes selected", selCount);

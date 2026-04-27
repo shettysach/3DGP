@@ -20,6 +20,9 @@ const char* kindToString(NodeKind kind) {
     case NodeKind::Perlin:            return "Perlin";
     case NodeKind::Simplex:           return "Simplex";
     case NodeKind::TerrainSynthesis:  return "TerrainSynthesis";
+    case NodeKind::Position:          return "Position";
+    case NodeKind::CreateVec2:        return "CreateVec2";
+    case NodeKind::Add2:              return "Add2";
     }
     throw std::runtime_error("Unknown NodeKind");
 }
@@ -31,6 +34,9 @@ NodeKind kindFromString(const std::string& s) {
     if (s == "Perlin")            return NodeKind::Perlin;
     if (s == "Simplex")           return NodeKind::Simplex;
     if (s == "TerrainSynthesis")  return NodeKind::TerrainSynthesis;
+    if (s == "Position")          return NodeKind::Position;
+    if (s == "CreateVec2")        return NodeKind::CreateVec2;
+    if (s == "Add2")              return NodeKind::Add2;
     throw std::runtime_error("Unknown NodeKind string: " + s);
 }
 
@@ -70,6 +76,17 @@ static TerrainSynthesisParams terrainSynthesisParamsFromJson(const json& j) {
     return p;
 }
 
+static json createVec2ParamsToJson(const CreateVec2Params& p) {
+    return {{"x", p.x}, {"y", p.y}};
+}
+
+static CreateVec2Params createVec2ParamsFromJson(const json& j) {
+    CreateVec2Params p;
+    if (j.contains("x")) p.x = j["x"].get<float>();
+    if (j.contains("y")) p.y = j["y"].get<float>();
+    return p;
+}
+
 static json paramsToJson(NodeKind kind, const NodeParams& params) {
     switch (kind) {
     case NodeKind::Fbm:
@@ -80,6 +97,10 @@ static json paramsToJson(NodeKind kind, const NodeParams& params) {
         return noiseParamsToJson(std::get<NoiseParams>(params));
     case NodeKind::TerrainSynthesis:
         return terrainSynthesisParamsToJson(std::get<TerrainSynthesisParams>(params));
+    case NodeKind::CreateVec2:
+        return createVec2ParamsToJson(std::get<CreateVec2Params>(params));
+    default:
+        break;
     }
     return json::object();
 }
@@ -94,8 +115,12 @@ static NodeParams paramsFromJson(NodeKind kind, const json& j) {
         return noiseParamsFromJson(j);
     case NodeKind::TerrainSynthesis:
         return terrainSynthesisParamsFromJson(j);
+    case NodeKind::CreateVec2:
+        return createVec2ParamsFromJson(j);
+    default:
+        break;
     }
-    return NoiseParams{};
+    return std::monostate{};
 }
 
 // ---------- Serialize ----------

@@ -9,8 +9,10 @@
 #include "graph/types.h"
 
 #include <algorithm>
+#include <climits>
 #include <cmath>
 #include <functional>
+#include <variant>
 #include <vector>
 
 namespace graph {
@@ -26,6 +28,8 @@ using terrain::MountainResult;
 using terrain::PlateauResult;
 using terrain::smoothstep;
 using terrain::ValleyResult;
+
+using NodeOutput = std::variant<std::monostate, std::vector<float>, std::vector<Vec2>>;
 
 namespace {
 
@@ -54,7 +58,6 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
     const float hScale = settings.horizontalScale;
     const size_t cellCount = static_cast<size_t>(w) * static_cast<size_t>(d);
 
-    // Find TerrainSynthesis root
     size_t rootIdx = 0;
     for (size_t i = 0; i < N; ++i) {
         if (compiled.nodes[i].kind == NodeKind::TerrainSynthesis) {
@@ -63,7 +66,7 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
         }
     }
 
-    std::vector<std::vector<float>> nodeOutputs(N);
+    std::vector<NodeOutput> nodeOutputs(N);
     std::vector<bool> visited(N, false);
     terrain::TerrainFields fields(w, d);
 
@@ -71,64 +74,125 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
     const float centerZ = static_cast<float>(d - 1) * 0.5f * hScale;
     const float maxRadius =
         std::min(static_cast<float>(w - 1), static_cast<float>(d - 1)) * 0.5f * hScale;
-    const float baseFreq = std::max(0.00001f, settings.noise.frequency);
-    const float warpFreqScale = settings.noise.warpFrequency / baseFreq;
-
     std::function<void(size_t)> eval = [&](size_t ni) {
         if (visited[ni])
             return;
 
         const CompiledNode& cn = compiled.nodes[ni];
 
-        // Evaluate inputs first
         for (uint16_t src : cn.inputs) {
-            eval(src);
+            if (src != UINT16_MAX)
+                eval(src);
         }
 
-        if (cn.kind == NodeKind::Fbm || cn.kind == NodeKind::RidgedFbm ||
-            cn.kind == NodeKind::FractalPerlin || cn.kind == NodeKind::Perlin ||
-            cn.kind == NodeKind::Simplex) {
-            const auto& np = std::get<NoiseParams>(cn.params);
-            auto& out = nodeOutputs[ni];
-            out.assign(cellCount, 0.0f);
+        switch (cn.kind) {
 
+        case NodeKind::Fbm:
+        case NodeKind::RidgedFbm:
+        case NodeKind::FractalPerlin:
+        case NodeKind::Perlin:
+        case NodeKind::Simplex: {
+            const auto& np = std::get<NoiseParams>(cn.params);
+
+            auto noiseVal = [&](float wx, float wz) -> float {
+                switch (cn.kind) {
+                case NodeKind::Fbm:
+                    return noiseContext.fbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.frequency);
+                case NodeKind::RidgedFbm:
+                    return noiseContext.ridgedFbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.sharpness, np.frequency);
+                case NodeKind::FractalPerlin:
+                    return noiseContext.perlinFbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.frequency);
+                case NodeKind::Perlin:
+                    return noiseContext.perlin2D(wx * np.frequency, wz * np.frequency);
+                default: // Simplex
+                    return noiseContext.simplex2D(wx * np.frequency, wz * np.frequency);
+                }
+            };
+
+            nodeOutputs[ni] = std::vector<float>(cellCount);
+            auto& out = std::get<std::vector<float>>(nodeOutputs[ni]);
+
+            if (cn.hasCoordInput) {
+                const auto& coordBuf = std::get<std::vector<Vec2>>(nodeOutputs[cn.inputs[0]]);
+                for (int z = 0; z < d; ++z) {
+                    for (int x = 0; x < w; ++x) {
+                        const size_t idx = fieldIndex(x, z, w);
+                        const float wx = coordBuf[idx].x + np.xOffset;
+                        const float wz = coordBuf[idx].y + np.zOffset;
+                        out[idx] = 0.5f * (noiseVal(wx, wz) + 1.0f);
+                    }
+                }
+            } else {
+                for (int z = 0; z < d; ++z) {
+                    for (int x = 0; x < w; ++x) {
+                        const size_t idx = fieldIndex(x, z, w);
+                        const float wx = static_cast<float>(x) * hScale + np.xOffset;
+                        const float wz = static_cast<float>(z) * hScale + np.zOffset;
+                        out[idx] = 0.5f * (noiseVal(wx, wz) + 1.0f);
+                    }
+                }
+            }
+            break;
+        }
+
+        case NodeKind::Position: {
+            nodeOutputs[ni] = std::vector<Vec2>(cellCount);
+            auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
             for (int z = 0; z < d; ++z) {
                 for (int x = 0; x < w; ++x) {
                     const size_t idx = fieldIndex(x, z, w);
-                    const float wx = static_cast<float>(x) * hScale + np.xOffset;
-                    const float wz = static_cast<float>(z) * hScale + np.zOffset;
-
-                    if (cn.kind == NodeKind::Fbm) {
-                        out[idx] = noiseContext.fbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.frequency);
-                    } else if (cn.kind == NodeKind::RidgedFbm) {
-                        out[idx] = noiseContext.ridgedFbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.sharpness, np.frequency);
-                    } else if (cn.kind == NodeKind::FractalPerlin) {
-                        out[idx] = noiseContext.perlinFbm(wx, wz, np.octaves, np.lacunarity, np.gain, np.frequency);
-                    } else if (cn.kind == NodeKind::Perlin) {
-                        out[idx] = noiseContext.perlin2D(wx * np.frequency, wz * np.frequency);
-                    } else { // Simplex
-                        out[idx] = noiseContext.simplex2D(wx * np.frequency, wz * np.frequency);
-                    }
-
-                    out[idx] = 0.5f * (out[idx] + 1.0f);
+                    out[idx] = Vec2{static_cast<float>(x) * hScale,
+                                    static_cast<float>(z) * hScale};
                 }
             }
-        } else if (cn.kind == NodeKind::TerrainSynthesis) {
+            break;
+        }
+
+        case NodeKind::CreateVec2: {
+            const auto& cp = std::get<CreateVec2Params>(cn.params);
+            const bool hasX = cn.inputs[0] != UINT16_MAX;
+            const bool hasY = cn.inputs[1] != UINT16_MAX;
+            const float* px = nullptr;
+            const float* py = nullptr;
+            if (hasX) px = std::get<std::vector<float>>(nodeOutputs[cn.inputs[0]]).data();
+            if (hasY) py = std::get<std::vector<float>>(nodeOutputs[cn.inputs[1]]).data();
+
+            nodeOutputs[ni] = std::vector<Vec2>(cellCount);
+            auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
+            for (size_t i = 0; i < cellCount; ++i) {
+                out[i] = Vec2{px ? px[i] + cp.x : cp.x,
+                               py ? py[i] + cp.y : cp.y};
+            }
+            break;
+        }
+
+        case NodeKind::Add2: {
+            const auto& a = std::get<std::vector<Vec2>>(nodeOutputs[cn.inputs[0]]);
+            const auto& b = std::get<std::vector<Vec2>>(nodeOutputs[cn.inputs[1]]);
+            nodeOutputs[ni] = std::vector<Vec2>(cellCount);
+            auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
+            for (size_t i = 0; i < cellCount; ++i) {
+                out[i] = Vec2{a[i].x + b[i].x, a[i].y + b[i].y};
+            }
+            break;
+        }
+
+        case NodeKind::TerrainSynthesis: {
             const auto& tsp = std::get<TerrainSynthesisParams>(cn.params);
             const float vertScale = tsp.verticalScale;
 
-            const std::vector<float>& continental  = nodeOutputs[cn.inputs[0]];
-            const std::vector<float>& ridges       = nodeOutputs[cn.inputs[1]];
-            const std::vector<float>& detailIn     = nodeOutputs[cn.inputs[2]];
-            const std::vector<float>& rangeMaskIn  = nodeOutputs[cn.inputs[3]];
-            const std::vector<float>& basinIn      = nodeOutputs[cn.inputs[4]];
-            const std::vector<float>& detailBandIn = nodeOutputs[cn.inputs[5]];
-            const std::vector<float>& rimMaskIn    = nodeOutputs[cn.inputs[6]];
-            const std::vector<float>& plainsBaseIn = nodeOutputs[cn.inputs[7]];
-            const std::vector<float>& macroReliefIn= nodeOutputs[cn.inputs[8]];
-            const std::vector<float>& hillinessIn  = nodeOutputs[cn.inputs[9]];
-            const std::vector<float>& basinNoiseIn = nodeOutputs[cn.inputs[10]];
-            const std::vector<float>& plateauMaskIn= nodeOutputs[cn.inputs[11]];
+            const std::vector<float>& continental  = std::get<std::vector<float>>(nodeOutputs[cn.inputs[0]]);
+            const std::vector<float>& ridges       = std::get<std::vector<float>>(nodeOutputs[cn.inputs[1]]);
+            const std::vector<float>& detailIn     = std::get<std::vector<float>>(nodeOutputs[cn.inputs[2]]);
+            const std::vector<float>& rangeMaskIn  = std::get<std::vector<float>>(nodeOutputs[cn.inputs[3]]);
+            const std::vector<float>& basinIn      = std::get<std::vector<float>>(nodeOutputs[cn.inputs[4]]);
+            const std::vector<float>& detailBandIn = std::get<std::vector<float>>(nodeOutputs[cn.inputs[5]]);
+            const std::vector<float>& rimMaskIn    = std::get<std::vector<float>>(nodeOutputs[cn.inputs[6]]);
+            const std::vector<float>& plainsBaseIn = std::get<std::vector<float>>(nodeOutputs[cn.inputs[7]]);
+            const std::vector<float>& macroReliefIn= std::get<std::vector<float>>(nodeOutputs[cn.inputs[8]]);
+            const std::vector<float>& hillinessIn  = std::get<std::vector<float>>(nodeOutputs[cn.inputs[9]]);
+            const std::vector<float>& basinNoiseIn = std::get<std::vector<float>>(nodeOutputs[cn.inputs[10]]);
+            const std::vector<float>& plateauMaskIn= std::get<std::vector<float>>(nodeOutputs[cn.inputs[11]]);
 
             fields.heights.assign(cellCount, 0.0f);
             fields.mountainWeights.assign(cellCount, 0.0f);
@@ -143,23 +207,8 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
                     const float worldX = static_cast<float>(x) * hScale;
                     const float worldZ = static_cast<float>(z) * hScale;
 
-                    // Warp is kept so that climate post-processing still
-                    // sees a coherent warped coordinate space.
-                    const float warpX =
-                        noiseContext.fbm(worldX * warpFreqScale + 31.7f,
-                                         worldZ * warpFreqScale - 18.2f, 3,
-                                         settings.noise.lacunarity, 0.5f, baseFreq) *
-                        settings.noise.warpAmplitude;
-                    const float warpZ =
-                        noiseContext.fbm(worldX * warpFreqScale - 47.1f,
-                                         worldZ * warpFreqScale + 22.8f, 3,
-                                         settings.noise.lacunarity, 0.5f, baseFreq) *
-                        settings.noise.warpAmplitude;
-
-                    const float sampleX = worldX + warpX;
-                    const float sampleZ = worldZ + warpZ;
-                    fields.sampleXs[idx] = sampleX;
-                    fields.sampleZs[idx] = sampleZ;
+                    fields.sampleXs[idx] = worldX;
+                    fields.sampleZs[idx] = worldZ;
 
                     const float detail      = detailIn[idx];
                     const float rangeMask   = smoothstep(0.42f, 0.72f, rangeMaskIn[idx]);
@@ -203,6 +252,9 @@ terrain::TerrainFields execute(const CompiledGraph& compiled,
                     fields.plateauWeights[idx] = plateau.weight;
                 }
             }
+            break;
+        }
+
         }
         visited[ni] = true;
     };
