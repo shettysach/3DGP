@@ -1,4 +1,4 @@
-#include "graph/graph_view.h"
+#include "graph/view.h"
 
 #include <iostream>
 
