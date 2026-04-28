@@ -112,7 +112,6 @@ struct TerrainSettings {
     int depth = 512;
     float horizontalScale = 2.0f;
     float verticalScale = 80.0f;
-    bool enableVoronoi = true;
     uint32_t seed = 1234u;
     bool useWFC = true;
     float voronoiCellSize = 24.0f;

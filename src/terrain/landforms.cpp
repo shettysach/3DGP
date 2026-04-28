@@ -2,8 +2,10 @@
 #include "util.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
+#include <queue>
 #include <vector>
 
 namespace terrain {
@@ -80,6 +82,164 @@ void blurScalarField(const std::vector<float>& src, std::vector<float>& dst, int
     }
 }
 
+void aggressiveBlurScalarField(
+    const std::vector<float>& src,
+    std::vector<float>& dst,
+    int width,
+    int depth,
+    int radius) {
+    dst.resize(src.size());
+    for (int z = 0; z < depth; ++z) {
+        const int z0 = std::max(0, z - radius);
+        const int z1 = std::min(depth - 1, z + radius);
+        for (int x = 0; x < width; ++x) {
+            const int x0 = std::max(0, x - radius);
+            const int x1 = std::min(width - 1, x + radius);
+            float sum = 0.0f;
+            float weight = 0.0f;
+            for (int nz = z0; nz <= z1; ++nz) {
+                for (int nx = x0; nx <= x1; ++nx) {
+                    const int manhattan = std::abs(nx - x) + std::abs(nz - z);
+                    const float sampleWeight = std::max(1.0f, static_cast<float>((radius * 2 + 2) - manhattan));
+                    sum += src[fieldIndex(nx, nz, width)] * sampleWeight;
+                    weight += sampleWeight;
+                }
+            }
+            dst[fieldIndex(x, z, width)] = sum / std::max(0.0001f, weight);
+        }
+    }
+}
+
+void applyAggressiveLandformMajority(std::vector<uint8_t>& levels, const TerrainFields& fields, int passes) {
+    constexpr size_t kCount = static_cast<size_t>(LandformId::Count);
+    for (int pass = 0; pass < passes; ++pass) {
+        std::vector<uint8_t> next = levels;
+        for (int z = 0; z < fields.depth; ++z) {
+            const int z0 = std::max(0, z - 2);
+            const int z1 = std::min(fields.depth - 1, z + 2);
+            for (int x = 0; x < fields.width; ++x) {
+                const int x0 = std::max(0, x - 2);
+                const int x1 = std::min(fields.width - 1, x + 2);
+                const size_t idx = fieldIndex(x, z, fields.width);
+                std::array<int, kCount> counts{};
+                counts.fill(0);
+                for (int nz = z0; nz <= z1; ++nz) {
+                    for (int nx = x0; nx <= x1; ++nx) {
+                        ++counts[levels[fieldIndex(nx, nz, fields.width)]];
+                    }
+                }
+                size_t majority = static_cast<size_t>(levels[idx]);
+                int best = counts[majority];
+                for (size_t i = 0; i < counts.size(); ++i) {
+                    if (counts[i] > best) {
+                        best = counts[i];
+                        majority = i;
+                    }
+                }
+                if (best >= 12) {
+                    next[idx] = static_cast<uint8_t>(majority);
+                }
+            }
+        }
+        levels.swap(next);
+    }
+}
+
+void removeSmallLandformIslands(std::vector<uint8_t>& levels, const TerrainFields& fields) {
+    const size_t total = levels.size();
+    if (total == 0) {
+        return;
+    }
+
+    constexpr int kMinComponentSize = 96;
+    constexpr size_t kCount = static_cast<size_t>(LandformId::Count);
+    std::vector<uint8_t> visited(total, 0);
+    std::vector<uint8_t> mark(total, 0);
+    std::queue<size_t> q;
+    std::vector<size_t> component;
+    component.reserve(256);
+
+    for (size_t start = 0; start < total; ++start) {
+        if (visited[start] != 0) {
+            continue;
+        }
+
+        const uint8_t label = levels[start];
+        if (label >= static_cast<uint8_t>(LandformId::Mountain)) {
+            visited[start] = 1;
+            continue;
+        }
+
+        q.push(start);
+        visited[start] = 1;
+        component.clear();
+        component.push_back(start);
+
+        while (!q.empty()) {
+            const size_t idx = q.front();
+            q.pop();
+            const int x = static_cast<int>(idx % static_cast<size_t>(fields.width));
+            const int z = static_cast<int>(idx / static_cast<size_t>(fields.width));
+            const int z0 = std::max(0, z - 1);
+            const int z1 = std::min(fields.depth - 1, z + 1);
+            const int x0 = std::max(0, x - 1);
+            const int x1 = std::min(fields.width - 1, x + 1);
+            for (int nz = z0; nz <= z1; ++nz) {
+                for (int nx = x0; nx <= x1; ++nx) {
+                    const size_t nidx = fieldIndex(nx, nz, fields.width);
+                    if (visited[nidx] != 0) {
+                        continue;
+                    }
+                    visited[nidx] = 1;
+                    if (levels[nidx] == label) {
+                        q.push(nidx);
+                        component.push_back(nidx);
+                    }
+                }
+            }
+        }
+
+        if (static_cast<int>(component.size()) >= kMinComponentSize) {
+            continue;
+        }
+
+        std::array<int, kCount> neighborCounts{};
+        neighborCounts.fill(0);
+        for (size_t idx : component) {
+            mark[idx] = 1;
+        }
+        for (size_t idx : component) {
+            const int x = static_cast<int>(idx % static_cast<size_t>(fields.width));
+            const int z = static_cast<int>(idx / static_cast<size_t>(fields.width));
+            const int z0 = std::max(0, z - 1);
+            const int z1 = std::min(fields.depth - 1, z + 1);
+            const int x0 = std::max(0, x - 1);
+            const int x1 = std::min(fields.width - 1, x + 1);
+            for (int nz = z0; nz <= z1; ++nz) {
+                for (int nx = x0; nx <= x1; ++nx) {
+                    const size_t nidx = fieldIndex(nx, nz, fields.width);
+                    if (mark[nidx] != 0) {
+                        continue;
+                    }
+                    ++neighborCounts[levels[nidx]];
+                }
+            }
+        }
+        size_t replacement = static_cast<size_t>(LandformId::Plain);
+        int best = -1;
+        for (size_t i = 0; i < neighborCounts.size(); ++i) {
+            if (neighborCounts[i] > best) {
+                best = neighborCounts[i];
+                replacement = i;
+            }
+        }
+        for (size_t idx : component) {
+            levels[idx] = static_cast<uint8_t>(replacement);
+            mark[idx] = 0;
+        }
+    }
+}
+
 } // namespace
 
 void computeLandformFields(TerrainFields& fields) {
@@ -107,6 +267,10 @@ void computeLandformFields(TerrainFields& fields) {
     std::vector<float> blurredSignal;
     blurScalarField(rawSignal, blurredSignal, fields.width, fields.depth);
     blurScalarField(blurredSignal, fields.landformSignal, fields.width, fields.depth);
+    for (int pass = 0; pass < 3; ++pass) {
+        aggressiveBlurScalarField(fields.landformSignal, blurredSignal, fields.width, fields.depth, 2);
+        fields.landformSignal.swap(blurredSignal);
+    }
 
     std::vector<uint8_t> levels(cellCount, static_cast<uint8_t>(LandformId::Plain));
     std::vector<float> elevationNorms(cellCount, 0.0f);
@@ -163,6 +327,10 @@ void computeLandformFields(TerrainFields& fields) {
         }
         levels.swap(nextLevels);
     }
+
+    applyAggressiveLandformMajority(levels, fields, 4);
+    removeSmallLandformIslands(levels, fields);
+    applyAggressiveLandformMajority(levels, fields, 2);
 
     fields.landformIds = levels;
 }
