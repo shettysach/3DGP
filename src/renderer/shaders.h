@@ -71,7 +71,8 @@ void main() {
     float rockSignal = slope * 0.42 + mountain * 0.92 + max(heightN - 0.58, 0.0) * 0.16;
     float rock = smoothstep(0.48, 0.88, rockSignal);
     float snow = smoothstep(0.76, 0.99, heightN + (1.0 - temperature) * 0.28 + slope * 0.04) *
-                 smoothstep(0.0, 0.55, 1.0 - moisture * 0.86);
+                 smoothstep(0.0, 0.55, 1.0 - moisture * 0.86) *
+                 smoothstep(0.01, 0.05, mountain);
     float sand = smoothstep(0.08, 0.48, river) *
                  smoothstep(0.0, 0.62, 1.0 - heightN) *
                  smoothstep(0.0, 0.62, 1.0 - moisture);
