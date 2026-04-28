@@ -16,7 +16,6 @@ using terrain::lerp;
 
 inline constexpr float kPi = 3.14159265358979323846f;
 inline constexpr int kMaterialTextureSize = 256;
-inline constexpr int kShadowMapSize = 1024;
 inline constexpr float kCameraFovDeg = 60.0f;
 inline constexpr float kCameraNear = 0.5f;
 inline constexpr float kCameraFar = 5000.0f;
@@ -115,24 +114,14 @@ extern PFNGLUNIFORM1FPROC Uniform1f;
 extern PFNGLUNIFORM3FPROC Uniform3f;
 extern PFNGLACTIVETEXTUREPROC ActiveTexture;
 extern PFNGLGENERATEMIPMAPPROC GenerateMipmap;
-extern PFNGLGENFRAMEBUFFERSPROC GenFramebuffers;
-extern PFNGLBINDFRAMEBUFFERPROC BindFramebuffer;
-extern PFNGLFRAMEBUFFERTEXTURE2DPROC FramebufferTexture2D;
-extern PFNGLCHECKFRAMEBUFFERSTATUSPROC CheckFramebufferStatus;
-extern PFNGLDELETEFRAMEBUFFERSPROC DeleteFramebuffers;
 
 bool load();
 } // namespace glfn
 
 inline constexpr Vec3 kSunDirection = {-0.42f, -1.0f, -0.28f};
 inline constexpr Vec3 kSunColor = {1.12f, 1.03f, 0.92f};
-inline constexpr Vec3 kSkyAmbientColor = {0.34f, 0.43f, 0.53f};
-inline constexpr Vec3 kGroundAmbientColor = {0.10f, 0.09f, 0.08f};
-inline constexpr Vec3 kSkyZenithColor = {0.21f, 0.40f, 0.70f};
-inline constexpr Vec3 kSkyHorizonColor = {0.22f, 0.30f, 0.42f};
+inline constexpr Vec3 kAmbientColor = {0.25f, 0.28f, 0.32f};
 inline constexpr Vec3 kFogHorizonColor = {0.58f, 0.68f, 0.78f};
-inline constexpr Vec3 kFogZenithColor = {0.28f, 0.44f, 0.62f};
-inline constexpr Vec3 kFogSunColor = {0.64f, 0.48f, 0.30f};
 
 float degToRad(float deg);
 bool usesMaterials(Mode mode);
@@ -159,7 +148,6 @@ Vec3 transformPoint(const Mat4& m, const Vec3& v);
 Mat4 perspective(float fovYRadians, float aspect, float nearPlane, float farPlane);
 Mat4 lookAt(const Vec3& eye, const Vec3& target, const Vec3& up);
 Mat4 orthoBox(float left, float right, float bottom, float top, float nearPlane, float farPlane);
-Mat4 buildLightViewProjection(const terrain::TerrainMesh& mesh);
 
 void setUniform(GLint location, const Mat4& value);
 void setUniform(GLint location, int value);

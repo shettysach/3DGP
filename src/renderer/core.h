@@ -50,43 +50,14 @@ enum class Mode {
 
 struct TerrainUniformLocations {
     GLint viewProj = -1;
-    GLint lightViewProj = -1;
-    GLint cameraPos = -1;
     GLint sunLightDir = -1;
     GLint sunColor = -1;
-    GLint skyAmbientColor = -1;
-    GLint groundAmbientColor = -1;
-    GLint fogHorizonColor = -1;
-    GLint fogZenithColor = -1;
-    GLint fogSunColor = -1;
-    GLint fogDensity = -1;
-    GLint fogHeightFalloff = -1;
-    GLint fogBaseHeight = -1;
-    GLint shadowTexelSize = -1;
+    GLint ambientColor = -1;
     GLint enableMaterials = -1;
-    GLint enableShadows = -1;
     GLint grassTex = -1;
     GLint rockTex = -1;
     GLint sandTex = -1;
     GLint snowTex = -1;
-    GLint shadowMap = -1;
-};
-
-struct SkyUniformLocations {
-    GLint cameraForward = -1;
-    GLint cameraRight = -1;
-    GLint cameraUp = -1;
-    GLint sunLightDir = -1;
-    GLint sunColor = -1;
-    GLint skyZenithColor = -1;
-    GLint skyHorizonColor = -1;
-    GLint fogHorizonColor = -1;
-    GLint aspect = -1;
-    GLint tanHalfFov = -1;
-};
-
-struct ShadowUniformLocations {
-    GLint lightViewProj = -1;
 };
 
 class Renderer {
@@ -141,20 +112,12 @@ class Renderer {
     GLuint terrainVao_;
     GLuint terrainVbo_;
     GLuint terrainIbo_;
-    GLuint skyVao_;
     GLuint terrainProgram_;
-    GLuint skyProgram_;
-    GLuint shadowProgram_;
-    GLuint shadowFramebuffer_;
-    GLuint shadowDepthTexture_;
     GLuint grassTexture_;
     GLuint rockTexture_;
     GLuint snowTexture_;
     GLuint sandTexture_;
-    int shadowMapSize_;
     TerrainUniformLocations terrainUniforms_;
-    SkyUniformLocations skyUniforms_;
-    ShadowUniformLocations shadowUniforms_;
     std::vector<float> terrainBaseColors_;
     bool profileNextFrame_;
     std::string pendingProfileReason_;

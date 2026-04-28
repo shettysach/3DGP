@@ -45,11 +45,6 @@ PFNGLUNIFORM1FPROC Uniform1f = nullptr;
 PFNGLUNIFORM3FPROC Uniform3f = nullptr;
 PFNGLACTIVETEXTUREPROC ActiveTexture = nullptr;
 PFNGLGENERATEMIPMAPPROC GenerateMipmap = nullptr;
-PFNGLGENFRAMEBUFFERSPROC GenFramebuffers = nullptr;
-PFNGLBINDFRAMEBUFFERPROC BindFramebuffer = nullptr;
-PFNGLFRAMEBUFFERTEXTURE2DPROC FramebufferTexture2D = nullptr;
-PFNGLCHECKFRAMEBUFFERSTATUSPROC CheckFramebufferStatus = nullptr;
-PFNGLDELETEFRAMEBUFFERSPROC DeleteFramebuffers = nullptr;
 
 bool load() {
     auto loadSymbol = [](const char* name) {
@@ -94,11 +89,6 @@ bool load() {
     LOAD_GL(Uniform3f);
     LOAD_GL(ActiveTexture);
     LOAD_GL(GenerateMipmap);
-    LOAD_GL(GenFramebuffers);
-    LOAD_GL(BindFramebuffer);
-    LOAD_GL(FramebufferTexture2D);
-    LOAD_GL(CheckFramebufferStatus);
-    LOAD_GL(DeleteFramebuffers);
 
 #undef LOAD_GL
     return true;
@@ -558,57 +548,6 @@ Mat4 orthoBox(float left, float right, float bottom, float top, float nearPlane,
     out.m[14] = -(farPlane + nearPlane) / (farPlane - nearPlane);
     out.m[15] = 1.0f;
     return out;
-}
-
-Mat4 buildLightViewProjection(const terrain::TerrainMesh& mesh) {
-    const float width = static_cast<float>(std::max(1, mesh.width - 1)) * mesh.horizontalScale;
-    const float depth = static_cast<float>(std::max(1, mesh.depth - 1)) * mesh.horizontalScale;
-    const Vec3 minCorner{0.0f, mesh.minHeight - 8.0f, 0.0f};
-    const Vec3 maxCorner{width, mesh.maxHeight + 24.0f, depth};
-    const Vec3 center{width * 0.5f, (mesh.minHeight + mesh.maxHeight) * 0.5f, depth * 0.5f};
-
-    Vec3 lightForward = normalize(kSunDirection);
-    Vec3 lightUp = {0.0f, 1.0f, 0.0f};
-    if (std::abs(dot(lightForward, lightUp)) > 0.98f) {
-        lightUp = {0.0f, 0.0f, 1.0f};
-    }
-
-    const float sceneRadius = std::max({width, depth, mesh.maxHeight - mesh.minHeight + 60.0f}) * 0.85f;
-    const Vec3 lightEye = center - lightForward * (sceneRadius * 1.8f);
-    const Mat4 lightView = lookAt(lightEye, center, lightUp);
-
-    const std::array<Vec3, 8> corners = {
-        Vec3{minCorner.x, minCorner.y, minCorner.z},
-        Vec3{maxCorner.x, minCorner.y, minCorner.z},
-        Vec3{minCorner.x, maxCorner.y, minCorner.z},
-        Vec3{maxCorner.x, maxCorner.y, minCorner.z},
-        Vec3{minCorner.x, minCorner.y, maxCorner.z},
-        Vec3{maxCorner.x, minCorner.y, maxCorner.z},
-        Vec3{minCorner.x, maxCorner.y, maxCorner.z},
-        Vec3{maxCorner.x, maxCorner.y, maxCorner.z},
-    };
-
-    Vec3 mins{std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
-    Vec3 maxs{-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max()};
-    for (const Vec3& corner : corners) {
-        const Vec3 ls = transformPoint(lightView, corner);
-        mins.x = std::min(mins.x, ls.x);
-        mins.y = std::min(mins.y, ls.y);
-        mins.z = std::min(mins.z, ls.z);
-        maxs.x = std::max(maxs.x, ls.x);
-        maxs.y = std::max(maxs.y, ls.y);
-        maxs.z = std::max(maxs.z, ls.z);
-    }
-
-    const float margin = 24.0f;
-    const Mat4 lightProjection = orthoBox(
-        mins.x - margin,
-        maxs.x + margin,
-        mins.y - margin,
-        maxs.y + margin,
-        mins.z - margin,
-        maxs.z + margin);
-    return multiply(lightProjection, lightView);
 }
 
 } // namespace renderer
