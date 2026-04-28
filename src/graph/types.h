@@ -34,6 +34,9 @@ enum class NodeKind : uint8_t {
     Valley,
     Plains,
     Plateau,
+    Terrace,
+    Smoothstep,
+    Lerp,
     Blend,
     Position,
     CreateVec2,
@@ -82,6 +85,21 @@ struct PlateauParams {
     float cliffness = 1.0f;
 };
 
+struct TerraceParams {
+    float steps = 10.0f;
+};
+
+struct SmoothstepParams {
+    float a = 0.0f;
+    float b = 1.0f;
+};
+
+struct LerpParams {
+    float a = 0.0f;
+    float b = 1.0f;
+    float t = 0.5f;
+};
+
 struct BlendParams {
     // no tunables currently
 };
@@ -101,6 +119,9 @@ using NodeParams = std::variant<
     ValleyParams,
     PlainsParams,
     PlateauParams,
+    TerraceParams,
+    SmoothstepParams,
+    LerpParams,
     BlendParams,
     CreateVec2Params,
     Scale2Params,

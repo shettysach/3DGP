@@ -79,6 +79,32 @@ namespace {
             {{"vec2", false, PinType::Vec2}},
         },
         {
+            NodeKind::Terrace,
+            "Terrace",
+            {
+                {"input", true, PinType::Float},
+            },
+            {{"float", false, PinType::Float}},
+        },
+        {
+            NodeKind::Smoothstep,
+            "Smoothstep",
+            {
+                {"x", true, PinType::Float},
+            },
+            {{"float", false, PinType::Float}},
+        },
+        {
+            NodeKind::Lerp,
+            "Lerp",
+            {
+                {"a", true, PinType::Float},
+                {"b", true, PinType::Float},
+                {"t", true, PinType::Float},
+            },
+            {{"float", false, PinType::Float}},
+        },
+        {
             NodeKind::Blend,
             "Blend",
             {
@@ -152,6 +178,12 @@ NodeParams defaultParams(NodeKind kind) {
             return PlainsParams {};
         case NodeKind::Plateau:
             return PlateauParams {};
+        case NodeKind::Terrace:
+            return TerraceParams {};
+        case NodeKind::Smoothstep:
+            return SmoothstepParams {};
+        case NodeKind::Lerp:
+            return LerpParams {};
         case NodeKind::Blend:
             return BlendParams {};
         case NodeKind::CreateVec2:
@@ -257,6 +289,22 @@ EditorGraph defaultGraph() {
         {11, NodeKind::Plateau, 1450.0f, 1050.0f, PlateauParams {}}
     );
 
+    // ── Modifier nodes ──────────────────────────────────────────────────────
+    g.nodes.push_back(
+        {19,
+         NodeKind::Smoothstep,
+         1250.0f,
+         1050.0f,
+         SmoothstepParams {0.42f, 0.72f}}
+    ); // rangeMask smoothstep
+    g.nodes.push_back(
+        {20,
+         NodeKind::Smoothstep,
+         1250.0f,
+         1250.0f,
+         SmoothstepParams {0.38f, 0.74f}}
+    ); // rimMask smoothstep
+
     // ── Blend sink ──────────────────────────────────────────────────────────
     g.nodes.push_back({12, NodeKind::Blend, 1850.0f, 600.0f, BlendParams {}});
 
@@ -301,10 +349,12 @@ EditorGraph defaultGraph() {
     // ── Links: noise → terrain nodes ────────────────────────────────────────
     g.links.push_back({4, {0, 0}, {8, 0}}); // continental   → Mountain
     g.links.push_back({5, {1, 0}, {8, 1}}); // ridges        → Mountain
-    g.links.push_back({6, {5, 0}, {8, 2}}); // rangeMask     → Mountain
+    g.links.push_back({6, {5, 0}, {19, 0}}); // rangeMask     → Smoothstep
+    g.links.push_back({30, {19, 0}, {8, 2}}); // Smoothstep    → Mountain:rangeMask
     g.links.push_back({7, {0, 0}, {9, 0}}); // continental   → Valley
     g.links.push_back({8, {2, 0}, {9, 1}}); // basin         → Valley
-    g.links.push_back({9, {6, 0}, {9, 2}}); // rimMask       → Valley
+    g.links.push_back({9, {6, 0}, {20, 0}}); // rimMask       → Smoothstep
+    g.links.push_back({31, {20, 0}, {9, 2}}); // Smoothstep    → Valley:rimMask
     g.links.push_back({10, {0, 0}, {10, 0}}); // continental   → Plains
     g.links.push_back({11, {3, 0}, {10, 1}}); // plainsBase    → Plains
     g.links.push_back({12, {0, 0}, {11, 0}}); // continental     → Plateau

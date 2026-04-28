@@ -271,6 +271,20 @@ static float drawToolbar() {
     }
 
     ImGui::SameLine();
+    if (ImGui::Button("Float v")) {
+        ImGui::OpenPopup("FloatPopup");
+    }
+    if (ImGui::BeginPopup("FloatPopup")) {
+        if (ImGui::Selectable("Terrace"))
+            addNode(NodeKind::Terrace);
+        if (ImGui::Selectable("Smoothstep"))
+            addNode(NodeKind::Smoothstep);
+        if (ImGui::Selectable("Lerp"))
+            addNode(NodeKind::Lerp);
+        ImGui::EndPopup();
+    }
+
+    ImGui::SameLine();
     if (ImGui::Button("Terrain v")) {
         ImGui::OpenPopup("TerrainPopup");
     }
@@ -494,6 +508,18 @@ static void drawInspector() {
             ImGui::DragFloat("Height Scale", &tp.heightScale, 0.01f, 0.1f, 2.0f, "%.2f");
             ImGui::DragFloat("Coverage", &tp.coverage, 0.01f, 0.1f, 1.0f, "%.2f");
             ImGui::DragFloat("Cliffness", &tp.cliffness, 0.01f, 0.1f, 3.0f, "%.2f");
+        } else if (node->kind == NodeKind::Terrace) {
+            auto& tp = std::get<TerraceParams>(node->params);
+            ImGui::DragFloat("Steps", &tp.steps, 0.1f, 1.0f, 100.0f, "%.1f");
+        } else if (node->kind == NodeKind::Smoothstep) {
+            auto& sp = std::get<SmoothstepParams>(node->params);
+            ImGui::DragFloat("A", &sp.a, 0.01f, -10.0f, 10.0f, "%.2f");
+            ImGui::DragFloat("B", &sp.b, 0.01f, -10.0f, 10.0f, "%.2f");
+        } else if (node->kind == NodeKind::Lerp) {
+            auto& lp = std::get<LerpParams>(node->params);
+            ImGui::DragFloat("A", &lp.a, 0.01f, -10.0f, 10.0f, "%.2f");
+            ImGui::DragFloat("B", &lp.b, 0.01f, -10.0f, 10.0f, "%.2f");
+            ImGui::DragFloat("T", &lp.t, 0.01f, 0.0f, 1.0f, "%.2f");
         } else if (node->kind == NodeKind::Blend) {
             ImGui::Text("(no tunable params)");
         } else if (node->kind == NodeKind::CreateVec2) {

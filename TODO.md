@@ -1,3 +1,1 @@
-- Better river carving. Currently uses grids.
-- Better rendering. HDRI lighting?
-- Better terrain generation.
+- Add Lerp, Smoothstep, explicit 

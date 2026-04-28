@@ -30,6 +30,12 @@ const char* kindToString(NodeKind kind) {
             return "Plains";
         case NodeKind::Plateau:
             return "Plateau";
+        case NodeKind::Terrace:
+            return "Terrace";
+        case NodeKind::Smoothstep:
+            return "Smoothstep";
+        case NodeKind::Lerp:
+            return "Lerp";
         case NodeKind::Blend:
             return "Blend";
         case NodeKind::Position:
@@ -63,6 +69,12 @@ NodeKind kindFromString(const std::string& s) {
         return NodeKind::Plains;
     if (s == "Plateau")
         return NodeKind::Plateau;
+    if (s == "Terrace")
+        return NodeKind::Terrace;
+    if (s == "Smoothstep")
+        return NodeKind::Smoothstep;
+    if (s == "Lerp")
+        return NodeKind::Lerp;
     if (s == "Blend")
         return NodeKind::Blend;
     if (s == "Position")
@@ -177,6 +189,45 @@ static PlateauParams plateauParamsFromJson(const json& j) {
     return p;
 }
 
+static json terraceParamsToJson(const TerraceParams& p) {
+    return {{"steps", p.steps}};
+}
+
+static TerraceParams terraceParamsFromJson(const json& j) {
+    TerraceParams p;
+    if (j.contains("steps"))
+        p.steps = j["steps"].get<float>();
+    return p;
+}
+
+static json smoothstepParamsToJson(const SmoothstepParams& p) {
+    return {{"a", p.a}, {"b", p.b}};
+}
+
+static SmoothstepParams smoothstepParamsFromJson(const json& j) {
+    SmoothstepParams p;
+    if (j.contains("a"))
+        p.a = j["a"].get<float>();
+    if (j.contains("b"))
+        p.b = j["b"].get<float>();
+    return p;
+}
+
+static json lerpParamsToJson(const LerpParams& p) {
+    return {{"a", p.a}, {"b", p.b}, {"t", p.t}};
+}
+
+static LerpParams lerpParamsFromJson(const json& j) {
+    LerpParams p;
+    if (j.contains("a"))
+        p.a = j["a"].get<float>();
+    if (j.contains("b"))
+        p.b = j["b"].get<float>();
+    if (j.contains("t"))
+        p.t = j["t"].get<float>();
+    return p;
+}
+
 static json createVec2ParamsToJson(const CreateVec2Params& p) {
     return {{"x", p.x}, {"y", p.y}};
 }
@@ -217,6 +268,12 @@ static json paramsToJson(NodeKind kind, const NodeParams& params) {
             return plainsParamsToJson(std::get<PlainsParams>(params));
         case NodeKind::Plateau:
             return plateauParamsToJson(std::get<PlateauParams>(params));
+        case NodeKind::Terrace:
+            return terraceParamsToJson(std::get<TerraceParams>(params));
+        case NodeKind::Smoothstep:
+            return smoothstepParamsToJson(std::get<SmoothstepParams>(params));
+        case NodeKind::Lerp:
+            return lerpParamsToJson(std::get<LerpParams>(params));
         case NodeKind::Blend:
             return json::object();
         case NodeKind::CreateVec2:
@@ -245,6 +302,12 @@ static NodeParams paramsFromJson(NodeKind kind, const json& j) {
             return plainsParamsFromJson(j);
         case NodeKind::Plateau:
             return plateauParamsFromJson(j);
+        case NodeKind::Terrace:
+            return terraceParamsFromJson(j);
+        case NodeKind::Smoothstep:
+            return smoothstepParamsFromJson(j);
+        case NodeKind::Lerp:
+            return lerpParamsFromJson(j);
         case NodeKind::Blend:
             return BlendParams{};
         case NodeKind::CreateVec2:
