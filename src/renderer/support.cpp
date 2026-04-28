@@ -40,8 +40,6 @@ PFNGLDELETEPROGRAMPROC DeleteProgram = nullptr;
 PFNGLGETUNIFORMLOCATIONPROC GetUniformLocation = nullptr;
 PFNGLUNIFORMMATRIX4FVPROC UniformMatrix4fv = nullptr;
 PFNGLUNIFORM1IPROC Uniform1i = nullptr;
-PFNGLUNIFORM1FPROC Uniform1f = nullptr;
-PFNGLUNIFORM3FPROC Uniform3f = nullptr;
 PFNGLACTIVETEXTUREPROC ActiveTexture = nullptr;
 
 bool load() {
@@ -83,8 +81,6 @@ bool load() {
     LOAD_GL(GetUniformLocation);
     LOAD_GL(UniformMatrix4fv);
     LOAD_GL(Uniform1i);
-    LOAD_GL(Uniform1f);
-    LOAD_GL(Uniform3f);
     LOAD_GL(ActiveTexture);
 
 #undef LOAD_GL
@@ -304,17 +300,7 @@ void setUniform(GLint location, int value) {
     }
 }
 
-void setUniform(GLint location, float value) {
-    if (location >= 0) {
-        glfn::Uniform1f(location, value);
-    }
-}
 
-void setUniform(GLint location, const Vec3& value) {
-    if (location >= 0) {
-        glfn::Uniform3f(location, value.x, value.y, value.z);
-    }
-}
 
 void destroyTexture(GLuint& texture) {
     if (texture != 0u) {

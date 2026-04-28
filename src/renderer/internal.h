@@ -110,8 +110,6 @@ extern PFNGLDELETEPROGRAMPROC DeleteProgram;
 extern PFNGLGETUNIFORMLOCATIONPROC GetUniformLocation;
 extern PFNGLUNIFORMMATRIX4FVPROC UniformMatrix4fv;
 extern PFNGLUNIFORM1IPROC Uniform1i;
-extern PFNGLUNIFORM1FPROC Uniform1f;
-extern PFNGLUNIFORM3FPROC Uniform3f;
 extern PFNGLACTIVETEXTUREPROC ActiveTexture;
 
 bool load();
@@ -145,8 +143,6 @@ Mat4 lookAt(const Vec3& eye, const Vec3& target, const Vec3& up);
 
 void setUniform(GLint location, const Mat4& value);
 void setUniform(GLint location, int value);
-void setUniform(GLint location, float value);
-void setUniform(GLint location, const Vec3& value);
 
 void destroyTexture(GLuint& texture);
 void destroyProgram(GLuint& program);
