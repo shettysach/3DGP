@@ -11,27 +11,6 @@
 
 namespace renderer {
 
-const char* modeName(Mode mode) {
-    switch (mode) {
-    case Mode::SurfaceBiomes:
-        return "Surface biomes";
-    case Mode::Landforms:
-        return "Landforms";
-    case Mode::Ecology:
-        return "Ecology";
-    case Mode::Temperature:
-        return "Temperature";
-    case Mode::Precipitation:
-        return "Precipitation";
-    case Mode::Moisture:
-        return "Moisture";
-    case Mode::Slope:
-        return "Slope";
-    }
-
-    return "Uncreachable modeName";
-}
-
 Renderer::Renderer(int width, int height)
     : width_(width),
       height_(height),
@@ -44,9 +23,7 @@ Renderer::Renderer(int width, int height)
       targetX_(0.0f),
       targetY_(0.0f),
       targetZ_(0.0f),
-      mode_(Mode::SurfaceBiomes),
       terrainBuffersValid_(false),
-      terrainColorsValid_(false),
       cachedTerrainVertexCount_(0u),
       cachedTerrainIndexCount_(0u),
       terrainVao_(0u),
@@ -56,21 +33,13 @@ Renderer::Renderer(int width, int height)
       grassTexture_(0u),
       rockTexture_(0u),
       snowTexture_(0u),
-      sandTexture_(0u),
-      profileNextFrame_(true),
-      pendingProfileReason_("startup") {}
+      sandTexture_(0u) {}
 
 Renderer::~Renderer() {
     shutdown();
 }
 
 bool Renderer::init() {
-    using Clock = std::chrono::steady_clock;
-    const auto initStart = Clock::now();
-    const auto stageMs = [](const Clock::time_point& start, const Clock::time_point& end) {
-        return std::chrono::duration<double, std::milli>(end - start).count();
-    };
-
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         std::cerr << "SDL_Init failed: " << SDL_GetError() << '\n';
         return false;
@@ -81,9 +50,6 @@ bool Renderer::init() {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
     SDL_DisplayMode displayMode;
     SDL_GetCurrentDisplayMode(0, &displayMode);
@@ -111,16 +77,13 @@ bool Renderer::init() {
     if (!glfn::load()) {
         return false;
     }
-    const auto glReady = Clock::now();
 
     SDL_GL_SetSwapInterval(1);
 
     glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LEQUAL);
     glEnable(GL_CULL_FACE);
     glFrontFace(GL_CW);
     glCullFace(GL_BACK);
-    glEnable(GL_MULTISAMPLE);
     glClearColor(kFogHorizonColor.x, kFogHorizonColor.y, kFogHorizonColor.z, 1.0f);
 
     terrainProgram_ = createProgram(kTerrainVertexShader, kTerrainFragmentShader);
@@ -135,7 +98,6 @@ bool Renderer::init() {
     terrainUniforms_.sunLightDir = cacheUniform(terrainProgram_, "uSunLightDir");
     terrainUniforms_.sunColor = cacheUniform(terrainProgram_, "uSunColor");
     terrainUniforms_.ambientColor = cacheUniform(terrainProgram_, "uAmbientColor");
-    terrainUniforms_.enableMaterials = cacheUniform(terrainProgram_, "uEnableMaterials");
     terrainUniforms_.grassTex = cacheUniform(terrainProgram_, "uGrassTex");
     terrainUniforms_.rockTex = cacheUniform(terrainProgram_, "uRockTex");
     terrainUniforms_.sandTex = cacheUniform(terrainProgram_, "uSandTex");
@@ -147,8 +109,6 @@ bool Renderer::init() {
     setUniform(terrainUniforms_.sandTex, 2);
     setUniform(terrainUniforms_.snowTex, 3);
     glfn::UseProgram(0);
-    const auto shadersReady = Clock::now();
-    const auto shadowReady = shadersReady;
 
     grassTexture_ = createProceduralTexture(
         kMaterialTextureSize,
@@ -182,15 +142,10 @@ bool Renderer::init() {
         {0.82f, 0.74f, 0.53f},
         1.20f,
         0.18f);
-    const auto texturesReady = Clock::now();
 
     std::cout << "GL Vendor: " << glGetString(GL_VENDOR) << '\n';
     std::cout << "GL Renderer: " << glGetString(GL_RENDERER) << '\n';
     std::cout << "GL Version: " << glGetString(GL_VERSION) << '\n';
-    std::cout << "[profile] renderer.init gl=" << stageMs(initStart, glReady) << "ms"
-              << " shaders=" << stageMs(glReady, shadersReady) << "ms"
-              << " textures=" << stageMs(shadersReady, texturesReady) << "ms"
-              << " total=" << stageMs(initStart, texturesReady) << "ms\n";
     return true;
 }
 
@@ -266,92 +221,21 @@ void Renderer::setTarget(float x, float y, float z) {
     targetZ_ = z;
 }
 
-void Renderer::setMode(Mode mode) {
-    if (mode_ != mode) {
-        terrainColorsValid_ = false;
-        profileNextFrame_ = true;
-        pendingProfileReason_ = "mode change";
-    }
-    mode_ = mode;
-}
-
-Mode Renderer::mode() const {
-    return mode_;
-}
-
 void Renderer::invalidateMeshCache() {
     terrainBuffersValid_ = false;
-    terrainColorsValid_ = false;
     cachedTerrainVertexCount_ = 0u;
     cachedTerrainIndexCount_ = 0u;
     terrainBaseColors_.clear();
-    profileNextFrame_ = true;
-    pendingProfileReason_ = "mesh rebuild";
-}
-
-bool Renderer::captureScreenshot(const std::string& filepath) const {
-    if (!window_) {
-        return false;
-    }
-
-    int drawableWidth = 0;
-    int drawableHeight = 0;
-    SDL_GL_GetDrawableSize(window_, &drawableWidth, &drawableHeight);
-    if (drawableWidth <= 0 || drawableHeight <= 0) {
-        return false;
-    }
-
-    std::vector<unsigned char> pixels(
-        static_cast<size_t>(drawableWidth) * static_cast<size_t>(drawableHeight) * 3u,
-        0u);
-
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glReadPixels(0, 0, drawableWidth, drawableHeight, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
-    if (glGetError() != GL_NO_ERROR) {
-        return false;
-    }
-
-    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(
-        0,
-        drawableWidth,
-        drawableHeight,
-        24,
-        SDL_PIXELFORMAT_RGB24);
-    if (!surface) {
-        return false;
-    }
-
-    const size_t rowBytes = static_cast<size_t>(drawableWidth) * 3u;
-    for (int y = 0; y < drawableHeight; ++y) {
-        unsigned char* dst = static_cast<unsigned char*>(surface->pixels) +
-                             static_cast<size_t>(y) * static_cast<size_t>(surface->pitch);
-        const unsigned char* src = pixels.data() +
-                                   static_cast<size_t>(drawableHeight - 1 - y) * rowBytes;
-        std::memcpy(dst, src, rowBytes);
-    }
-
-    const int saveResult = SDL_SaveBMP(surface, filepath.c_str());
-    SDL_FreeSurface(surface);
-    return saveResult == 0;
 }
 
 void Renderer::render(const terrain::TerrainMesh& mesh) {
-    using Clock = std::chrono::steady_clock;
-    const auto frameStart = Clock::now();
-    const auto elapsedMs = [](const Clock::time_point& start, const Clock::time_point& end) {
-        return std::chrono::duration<double, std::milli>(end - start).count();
-    };
-    double terrainUploadMs = 0.0;
-    double sceneSubmitMs = 0.0;
-
     if (!window_) {
         return;
     }
 
-    if (!terrainColorsValid_ || !terrainBuffersValid_ || cachedTerrainVertexCount_ != mesh.vertices.size() ||
+    if (!terrainBuffersValid_ || cachedTerrainVertexCount_ != mesh.vertices.size() ||
         cachedTerrainIndexCount_ != mesh.indices.size()) {
-        const auto uploadStart = Clock::now();
-        rebuildTerrainColorBuffer(mesh, mode_, terrainBaseColors_);
+        buildTerrainColorBuffer(mesh, terrainBaseColors_);
 
         std::vector<TerrainGpuVertex> terrainVertices(mesh.vertices.size());
         const float invHeightRange = 1.0f / std::max(0.001f, mesh.maxHeight - mesh.minHeight);
@@ -431,9 +315,7 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
 
         cachedTerrainVertexCount_ = mesh.vertices.size();
         cachedTerrainIndexCount_ = mesh.indices.size();
-        terrainColorsValid_ = true;
         terrainBuffersValid_ = true;
-        terrainUploadMs = elapsedMs(uploadStart, Clock::now());
     }
 
     int drawableWidth = 0;
@@ -464,13 +346,9 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
     const Mat4 viewProjection = multiply(projection, view);
 
     const Vec3 sunLightDir = normalize(Vec3{-kSunDirection.x, -kSunDirection.y, -kSunDirection.z});
-    const bool enableMaterials = usesMaterials(mode_);
-
-    glEnable(GL_DEPTH_TEST);
 
     glViewport(0, 0, drawableWidth, drawableHeight);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    const auto sceneStart = Clock::now();
 
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
@@ -482,7 +360,6 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
     setUniform(terrainUniforms_.sunLightDir, sunLightDir);
     setUniform(terrainUniforms_.sunColor, kSunColor);
     setUniform(terrainUniforms_.ambientColor, kAmbientColor);
-    setUniform(terrainUniforms_.enableMaterials, enableMaterials ? 1 : 0);
 
     glfn::ActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, grassTexture_);
@@ -504,28 +381,6 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
     glfn::ActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
     glfn::UseProgram(0);
-    sceneSubmitMs = elapsedMs(sceneStart, Clock::now());
-
-    if (profileNextFrame_) {
-        const double cpuTotalMs = elapsedMs(frameStart, Clock::now());
-        glFinish();
-        const double gpuTotalMs = elapsedMs(frameStart, Clock::now());
-        const double terrainVertexMiB =
-            static_cast<double>(mesh.vertices.size() * sizeof(TerrainGpuVertex)) / (1024.0 * 1024.0);
-        const double terrainIndexMiB =
-            static_cast<double>(mesh.indices.size() * sizeof(uint32_t)) / (1024.0 * 1024.0);
-        std::cout << "[profile] renderer.frame reason=" << pendingProfileReason_
-                  << " terrainUpload=" << terrainUploadMs << "ms"
-                  << " sceneSubmit=" << sceneSubmitMs << "ms"
-                  << " cpuTotal=" << cpuTotalMs << "ms"
-                  << " gpuTotal=" << gpuTotalMs << "ms"
-                  << " terrainVerts=" << mesh.vertices.size()
-                  << " terrainTris=" << (mesh.indices.size() / 3u)
-                  << " terrainVB=" << terrainVertexMiB << "MiB"
-                  << " terrainIB=" << terrainIndexMiB << "MiB" << '\n';
-        profileNextFrame_ = false;
-        pendingProfileReason_.clear();
-    }
 }
 
 } // namespace renderer

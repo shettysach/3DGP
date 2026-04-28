@@ -134,6 +134,29 @@ float valueNoise2D(float x, float y, uint32_t seed) {
     return lerp(nx0, nx1, sy);
 }
 
+GLuint compileShader(GLenum type, const char* source) {
+    const GLuint shader = glfn::CreateShader(type);
+    glfn::ShaderSource(shader, 1, &source, nullptr);
+    glfn::CompileShader(shader);
+
+    GLint compiled = GL_FALSE;
+    glfn::GetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+    if (compiled == GL_TRUE) {
+        return shader;
+    }
+
+    GLint infoLen = 0;
+    glfn::GetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLen);
+    std::string log(static_cast<size_t>(std::max(1, infoLen)), '\0');
+    glfn::GetShaderInfoLog(shader, infoLen, nullptr, log.data());
+    std::cerr << "Shader compilation failed:\n"
+              << log << '\n';
+    glfn::DeleteShader(shader);
+    return 0u;
+}
+
+} // namespace
+
 Color3 biomeVertexColor(const terrain::TerrainVertex& v, float minH, float maxH) {
     const float h = (v.y - minH) / std::max(0.001f, maxH - minH);
     const float slope = std::clamp(v.slope, 0.0f, 1.0f);
@@ -173,119 +196,12 @@ Color3 biomeVertexColor(const terrain::TerrainVertex& v, float minH, float maxH)
     return clampColor(color, 0.0f, 1.0f);
 }
 
-Color3 heatmapColor(float value) {
-    const float t = std::clamp(value, 0.0f, 1.0f);
-    if (t < 0.33f) {
-        return mixColor({0.06f, 0.12f, 0.42f}, {0.17f, 0.62f, 0.86f}, t / 0.33f);
-    }
-    if (t < 0.66f) {
-        return mixColor({0.17f, 0.62f, 0.86f}, {0.90f, 0.82f, 0.24f}, (t - 0.33f) / 0.33f);
-    }
-    return mixColor({0.90f, 0.82f, 0.24f}, {0.82f, 0.22f, 0.14f}, (t - 0.66f) / 0.34f);
-}
-
-Color3 precipitationColor(float value) {
-    const float t = std::clamp(value, 0.0f, 1.0f);
-    if (t < 0.5f) {
-        return mixColor({0.74f, 0.61f, 0.38f}, {0.42f, 0.68f, 0.28f}, t / 0.5f);
-    }
-    return mixColor({0.42f, 0.68f, 0.28f}, {0.12f, 0.38f, 0.63f}, (t - 0.5f) / 0.5f);
-}
-
-Color3 moistureColor(float value) {
-    const float t = std::clamp(value, 0.0f, 1.0f);
-    if (t < 0.5f) {
-        return mixColor({0.63f, 0.52f, 0.34f}, {0.31f, 0.55f, 0.20f}, t / 0.5f);
-    }
-    return mixColor({0.31f, 0.55f, 0.20f}, {0.06f, 0.44f, 0.36f}, (t - 0.5f) / 0.5f);
-}
-
-Color3 slopeColor(float value) {
-    const float t = std::clamp(value, 0.0f, 1.0f);
-    if (t < 0.4f) {
-        return mixColor({0.15f, 0.38f, 0.12f}, {0.57f, 0.56f, 0.26f}, t / 0.4f);
-    }
-    if (t < 0.75f) {
-        return mixColor({0.57f, 0.56f, 0.26f}, {0.55f, 0.49f, 0.44f}, (t - 0.4f) / 0.35f);
-    }
-    return mixColor({0.55f, 0.49f, 0.44f}, {0.95f, 0.95f, 0.95f}, (t - 0.75f) / 0.25f);
-}
-
-Color3 debugVertexColor(const terrain::TerrainVertex& v, float minH, float maxH, Mode mode) {
-    switch (mode) {
-    case Mode::SurfaceBiomes:
-        return biomeVertexColor(v, minH, maxH);
-    case Mode::Landforms: {
-        const terrain::BiomeColor c = terrain::landformColor(static_cast<terrain::LandformId>(v.landform));
-        return {c.r, c.g, c.b};
-    }
-    case Mode::Ecology: {
-        const terrain::BiomeColor c = terrain::ecologyColor(static_cast<terrain::EcologyId>(v.ecology));
-        return {c.r, c.g, c.b};
-    }
-    case Mode::Temperature:
-        return heatmapColor(v.temperature);
-    case Mode::Precipitation:
-        return precipitationColor(v.precipitation);
-    case Mode::Moisture:
-        return moistureColor(v.moisture);
-    case Mode::Slope:
-        return slopeColor(v.slope);
-    }
-
-    return biomeVertexColor(v, minH, maxH);
-}
-
-GLuint compileShader(GLenum type, const char* source) {
-    const GLuint shader = glfn::CreateShader(type);
-    glfn::ShaderSource(shader, 1, &source, nullptr);
-    glfn::CompileShader(shader);
-
-    GLint compiled = GL_FALSE;
-    glfn::GetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
-    if (compiled == GL_TRUE) {
-        return shader;
-    }
-
-    GLint infoLen = 0;
-    glfn::GetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLen);
-    std::string log(static_cast<size_t>(std::max(1, infoLen)), '\0');
-    glfn::GetShaderInfoLog(shader, infoLen, nullptr, log.data());
-    std::cerr << "Shader compilation failed:\n"
-              << log << '\n';
-    glfn::DeleteShader(shader);
-    return 0u;
-}
-
-} // namespace
-
-bool usesMaterials(Mode mode) {
-    return mode == Mode::SurfaceBiomes;
-}
-
-void rebuildTerrainColorBuffer(
+void buildTerrainColorBuffer(
     const terrain::TerrainMesh& mesh,
-    Mode mode,
     std::vector<float>& terrainColors) {
     terrainColors.resize(mesh.vertices.size() * 3u);
-
-    float precipMin = 0.0f;
-    float precipMax = 1.0f;
-    if (mode == Mode::Precipitation && !mesh.vertices.empty()) {
-        precipMin = mesh.vertices.front().precipitation;
-        precipMax = mesh.vertices.front().precipitation;
-        for (const terrain::TerrainVertex& v : mesh.vertices) {
-            precipMin = std::min(precipMin, v.precipitation);
-            precipMax = std::max(precipMax, v.precipitation);
-        }
-    }
-
     for (size_t i = 0; i < mesh.vertices.size(); ++i) {
-        Color3 color = debugVertexColor(mesh.vertices[i], mesh.minHeight, mesh.maxHeight, mode);
-        if (mode == Mode::Precipitation) {
-            const float normalized = (mesh.vertices[i].precipitation - precipMin) / std::max(0.0001f, precipMax - precipMin);
-            color = precipitationColor(normalized);
-        }
+        const Color3 color = biomeVertexColor(mesh.vertices[i], mesh.minHeight, mesh.maxHeight);
         const size_t base = i * 3u;
         terrainColors[base + 0u] = color.r;
         terrainColors[base + 1u] = color.g;

@@ -42,7 +42,6 @@ uniform sampler2D uSnowTex;
 uniform vec3 uSunLightDir;
 uniform vec3 uSunColor;
 uniform vec3 uAmbientColor;
-uniform int uEnableMaterials;
 
 out vec4 fragColor;
 
@@ -86,36 +85,33 @@ void main() {
     float temperature = vParams1.y;
     float precipitation = vParams1.z;
 
-    vec3 albedo = vBaseColor;
-    if (uEnableMaterials == 1) {
-        float rockSignal = slope * 0.42 + mountain * 0.92 + max(heightN - 0.58, 0.0) * 0.16;
-        float rock = smoothstep(0.48, 0.88, rockSignal);
-        float snow = smoothstep(0.76, 0.99, heightN + (1.0 - temperature) * 0.28 + slope * 0.04) *
-                     smoothstep(0.0, 0.55, 1.0 - moisture * 0.86);
-        float sand = smoothstep(0.08, 0.48, river) *
-                     smoothstep(0.0, 0.62, 1.0 - heightN) *
-                     smoothstep(0.0, 0.62, 1.0 - moisture);
-        float grass = clamp(1.0 - max(rock, snow), 0.0, 1.0) * (1.0 - sand * 0.72);
+    float rockSignal = slope * 0.42 + mountain * 0.92 + max(heightN - 0.58, 0.0) * 0.16;
+    float rock = smoothstep(0.48, 0.88, rockSignal);
+    float snow = smoothstep(0.76, 0.99, heightN + (1.0 - temperature) * 0.28 + slope * 0.04) *
+                 smoothstep(0.0, 0.55, 1.0 - moisture * 0.86);
+    float sand = smoothstep(0.08, 0.48, river) *
+                 smoothstep(0.0, 0.62, 1.0 - heightN) *
+                 smoothstep(0.0, 0.62, 1.0 - moisture);
+    float grass = clamp(1.0 - max(rock, snow), 0.0, 1.0) * (1.0 - sand * 0.72);
 
-        float weightSum = max(grass + rock + sand + snow, 0.0001);
-        grass /= weightSum;
-        rock /= weightSum;
-        sand /= weightSum;
-        snow /= weightSum;
+    float weightSum = max(grass + rock + sand + snow, 0.0001);
+    grass /= weightSum;
+    rock /= weightSum;
+    sand /= weightSum;
+    snow /= weightSum;
 
-        vec3 grassDetail = texture(uGrassTex, vWorldPos.xz * 0.052).rgb;
-        vec3 sandDetail = texture(uSandTex, vWorldPos.xz * 0.067).rgb;
-        vec3 rockDetail = triplanarSample(uRockTex, vWorldPos, normal, 0.085);
-        vec3 snowDetail = triplanarSample(uSnowTex, vWorldPos, normal, 0.042);
+    vec3 grassDetail = texture(uGrassTex, vWorldPos.xz * 0.052).rgb;
+    vec3 sandDetail = texture(uSandTex, vWorldPos.xz * 0.067).rgb;
+    vec3 rockDetail = triplanarSample(uRockTex, vWorldPos, normal, 0.085);
+    vec3 snowDetail = triplanarSample(uSnowTex, vWorldPos, normal, 0.042);
 
-        vec3 fertileTint = mix(vec3(0.78, 0.68, 0.46), vec3(0.86, 0.95, 0.76), saturate(moisture * 0.62 + precipitation * 0.38));
-        vec3 grassMaterial = grassDetail * mix(vBaseColor * 1.16, fertileTint, 0.22);
-        vec3 rockMaterial = rockDetail * mix(vec3(0.66, 0.67, 0.69), vBaseColor * 1.08, 0.20);
-        vec3 sandMaterial = sandDetail * mix(vec3(0.92, 0.84, 0.62), vBaseColor * 1.03, 0.12);
-        vec3 snowMaterial = snowDetail * vec3(0.93, 0.97, 1.02);
+    vec3 fertileTint = mix(vec3(0.78, 0.68, 0.46), vec3(0.86, 0.95, 0.76), saturate(moisture * 0.62 + precipitation * 0.38));
+    vec3 grassMaterial = grassDetail * mix(vBaseColor * 1.16, fertileTint, 0.22);
+    vec3 rockMaterial = rockDetail * mix(vec3(0.66, 0.67, 0.69), vBaseColor * 1.08, 0.20);
+    vec3 sandMaterial = sandDetail * mix(vec3(0.92, 0.84, 0.62), vBaseColor * 1.03, 0.12);
+    vec3 snowMaterial = snowDetail * vec3(0.93, 0.97, 1.02);
 
-        albedo = grassMaterial * grass + rockMaterial * rock + sandMaterial * sand + snowMaterial * snow;
-    }
+    vec3 albedo = grassMaterial * grass + rockMaterial * rock + sandMaterial * sand + snowMaterial * snow;
 
     float diffuse = saturate(dot(normal, lightDir));
     float wrappedDiffuse = saturate((dot(normal, lightDir) + 0.24) / 1.24);

@@ -124,8 +124,8 @@ inline constexpr Vec3 kAmbientColor = {0.25f, 0.28f, 0.32f};
 inline constexpr Vec3 kFogHorizonColor = {0.58f, 0.68f, 0.78f};
 
 float degToRad(float deg);
-bool usesMaterials(Mode mode);
-void rebuildTerrainColorBuffer(const terrain::TerrainMesh& mesh, Mode mode, std::vector<float>& terrainColors);
+Color3 biomeVertexColor(const terrain::TerrainVertex& v, float minH, float maxH);
+void buildTerrainColorBuffer(const terrain::TerrainMesh& mesh, std::vector<float>& terrainColors);
 GLuint createProceduralTexture(
     int size,
     float scale,

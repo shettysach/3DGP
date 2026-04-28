@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -108,10 +107,6 @@ void runDemo() {
               << settings.depth << "...\n";
     terrain::TerrainMesh mesh = generator.generateMesh();
 
-    auto setMode = [&renderer](Mode mode) {
-        renderer.setMode(mode);
-        std::cout << "Render mode: " << modeName(mode) << '\n';
-    };
     auto updateVoronoiHint = [&renderer, &settings]() {
         const std::string title =
             std::string("Terrain Generator Demo  |  Voronoi: ") +
@@ -120,7 +115,6 @@ void runDemo() {
         SDL_SetWindowTitle(renderer.window(), title.c_str());
     };
 
-    Mode currentMode = renderer.mode();
     updateVoronoiHint();
 
     const float centerX =
@@ -141,11 +135,8 @@ void runDemo() {
     std::cout << "  Q/E: move down/up\n";
     std::cout << "  R: regenerate terrain\n";
     std::cout << "  B: toggle Voronoi on/off (same seed)\n";
-    std::cout << "  V: cycle forward through modes\n";
-    std::cout << "  P: save screenshot\n";
     std::cout << "  ESC: quit\n";
     printBiomeStats(mesh);
-    setMode(currentMode);
 
     SDL_Event event;
     bool orbiting = false;
@@ -191,39 +182,7 @@ void runDemo() {
                               << " (seed " << settings.seed << ")\n";
                     printBiomeStats(mesh);
                     break;
-                case SDLK_v:
-                    if (event.key.keysym.mod & KMOD_SHIFT) {
-                        if (static_cast<int>(currentMode) == 0) {
-                            currentMode = Mode::Slope;
-                        } else {
-                            currentMode = static_cast<Mode>(
-                                static_cast<int>(currentMode) - 1
-                            );
-                        }
-                    } else {
-                        currentMode = static_cast<Mode>(
-                            (static_cast<int>(currentMode) + 1)
-                            % (static_cast<int>(Mode::Slope) + 1)
-                        );
-                    }
-                    renderer.setMode(currentMode);
-                    std::cout << "Render mode: " << modeName(currentMode)
-                              << '\n';
-                    break;
-                    case SDLK_p: {
-                        const std::time_t now = std::time(nullptr);
-                        const std::string screenshotPath = "screenshot_"
-                            + std::to_string(static_cast<long long>(now))
-                            + ".bmp";
-                        if (renderer.captureScreenshot(screenshotPath)) {
-                            std::cout << "Saved screenshot to "
-                                      << screenshotPath << '\n';
-                        } else {
-                            std::cout << "Failed to save screenshot\n";
-                        }
-                        break;
-                    }
-                    default:
+                default:
                         break;
                 }
             }

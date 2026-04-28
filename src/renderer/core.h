@@ -38,22 +38,11 @@
 
 namespace renderer {
 
-enum class Mode {
-    SurfaceBiomes = 0,
-    Landforms,
-    Ecology,
-    Temperature,
-    Precipitation,
-    Moisture,
-    Slope,
-};
-
 struct TerrainUniformLocations {
     GLint viewProj = -1;
     GLint sunLightDir = -1;
     GLint sunColor = -1;
     GLint ambientColor = -1;
-    GLint enableMaterials = -1;
     GLint grassTex = -1;
     GLint rockTex = -1;
     GLint sandTex = -1;
@@ -78,8 +67,6 @@ class Renderer {
     void moveForward(float amount);
     void moveRight(float amount);
     void setTarget(float x, float y, float z);
-    void setMode(Mode mode);
-    Mode mode() const;
 
     SDL_Window* window() const {
         return window_;
@@ -90,7 +77,6 @@ class Renderer {
     }
 
     void invalidateMeshCache();
-    bool captureScreenshot(const std::string& filepath) const;
 
   private:
     int width_;
@@ -104,9 +90,7 @@ class Renderer {
     float targetX_;
     float targetY_;
     float targetZ_;
-    Mode mode_;
     bool terrainBuffersValid_;
-    bool terrainColorsValid_;
     std::size_t cachedTerrainVertexCount_;
     std::size_t cachedTerrainIndexCount_;
     GLuint terrainVao_;
@@ -119,12 +103,9 @@ class Renderer {
     GLuint sandTexture_;
     TerrainUniformLocations terrainUniforms_;
     std::vector<float> terrainBaseColors_;
-    bool profileNextFrame_;
-    std::string pendingProfileReason_;
 };
 
 void runDemo();
-const char* modeName(Mode mode);
 
 } // namespace renderer
 
