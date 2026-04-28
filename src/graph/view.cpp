@@ -228,12 +228,25 @@ static float drawToolbar() {
     }
 
     ImGui::SameLine();
-    if (ImGui::Button("Default")) {
-        gGraph = defaultGraph();
-        gNextNodeId = 0;
-        gNextLinkId = 0;
-        syncIdsFromGraph(gGraph);
-        saveToFile();
+    if (ImGui::Button("Presets v")) {
+        ImGui::OpenPopup("PresetsPopup");
+    }
+    if (ImGui::BeginPopup("PresetsPopup")) {
+        if (ImGui::Selectable("preset 0")) {
+            gGraph = defaultGraph();
+            gNextNodeId = 0;
+            gNextLinkId = 0;
+            syncIdsFromGraph(gGraph);
+            saveToFile();
+        }
+        if (ImGui::Selectable("preset 1")) {
+            gGraph = preset1Graph();
+            gNextNodeId = 0;
+            gNextLinkId = 0;
+            syncIdsFromGraph(gGraph);
+            saveToFile();
+        }
+        ImGui::EndPopup();
     }
 
     ImGui::SameLine();

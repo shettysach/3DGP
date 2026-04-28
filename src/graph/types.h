@@ -184,6 +184,9 @@ NodeParams defaultParams(NodeKind kind);
 // Builds the default graph.
 EditorGraph defaultGraph();
 
+// Builds the bilinear-continent preset graph.
+EditorGraph preset1Graph();
+
 } // namespace graph
 
 #endif // GRAPH_TYPES_H
