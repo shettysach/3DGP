@@ -2,10 +2,7 @@
 #include "renderer/shaders.h"
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
-#include <cstddef>
-#include <cstring>
 #include <iostream>
 #include <vector>
 
@@ -95,9 +92,6 @@ bool Renderer::init() {
         return glfn::GetUniformLocation(program, name);
     };
     terrainUniforms_.viewProj = cacheUniform(terrainProgram_, "uViewProj");
-    terrainUniforms_.sunLightDir = cacheUniform(terrainProgram_, "uSunLightDir");
-    terrainUniforms_.sunColor = cacheUniform(terrainProgram_, "uSunColor");
-    terrainUniforms_.ambientColor = cacheUniform(terrainProgram_, "uAmbientColor");
     terrainUniforms_.grassTex = cacheUniform(terrainProgram_, "uGrassTex");
     terrainUniforms_.rockTex = cacheUniform(terrainProgram_, "uRockTex");
     terrainUniforms_.sandTex = cacheUniform(terrainProgram_, "uSandTex");
@@ -345,21 +339,11 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
         kCameraFar);
     const Mat4 viewProjection = multiply(projection, view);
 
-    const Vec3 sunLightDir = normalize(Vec3{-kSunDirection.x, -kSunDirection.y, -kSunDirection.z});
-
     glViewport(0, 0, drawableWidth, drawableHeight);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-    glEnable(GL_CULL_FACE);
-    glDepthMask(GL_TRUE);
-
     glfn::UseProgram(terrainProgram_);
     setUniform(terrainUniforms_.viewProj, viewProjection);
-    setUniform(terrainUniforms_.sunLightDir, sunLightDir);
-    setUniform(terrainUniforms_.sunColor, kSunColor);
-    setUniform(terrainUniforms_.ambientColor, kAmbientColor);
 
     glfn::ActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, grassTexture_);
@@ -376,11 +360,6 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
         static_cast<GLsizei>(cachedTerrainIndexCount_),
         GL_UNSIGNED_INT,
         nullptr);
-    glfn::BindVertexArray(0);
-
-    glfn::ActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glfn::UseProgram(0);
 }
 
 } // namespace renderer

@@ -39,27 +39,11 @@ uniform sampler2D uGrassTex;
 uniform sampler2D uRockTex;
 uniform sampler2D uSandTex;
 uniform sampler2D uSnowTex;
-uniform vec3 uSunLightDir;
-uniform vec3 uSunColor;
-uniform vec3 uAmbientColor;
 
 out vec4 fragColor;
 
 float saturate(float x) {
     return clamp(x, 0.0, 1.0);
-}
-
-vec3 toneMap(vec3 color) {
-    color = max(color, vec3(0.0));
-    return clamp(
-        (color * (2.51 * color + 0.03)) /
-            max(color * (2.43 * color + 0.59) + 0.14, vec3(0.14)),
-        0.0,
-        1.0);
-}
-
-vec3 toDisplay(vec3 color) {
-    return pow(toneMap(color), vec3(1.0 / 2.2));
 }
 
 vec3 triplanarSample(sampler2D tex, vec3 pos, vec3 normal, float scale) {
@@ -75,7 +59,6 @@ vec3 triplanarSample(sampler2D tex, vec3 pos, vec3 normal, float scale) {
 
 void main() {
     vec3 normal = normalize(vNormal);
-    vec3 lightDir = normalize(uSunLightDir);
 
     float slope = vParams0.x;
     float mountain = vParams0.y;
@@ -113,11 +96,11 @@ void main() {
 
     vec3 albedo = grassMaterial * grass + rockMaterial * rock + sandMaterial * sand + snowMaterial * snow;
 
+    vec3 lightDir = vec3(0.375, 0.893, 0.250);
     float diffuse = saturate(dot(normal, lightDir));
-    float wrappedDiffuse = saturate((dot(normal, lightDir) + 0.24) / 1.24);
-    vec3 lit = albedo * (uAmbientColor + uSunColor * wrappedDiffuse);
+    vec3 lit = albedo * (vec3(0.25, 0.28, 0.32) + vec3(1.12, 1.03, 0.92) * diffuse);
 
-    fragColor = vec4(toDisplay(lit), 1.0);
+    fragColor = vec4(pow(clamp(lit, 0.0, 1.0), vec3(1.0 / 2.2)), 1.0);
 }
 )glsl";
 

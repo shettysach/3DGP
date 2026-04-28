@@ -9,7 +9,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
-#include <limits>
 #include <string>
 #include <vector>
 
@@ -44,7 +43,6 @@ PFNGLUNIFORM1IPROC Uniform1i = nullptr;
 PFNGLUNIFORM1FPROC Uniform1f = nullptr;
 PFNGLUNIFORM3FPROC Uniform3f = nullptr;
 PFNGLACTIVETEXTUREPROC ActiveTexture = nullptr;
-PFNGLGENERATEMIPMAPPROC GenerateMipmap = nullptr;
 
 bool load() {
     auto loadSymbol = [](const char* name) {
@@ -88,7 +86,6 @@ bool load() {
     LOAD_GL(Uniform1f);
     LOAD_GL(Uniform3f);
     LOAD_GL(ActiveTexture);
-    LOAD_GL(GenerateMipmap);
 
 #undef LOAD_GL
     return true;
@@ -252,12 +249,11 @@ GLuint createProceduralTexture(
     GLuint tex = 0u;
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, size, size, 0, GL_RGB, GL_UNSIGNED_BYTE, data.data());
-    glfn::GenerateMipmap(GL_TEXTURE_2D);
     glBindTexture(GL_TEXTURE_2D, 0);
     return tex;
 }
@@ -405,14 +401,6 @@ Mat4 multiply(const Mat4& a, const Mat4& b) {
     return out;
 }
 
-Vec3 transformPoint(const Mat4& m, const Vec3& v) {
-    return {
-        m.m[0] * v.x + m.m[4] * v.y + m.m[8] * v.z + m.m[12],
-        m.m[1] * v.x + m.m[5] * v.y + m.m[9] * v.z + m.m[13],
-        m.m[2] * v.x + m.m[6] * v.y + m.m[10] * v.z + m.m[14],
-    };
-}
-
 Mat4 perspective(float fovYRadians, float aspect, float nearPlane, float farPlane) {
     const float f = 1.0f / std::tan(fovYRadians * 0.5f);
     Mat4 out{};
@@ -449,19 +437,6 @@ Mat4 lookAt(const Vec3& eye, const Vec3& target, const Vec3& up) {
     out.m[3] = 0.0f;
     out.m[7] = 0.0f;
     out.m[11] = 0.0f;
-    out.m[15] = 1.0f;
-    return out;
-}
-
-Mat4 orthoBox(float left, float right, float bottom, float top, float nearPlane, float farPlane) {
-    Mat4 out{};
-    std::fill(std::begin(out.m), std::end(out.m), 0.0f);
-    out.m[0] = 2.0f / (right - left);
-    out.m[5] = 2.0f / (top - bottom);
-    out.m[10] = -2.0f / (farPlane - nearPlane);
-    out.m[12] = -(right + left) / (right - left);
-    out.m[13] = -(top + bottom) / (top - bottom);
-    out.m[14] = -(farPlane + nearPlane) / (farPlane - nearPlane);
     out.m[15] = 1.0f;
     return out;
 }

@@ -113,14 +113,10 @@ extern PFNGLUNIFORM1IPROC Uniform1i;
 extern PFNGLUNIFORM1FPROC Uniform1f;
 extern PFNGLUNIFORM3FPROC Uniform3f;
 extern PFNGLACTIVETEXTUREPROC ActiveTexture;
-extern PFNGLGENERATEMIPMAPPROC GenerateMipmap;
 
 bool load();
 } // namespace glfn
 
-inline constexpr Vec3 kSunDirection = {-0.42f, -1.0f, -0.28f};
-inline constexpr Vec3 kSunColor = {1.12f, 1.03f, 0.92f};
-inline constexpr Vec3 kAmbientColor = {0.25f, 0.28f, 0.32f};
 inline constexpr Vec3 kFogHorizonColor = {0.58f, 0.68f, 0.78f};
 
 float degToRad(float deg);
@@ -144,10 +140,8 @@ Vec3 cross(const Vec3& a, const Vec3& b);
 float length(const Vec3& v);
 Vec3 normalize(const Vec3& v);
 Mat4 multiply(const Mat4& a, const Mat4& b);
-Vec3 transformPoint(const Mat4& m, const Vec3& v);
 Mat4 perspective(float fovYRadians, float aspect, float nearPlane, float farPlane);
 Mat4 lookAt(const Vec3& eye, const Vec3& target, const Vec3& up);
-Mat4 orthoBox(float left, float right, float bottom, float top, float nearPlane, float farPlane);
 
 void setUniform(GLint location, const Mat4& value);
 void setUniform(GLint location, int value);

@@ -40,9 +40,6 @@ namespace renderer {
 
 struct TerrainUniformLocations {
     GLint viewProj = -1;
-    GLint sunLightDir = -1;
-    GLint sunColor = -1;
-    GLint ambientColor = -1;
     GLint grassTex = -1;
     GLint rockTex = -1;
     GLint sandTex = -1;
