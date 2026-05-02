@@ -97,13 +97,13 @@ static void initImGui() {
     ImGui::StyleColorsDark();
 
     ImGuiIO& io = ImGui::GetIO();
-    io.FontGlobalScale = 3.0f;
-    ImGui::GetStyle().ScaleAllSizes(3.0f);
+    io.FontGlobalScale = 1.0f;
+    ImGui::GetStyle().ScaleAllSizes(1.0f);
 
     ImNodesStyle& ns = ImNodes::GetStyle();
     ns.Flags |= ImNodesStyleFlags_GridLines;
-    ns.PinCircleRadius *= 2.0f;
-    ns.LinkHoverDistance *= 2.0f;
+    ns.PinCircleRadius *= 1.0f;
+    ns.LinkHoverDistance *= 1.0f;
 
     ImGui_ImplSDL2_InitForOpenGL(gWindow, gGlCtx);
     ImGui_ImplOpenGL3_Init("#version 330");

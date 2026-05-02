@@ -1,3 +1,4 @@
+// for removal 
 #include "landforms.h"
 #include "util.h"
 
@@ -241,98 +242,5 @@ void removeSmallLandformIslands(std::vector<uint8_t>& levels, const TerrainField
 }
 
 } // namespace
-
-void computeLandformFields(TerrainFields& fields) {
-    if (fields.heights.empty()) {
-        return;
-    }
-
-    const float invHeightRange = 1.0f / std::max(0.0001f, fields.maxHeight - fields.minHeight);
-    const size_t cellCount = fields.size();
-
-    std::vector<float> rawSignal(cellCount, 0.0f);
-    for (size_t idx = 0; idx < cellCount; ++idx) {
-        const float elevationNorm = (fields.heights[idx] - fields.minHeight) * invHeightRange;
-        const float slope = std::clamp(fields.slopes[idx], 0.0f, 1.0f);
-        const float valleyPull = std::clamp(fields.valleyWeights[idx], 0.0f, 1.0f);
-        rawSignal[idx] = std::clamp(
-            fields.mountainWeights[idx] * 0.72f +
-                valleyPull * 0.30f +
-                smoothstep(0.04f, 0.36f, slope) * 0.35f +
-                smoothstep(0.35f, 0.82f, elevationNorm) * 0.38f,
-            0.0f,
-            1.0f);
-    }
-
-    std::vector<float> blurredSignal;
-    blurScalarField(rawSignal, blurredSignal, fields.width, fields.depth);
-    blurScalarField(blurredSignal, fields.landformSignal, fields.width, fields.depth);
-    for (int pass = 0; pass < 3; ++pass) {
-        aggressiveBlurScalarField(fields.landformSignal, blurredSignal, fields.width, fields.depth, 2);
-        fields.landformSignal.swap(blurredSignal);
-    }
-
-    std::vector<uint8_t> levels(cellCount, static_cast<uint8_t>(LandformId::Plain));
-    std::vector<float> elevationNorms(cellCount, 0.0f);
-    for (size_t idx = 0; idx < cellCount; ++idx) {
-        elevationNorms[idx] = (fields.heights[idx] - fields.minHeight) * invHeightRange;
-        levels[idx] = static_cast<uint8_t>(classifyLandform(
-            elevationNorms[idx],
-            fields.temperature[idx],
-            fields.slopes[idx],
-            fields.landformSignal[idx],
-            fields.plateauWeights[idx]));
-    }
-
-    for (int iteration = 0; iteration < 2; ++iteration) {
-        std::vector<uint8_t> nextLevels = levels;
-        for (int z = 0; z < fields.depth; ++z) {
-            const int z0 = std::max(0, z - 1);
-            const int z1 = std::min(fields.depth - 1, z + 1);
-            for (int x = 0; x < fields.width; ++x) {
-                const int x0 = std::max(0, x - 1);
-                const int x1 = std::min(fields.width - 1, x + 1);
-                const size_t idx = fieldIndex(x, z, fields.width);
-
-                int level = static_cast<int>(levels[idx]);
-                int sum = level * 2;
-                int count = 2;
-                for (int nz = z0; nz <= z1; ++nz) {
-                    for (int nx = x0; nx <= x1; ++nx) {
-                        if (nx == x && nz == z) {
-                            continue;
-                        }
-                        sum += static_cast<int>(levels[fieldIndex(nx, nz, fields.width)]);
-                        ++count;
-                    }
-                }
-
-                const int neighborAverage = (count > 0) ? (sum / count) : 0;
-                if (level > neighborAverage + 1) {
-                    --level;
-                } else if (level < neighborAverage - 1) {
-                    ++level;
-                }
-
-                level = std::min(level, maxAllowedLevel(elevationNorms[idx], fields.temperature[idx], fields.landformSignal[idx], fields.plateauWeights[idx]));
-                if (fields.valleyWeights[idx] > 0.45f && level > static_cast<int>(LandformId::Valley) && level < static_cast<int>(LandformId::Mountain)) {
-                    level = static_cast<int>(LandformId::Valley);
-                }
-                if (level == static_cast<int>(LandformId::Lowland) &&
-                    !(elevationNorms[idx] < 0.30f && fields.slopes[idx] < 0.12f)) {
-                    level = static_cast<int>(LandformId::Plain);
-                }
-                nextLevels[idx] = static_cast<uint8_t>(std::clamp(level, 0, static_cast<int>(LandformId::Snowcap)));
-            }
-        }
-        levels.swap(nextLevels);
-    }
-
-    applyAggressiveLandformMajority(levels, fields, 4);
-    removeSmallLandformIslands(levels, fields);
-    applyAggressiveLandformMajority(levels, fields, 2);
-
-    fields.landformIds = levels;
-}
 
 } // namespace terrain

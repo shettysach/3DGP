@@ -655,7 +655,7 @@ void computeBiomeFieldsWFC(TerrainFields& fields, const TerrainSettings& setting
     std::cout << "[WFC] Starting Wave Function Collapse solver..." << std::endl;
     BiomeConstraintGraph constraints;
     WFCBiomeSolver solver(graph, constraints, settings.seed);
-
+    // check compuet biome fields.
     // We'll pass heuristics to help selection (though current solver doesn't use them yet,
     // it's ready for that expansion)
     if (!solver.solve(tempHeuristics, moistureHeuristics)) {

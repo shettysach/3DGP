@@ -6,11 +6,7 @@
 namespace terrain {
 
 BiomeConstraintGraph::BiomeConstraintGraph() {
-    // --- ECOLOGICAL CONSTRAINTS ---
-    // We enforce strict adjacency rules for temperature/climate.
-    // For example, Snow can never touch a Desert.
-    
-    // Group biomes by ecology to make rule generation easier
+
     std::vector<BiomeId> deserts = {BiomeId::DesertPlain, BiomeId::DesertPlateau};
     std::vector<BiomeId> steppes = {BiomeId::SteppePlain, BiomeId::SteppeFoothill, BiomeId::SteppePlateau};
     std::vector<BiomeId> grasslands = {BiomeId::GrasslandPlain, BiomeId::GrasslandFoothill, BiomeId::GrasslandPlateau, BiomeId::MarshLowland};
@@ -57,9 +53,6 @@ BiomeConstraintGraph::BiomeConstraintGraph() {
     // Rule 7: Alpines/Snow can touch Taigas and Tundras
     connectGroups(alpines, alpines);
     
-    // Note: We deliberately DO NOT constrain Landforms (e.g., Plains touching Mountains).
-    // Because the heightmap is fixed before WFC runs, WFC must be allowed to transition 
-    // a Plain directly to a Mountain if the Voronoi partitioning demands it.
 }
 
 void BiomeConstraintGraph::addRule(BiomeId a, BiomeId b) {
@@ -106,20 +99,17 @@ bool WFCBiomeSolver::solve(const std::vector<float>& temperatureHeuristics,
     
     while (iterations++ < maxIterations) {
         if (!collapseNext()) {
-            // Check if we finished
             bool finished = true;
             for (auto b : state_.collapsedBiomes) {
                 if (b == -1) { finished = false; break; }
             }
             if (finished) return true;
             
-            // Contradiction! Backtrack.
             if (history_.empty()) {
                 std::cout << "[WFC] Fatal contradiction. No history left to backtrack!" << std::endl;
                 return false; // Fail
             }
             
-            // std::cout << "[WFC] Contradiction hit! Backtracking..." << std::endl;
             state_ = history_.top();
             history_.pop();
             
@@ -129,7 +119,6 @@ bool WFCBiomeSolver::solve(const std::vector<float>& temperatureHeuristics,
                 state_.possibilities[state_.lastChoiceCell * biomeCount + state_.lastChoiceBiome] = false;
             }
             
-            // Continue the loop, it will now try a different possibility for that cell or another cell
         }
     }
     std::cout << "[WFC] Failed: Exceeded maximum iterations (" << maxIterations << ")." << std::endl;
@@ -145,9 +134,8 @@ float WFCBiomeSolver::calculateEntropy(uint32_t cellIdx) const {
         if (state_.possibilities[cellIdx * biomeCount + i]) count++;
     }
     
-    if (count == 0) return -1.0f; // Contradiction
+    if (count == 0) return -1.0f;
     
-    // Add small random noise to break ties
     std::uniform_real_distribution<float> dist(0.0f, 0.1f);
     return static_cast<float>(count) + dist(const_cast<std::mt19937&>(rng_));
 }
@@ -178,7 +166,6 @@ bool WFCBiomeSolver::collapseNext() {
     
     int biomeCount = static_cast<int>(BiomeId::Count);
     
-    // Helper to group biomes by color/ecology (so a Grassland Plain next to a Grassland Foothill gets a bonus)
     auto getEcologyGroup = [](BiomeId b) -> int {
         switch(b) {
             case BiomeId::DesertPlain: case BiomeId::DesertPlateau: return 0;
@@ -209,14 +196,11 @@ bool WFCBiomeSolver::collapseNext() {
             // Heuristic: how well does this biome fit the local climate?
             float weight = getHeuristicWeight(bestCell, static_cast<BiomeId>(i));
             
-            // Continuity Prior: Massive multiplier if this biome matches a neighbor's ecology
             int myEco = getEcologyGroup(static_cast<BiomeId>(i));
             if (neighborEcologyCounts[myEco] > 0) {
-                weight *= (1.0f + 100.0f * neighborEcologyCounts[myEco]); // Extreme bonus to clump colors
+                weight *= (1.0f + 100.0f * neighborEcologyCounts[myEco]);
             }
-            
-            // Add a base weight so even bad choices are *possible*, just less likely,
-            // which allows the solver to escape dead ends if forced by constraints.
+
             weight = std::max(0.01f, weight);
             weights.push_back(weight);
             weightSum += weight;
@@ -340,11 +324,8 @@ float WFCBiomeSolver::getHeuristicWeight(uint32_t cellIdx, BiomeId biome) const 
         default: break;
     }
     
-    // Calculate difference
     float diff = std::abs(cellTemp - targetTemp);
-    
-    // Convert difference to a weight (Gaussian-like curve)
-    // Small difference = high weight (~1.0). Large difference = low weight (~0.01)
+   
     return std::exp(-diff * diff * 15.0f);
 }
 

@@ -183,18 +183,9 @@ TerrainMesh TerrainGenerator::generateMesh() const {
     computeHeightExtents(fields.heights, fields.minHeight, fields.maxHeight);
     computeSlopeField(fields, settings_.horizontalScale);
     const auto slopesDone = Clock::now();
-    // for removal.
-    computeClimateFields(fields);
-    const auto climateDone = Clock::now();
-    // for removal.
-    computeLandformFields(fields);
     const auto landformsDone = Clock::now();
 
-    if (settings_.useWFC) {
-        computeBiomeFieldsWFC(fields, settings_);
-    } else {
-        computeBiomeFields(fields);
-    }
+    computeBiomeFieldsWFC(fields, settings_);
     const auto biomesDone = Clock::now();
 
     TerrainMesh mesh;
@@ -214,8 +205,6 @@ TerrainMesh TerrainGenerator::generateMesh() const {
               << " base=" << stageMs(stageStart, baseTerrainDone) << "ms"
               << " rivers=" << stageMs(smoothDone, riversDone) << "ms"
               << " slopes=" << stageMs(riversDone, slopesDone) << "ms"
-              << " climate=" << stageMs(slopesDone, climateDone) << "ms"
-              << " landforms=" << stageMs(climateDone, landformsDone) << "ms"
               << " biomes=" << stageMs(landformsDone, biomesDone) << "ms"
               << " extents=" << stageMs(biomesDone, extentsDone) << "ms"
               << " vertices=" << stageMs(extentsDone, verticesDone) << "ms"
