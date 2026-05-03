@@ -111,10 +111,7 @@ add_executable(terrain_demo
   src/terrain/blending.h
   src/terrain/biomes.cpp
   src/terrain/biomes.h
-  src/terrain/climate.cpp
   src/terrain/fields.h
-  src/terrain/landforms.cpp
-  src/terrain/landforms.h
   src/terrain/util.h
   src/terrain/terrain_noise.cpp
   src/terrain/terrain_noise.h

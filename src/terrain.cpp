@@ -5,7 +5,6 @@
 #include "terrain/biomes.h"
 #include "terrain/blending.h"
 #include "terrain/fields.h"
-#include "terrain/landforms.h"
 #include "terrain/rivers.h"
 #include "terrain/util.h"
 
