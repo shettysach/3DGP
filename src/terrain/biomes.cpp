@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <queue>
 #include <vector>
 
 namespace terrain {
@@ -453,96 +452,6 @@ void applyAggressiveBiomeMajority(std::vector<uint8_t>& primaryIds, const Terrai
     }
 }
 
-void removeSmallBiomeIslands(std::vector<uint8_t>& primaryIds, const TerrainFields& fields) {
-    const size_t total = primaryIds.size();
-    if (total == 0) {
-        return;
-    }
-
-    constexpr int kMinComponentSize = 120;
-    constexpr size_t kCount = static_cast<size_t>(BiomeId::Count);
-    std::vector<uint8_t> visited(total, 0);
-    std::vector<uint8_t> mark(total, 0);
-    std::queue<size_t> q;
-    std::vector<size_t> component;
-    component.reserve(256);
-
-    for (size_t start = 0; start < total; ++start) {
-        if (visited[start] != 0) {
-            continue;
-        }
-
-        const uint8_t label = primaryIds[start];
-        q.push(start);
-        visited[start] = 1;
-        component.clear();
-        component.push_back(start);
-
-        while (!q.empty()) {
-            const size_t idx = q.front();
-            q.pop();
-            const int x = static_cast<int>(idx % static_cast<size_t>(fields.width));
-            const int z = static_cast<int>(idx / static_cast<size_t>(fields.width));
-            const int z0 = std::max(0, z - 1);
-            const int z1 = std::min(fields.depth - 1, z + 1);
-            const int x0 = std::max(0, x - 1);
-            const int x1 = std::min(fields.width - 1, x + 1);
-            for (int nz = z0; nz <= z1; ++nz) {
-                for (int nx = x0; nx <= x1; ++nx) {
-                    const size_t nidx = fieldIndex(nx, nz, fields.width);
-                    if (visited[nidx] != 0) {
-                        continue;
-                    }
-                    visited[nidx] = 1;
-                    if (primaryIds[nidx] == label) {
-                        q.push(nidx);
-                        component.push_back(nidx);
-                    }
-                }
-            }
-        }
-
-        if (static_cast<int>(component.size()) >= kMinComponentSize) {
-            continue;
-        }
-
-        std::array<int, kCount> neighborCounts{};
-        neighborCounts.fill(0);
-        for (size_t idx : component) {
-            mark[idx] = 1;
-        }
-        for (size_t idx : component) {
-            const int x = static_cast<int>(idx % static_cast<size_t>(fields.width));
-            const int z = static_cast<int>(idx / static_cast<size_t>(fields.width));
-            const int z0 = std::max(0, z - 1);
-            const int z1 = std::min(fields.depth - 1, z + 1);
-            const int x0 = std::max(0, x - 1);
-            const int x1 = std::min(fields.width - 1, x + 1);
-            for (int nz = z0; nz <= z1; ++nz) {
-                for (int nx = x0; nx <= x1; ++nx) {
-                    const size_t nidx = fieldIndex(nx, nz, fields.width);
-                    if (mark[nidx] != 0) {
-                        continue;
-                    }
-                    ++neighborCounts[primaryIds[nidx]];
-                }
-            }
-        }
-        size_t replacement = static_cast<size_t>(BiomeId::GrasslandPlain);
-        int best = -1;
-        for (size_t i = 0; i < neighborCounts.size(); ++i) {
-            if (neighborCounts[i] > best) {
-                best = neighborCounts[i];
-                replacement = i;
-            }
-        }
-        for (size_t idx : component) {
-            primaryIds[idx] = static_cast<uint8_t>(replacement);
-            mark[idx] = 0;
-        }
-    }
-}
-
 void forceHardBiomeLabels(TerrainFields& fields) {
     for (size_t idx = 0; idx < fields.size(); ++idx) {
         const uint8_t biome = fields.primaryBiomeIds[idx];
@@ -555,9 +464,6 @@ void forceHardBiomeLabels(TerrainFields& fields) {
 
 void aggressiveBiomeCleanup(TerrainFields& fields) {
     std::vector<uint8_t> ids = fields.primaryBiomeIds;
-    applyAggressiveBiomeMajority(ids, fields, 4);
-    removeSmallBiomeIslands(ids, fields);
-    applyAggressiveBiomeMajority(ids, fields, 2);
     fields.primaryBiomeIds = ids;
     forceHardBiomeLabels(fields);
 }

@@ -1,3 +1,4 @@
+#if 0
 // for removal 
 #include "landforms.h"
 #include "util.h"
@@ -244,3 +245,4 @@ void removeSmallLandformIslands(std::vector<uint8_t>& levels, const TerrainField
 } // namespace
 
 } // namespace terrain
+#endif
