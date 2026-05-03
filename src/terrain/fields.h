@@ -23,8 +23,6 @@ struct TerrainFields {
     std::vector<float> temperature;
     std::vector<float> precipitation;
     std::vector<float> moisture;
-    std::vector<float> sampleXs;
-    std::vector<float> sampleZs;
     std::vector<uint8_t> landformIds;
     std::vector<float> landformSignal;
     std::vector<float> valleyWeights;
@@ -56,8 +54,6 @@ struct TerrainFields {
         temperature.assign(count, 0.5f);
         precipitation.assign(count, 0.5f);
         moisture.assign(count, 0.5f);
-        sampleXs.assign(count, 0.0f);
-        sampleZs.assign(count, 0.0f);
         landformIds.assign(count, static_cast<uint8_t>(LandformId::Plain));
         landformSignal.assign(count, 0.0f);
         valleyWeights.assign(count, 0.0f);

@@ -29,9 +29,6 @@ CompiledGraph compile(const EditorGraph& editorGraph) {
         const size_t srcIdx = idToIndex.at(link.from.nodeId);
         const size_t dstIdx = idToIndex.at(link.to.nodeId);
 
-        const NodeDef& srcDef = nodeDefinition(compiled.nodes[srcIdx].kind);
-        const NodeDef& dstDef = nodeDefinition(compiled.nodes[dstIdx].kind);
-
         compiled.nodes[dstIdx].inputs[link.to.slot] =
             static_cast<uint16_t>(srcIdx);
     }

@@ -478,17 +478,12 @@ terrain::TerrainFields execute(
                 fields.mountainWeights.assign(cellCount, 0.0f);
                 fields.valleyWeights.assign(cellCount, 0.0f);
                 fields.plateauWeights.assign(cellCount, 0.0f);
-                fields.sampleXs.assign(cellCount, 0.0f);
-                fields.sampleZs.assign(cellCount, 0.0f);
 
                 for (int z = 0; z < d; ++z) {
                     for (int x = 0; x < w; ++x) {
                         const size_t idx = fieldIndex(x, z, w);
                         const float wx = static_cast<float>(x) * hScale;
                         const float wz = static_cast<float>(z) * hScale;
-
-                        fields.sampleXs[idx] = wx;
-                        fields.sampleZs[idx] = wz;
 
                         const float detail = 0.5f
                             * (noiseContext.simplex2D(

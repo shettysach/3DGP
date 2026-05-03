@@ -164,7 +164,6 @@ struct CompiledGraph {
 
 struct PinDef {
     const char* label;
-    bool isInput = false;
     PinType type = PinType::Float;
 };
 
