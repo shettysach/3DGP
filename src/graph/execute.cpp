@@ -66,6 +66,8 @@ terrain::TerrainFields execute(
     std::vector<NodeOutput> nodeOutputs(N);
     std::vector<bool> visited(N, false);
     terrain::TerrainFields fields(w, d);
+    std::vector<float> detailField;
+    bool detailFieldReady = false;
 
     const std::vector<float> zeroFloat(cellCount, 0.0f);
     const std::vector<Vec2> zeroVec2(cellCount, Vec2 {0.0f, 0.0f});
@@ -82,6 +84,27 @@ terrain::TerrainFields execute(
         if (slot < cn.inputs.size() && cn.inputs[slot].has_value())
             return std::get<std::vector<Vec2>>(nodeOutputs[*cn.inputs[slot]]);
         return zeroVec2;
+    };
+
+    auto getDetailField = [&]() -> const std::vector<float>& {
+        if (detailFieldReady) {
+            return detailField;
+        }
+
+        detailField.assign(cellCount, 0.0f);
+        for (int z = 0; z < d; ++z) {
+            for (int x = 0; x < w; ++x) {
+                const size_t idx = fieldIndex(x, z, w);
+                const float wx = static_cast<float>(x) * hScale;
+                const float wz = static_cast<float>(z) * hScale;
+                detailField[idx] = 0.5f
+                    * (noiseContext.simplex2D(wx * kDetailFreq, wz * kDetailFreq)
+                       + 1.0f);
+            }
+        }
+
+        detailFieldReady = true;
+        return detailField;
     };
 
     std::function<void(size_t)> eval = [&](size_t ni) {
@@ -245,6 +268,7 @@ terrain::TerrainFields execute(
                 const auto& continental = getFloat(cn, 0);
                 const auto& ridges = getFloat(cn, 1);
                 const auto& rangeMaskIn = getFloat(cn, 2);
+                const auto& detail = getDetailField();
 
                 nodeOutputs[ni] = std::vector<Vec2>(cellCount);
                 auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
@@ -252,20 +276,10 @@ terrain::TerrainFields execute(
                 for (int z = 0; z < d; ++z) {
                     for (int x = 0; x < w; ++x) {
                         const size_t idx = fieldIndex(x, z, w);
-                        const float wx = static_cast<float>(x) * hScale;
-                        const float wz = static_cast<float>(z) * hScale;
-
-                        const float detail = 0.5f
-                            * (noiseContext.simplex2D(
-                                   wx * kDetailFreq,
-                                   wz * kDetailFreq
-                               )
-                               + 1.0f);
-
                         MountainInput mtnIn {
                             continental[idx],
                             ridges[idx],
-                            detail,
+                            detail[idx],
                             rangeMaskIn[idx],
                             vertScale,
                             mp
@@ -285,6 +299,7 @@ terrain::TerrainFields execute(
                 const auto& continental = getFloat(cn, 0);
                 const auto& basin = getFloat(cn, 1);
                 const auto& rimMaskIn = getFloat(cn, 2);
+                const auto& detail = getDetailField();
 
                 nodeOutputs[ni] = std::vector<Vec2>(cellCount);
                 auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
@@ -292,20 +307,10 @@ terrain::TerrainFields execute(
                 for (int z = 0; z < d; ++z) {
                     for (int x = 0; x < w; ++x) {
                         const size_t idx = fieldIndex(x, z, w);
-                        const float wx = static_cast<float>(x) * hScale;
-                        const float wz = static_cast<float>(z) * hScale;
-
-                        const float detail = 0.5f
-                            * (noiseContext.simplex2D(
-                                   wx * kDetailFreq,
-                                   wz * kDetailFreq
-                               )
-                               + 1.0f);
-
                         ValleyInput vIn {
                             continental[idx],
                             basin[idx],
-                            detail,
+                            detail[idx],
                             rimMaskIn[idx],
                             vertScale,
                             vp
@@ -324,6 +329,7 @@ terrain::TerrainFields execute(
 
                 const auto& continental = getFloat(cn, 0);
                 const auto& plainsBase = getFloat(cn, 1);
+                const auto& detail = getDetailField();
 
                 nodeOutputs[ni] = std::vector<float>(cellCount);
                 auto& out = std::get<std::vector<float>>(nodeOutputs[ni]);
@@ -333,13 +339,6 @@ terrain::TerrainFields execute(
                         const size_t idx = fieldIndex(x, z, w);
                         const float wx = static_cast<float>(x) * hScale;
                         const float wz = static_cast<float>(z) * hScale;
-
-                        const float detail = 0.5f
-                            * (noiseContext.simplex2D(
-                                   wx * kDetailFreq,
-                                   wz * kDetailFreq
-                               )
-                               + 1.0f);
 
                         const float rawMacro = noiseContext.perlinFbm(
                             wx * kMacroReliefFreq + 219.4f * kMacroReliefFreq,
@@ -373,7 +372,7 @@ terrain::TerrainFields execute(
                             macroRelief,
                             hilliness,
                             basinNoise,
-                            detail,
+                            detail[idx],
                             vertScale,
                             pp
                         };
@@ -390,6 +389,7 @@ terrain::TerrainFields execute(
                 const auto& continental = getFloat(cn, 0);
                 const auto& plateauFeature = getFloat(cn, 1);
                 const auto& plateauMaskIn = getFloat(cn, 2);
+                const auto& detail = getDetailField();
 
                 nodeOutputs[ni] = std::vector<Vec2>(cellCount);
                 auto& out = std::get<std::vector<Vec2>>(nodeOutputs[ni]);
@@ -397,23 +397,13 @@ terrain::TerrainFields execute(
                 for (int z = 0; z < d; ++z) {
                     for (int x = 0; x < w; ++x) {
                         const size_t idx = fieldIndex(x, z, w);
-                        const float wx = static_cast<float>(x) * hScale;
-                        const float wz = static_cast<float>(z) * hScale;
-
-                        const float detail = 0.5f
-                            * (noiseContext.simplex2D(
-                                   wx * kDetailFreq,
-                                   wz * kDetailFreq
-                               )
-                               + 1.0f);
-
                         const float combinedMask = plateauMaskIn[idx] * 0.5f
                             + plateauFeature[idx] * 0.5f;
 
                         PlateauInput platIn {
                             continental[idx],
                             combinedMask,
-                            detail,
+                            detail[idx],
                             vertScale,
                             tp
                         };
@@ -473,6 +463,7 @@ terrain::TerrainFields execute(
                 const auto& valley = getVec2(cn, 1);
                 const auto& plains = getFloat(cn, 2);
                 const auto& plateau = getVec2(cn, 3);
+                const auto& detail = getDetailField();
 
                 fields.heights.assign(cellCount, 0.0f);
                 fields.mountainWeights.assign(cellCount, 0.0f);
@@ -482,16 +473,6 @@ terrain::TerrainFields execute(
                 for (int z = 0; z < d; ++z) {
                     for (int x = 0; x < w; ++x) {
                         const size_t idx = fieldIndex(x, z, w);
-                        const float wx = static_cast<float>(x) * hScale;
-                        const float wz = static_cast<float>(z) * hScale;
-
-                        const float detail = 0.5f
-                            * (noiseContext.simplex2D(
-                                   wx * kDetailFreq,
-                                   wz * kDetailFreq
-                               )
-                               + 1.0f);
-
                         BlendInput blIn {
                             mountain[idx].x,
                             mountain[idx].y,
@@ -499,7 +480,7 @@ terrain::TerrainFields execute(
                             plateau[idx].x,
                             plateau[idx].y,
                             valley[idx].x,
-                            detail,
+                            detail[idx],
                             vertScale
                         };
                         const BlendResult blend = blendTerrain(blIn);
