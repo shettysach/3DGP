@@ -1,10 +1,10 @@
 #ifndef TERRAIN_BIOMES_H
 #define TERRAIN_BIOMES_H
 
+#include <cstdint>
+
 #include "../terrain.h"
 #include "fields.h"
-
-#include <cstdint>
 
 namespace terrain {
 
@@ -14,8 +14,10 @@ struct BiomeColor {
     float b = 0.0f;
 };
 
-void computeBiomeFields(TerrainFields& fields);
-void computeBiomeFieldsWFC(TerrainFields& fields, const TerrainSettings& settings);
+void computeBiomeFieldsWFC(
+    TerrainFields& fields,
+    const TerrainSettings& settings
+);
 
 const char* biomeName(BiomeId biome);
 BiomeColor biomeColor(BiomeId biome);
