@@ -22,12 +22,6 @@ void computeBiomeFieldsWFC(
 const char* biomeName(BiomeId biome);
 BiomeColor biomeColor(BiomeId biome);
 
-const char* ecologyName(EcologyId ecology);
-BiomeColor ecologyColor(EcologyId ecology);
-
-const char* landformName(LandformId landform);
-BiomeColor landformColor(LandformId landform);
-
 } // namespace terrain
 
 #endif // TERRAIN_BIOMES_H

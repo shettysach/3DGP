@@ -15,28 +15,7 @@ namespace terrain {
 
 struct TerrainFields;
 
-enum class LandformId : uint8_t {
-    Lowland = 0,
-    Plain,
-    Valley,
-    Plateau,
-    Foothill,
-    Mountain,
-    Alpine,
-    Snowcap,
-    Count,
-};
 
-enum class EcologyId : uint8_t {
-    Desert = 0,
-    Steppe,
-    Grassland,
-    Forest,
-    Taiga,
-    Tundra,
-    Marsh,
-    Count,
-};
 
 enum class BiomeId : uint8_t {
     MarshLowland = 0,
@@ -134,8 +113,7 @@ struct TerrainVertex {
     float temperature = 0.5f;
     float precipitation = 0.5f;
     float moisture = 0.5f;
-    uint8_t landform = static_cast<uint8_t>(LandformId::Plain);
-    uint8_t ecology = static_cast<uint8_t>(EcologyId::Grassland);
+
     uint8_t primaryBiome = static_cast<uint8_t>(BiomeId::GrasslandPlain);
     uint8_t secondaryBiome = static_cast<uint8_t>(BiomeId::GrasslandPlain);
     float primaryBiomeWeight = 1.0f;

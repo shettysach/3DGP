@@ -84,8 +84,7 @@ void buildVertices(TerrainMesh& mesh, const TerrainFields& fields,
             v.temperature = fields.temperature[idx];
             v.precipitation = fields.precipitation[idx];
             v.moisture = fields.moisture[idx];
-            v.landform = fields.landformIds[idx];
-            v.ecology = fields.ecologyIds[idx];
+
             v.primaryBiome = fields.primaryBiomeIds[idx];
             v.secondaryBiome = fields.secondaryBiomeIds[idx];
             v.primaryBiomeWeight = fields.primaryBiomeWeights[idx];
