@@ -96,6 +96,7 @@ bool Renderer::init() {
     terrainUniforms_.rockTex = cacheUniform(terrainProgram_, "uRockTex");
     terrainUniforms_.sandTex = cacheUniform(terrainProgram_, "uSandTex");
     terrainUniforms_.snowTex = cacheUniform(terrainProgram_, "uSnowTex");
+    terrainUniforms_.visualizationMode = cacheUniform(terrainProgram_, "uVisualizationMode");
 
     glfn::UseProgram(terrainProgram_);
     setUniform(terrainUniforms_.grassTex, 0);
@@ -184,7 +185,7 @@ void Renderer::orbit(float deltaYaw, float deltaPitch) {
 
 void Renderer::zoom(float deltaDistance) {
     distance_ += deltaDistance;
-    distance_ = std::clamp(distance_, 18.0f, 1600.0f);
+    distance_ = std::clamp(distance_, 18.0f, 2000.0f);
 }
 
 void Renderer::pan(float deltaX, float deltaY) {
@@ -241,7 +242,9 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
                 {v.nx, v.ny, v.nz},
                 {terrainBaseColors_[colorBase], terrainBaseColors_[colorBase + 1u], terrainBaseColors_[colorBase + 2u]},
                 {std::clamp(v.slope, 0.0f, 1.0f), std::clamp(v.mountainWeight, 0.0f, 1.0f), std::clamp(v.riverWeight, 0.0f, 1.0f), std::clamp(v.moisture, 0.0f, 1.0f)},
-                {std::clamp((v.y - mesh.minHeight) * invHeightRange, 0.0f, 1.0f), std::clamp(v.temperature, 0.0f, 1.0f), std::clamp(v.precipitation, 0.0f, 1.0f), 0.0f}
+                {std::clamp((v.y - mesh.minHeight) * invHeightRange, 0.0f, 1.0f), std::clamp(v.temperature, 0.0f, 1.0f), std::clamp(v.precipitation, 0.0f, 1.0f), 0.0f},
+                {v.voronoiR, v.voronoiG, v.voronoiB},
+                {v.wfcR, v.wfcG, v.wfcB}
             };
         }
 
@@ -305,6 +308,22 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
             GL_FALSE,
             static_cast<GLsizei>(sizeof(TerrainGpuVertex)),
             reinterpret_cast<const void*>(offsetof(TerrainGpuVertex, params1)));
+        glfn::EnableVertexAttribArray(5);
+        glfn::VertexAttribPointer(
+            5,
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            static_cast<GLsizei>(sizeof(TerrainGpuVertex)),
+            reinterpret_cast<const void*>(offsetof(TerrainGpuVertex, voronoiColor)));
+        glfn::EnableVertexAttribArray(6);
+        glfn::VertexAttribPointer(
+            6,
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            static_cast<GLsizei>(sizeof(TerrainGpuVertex)),
+            reinterpret_cast<const void*>(offsetof(TerrainGpuVertex, wfcColor)));
         glfn::BindVertexArray(0);
 
         cachedTerrainVertexCount_ = mesh.vertices.size();
@@ -344,6 +363,7 @@ void Renderer::render(const terrain::TerrainMesh& mesh) {
 
     glfn::UseProgram(terrainProgram_);
     setUniform(terrainUniforms_.viewProj, viewProjection);
+    setUniform(terrainUniforms_.visualizationMode, currentVisualizationMode_);
 
     glfn::ActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, grassTexture_);

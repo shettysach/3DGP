@@ -44,6 +44,7 @@ struct TerrainUniformLocations {
     GLint rockTex = -1;
     GLint sandTex = -1;
     GLint snowTex = -1;
+    GLint visualizationMode = -1;
 };
 
 class Renderer {
@@ -64,6 +65,18 @@ class Renderer {
     void moveForward(float amount);
     void moveRight(float amount);
     void setTarget(float x, float y, float z);
+
+    void setDistance(float d) {
+        distance_ = std::clamp(d, 18.0f, 2000.0f);
+    }
+
+    void setVisualizationMode(int mode) {
+        currentVisualizationMode_ = mode;
+    }
+
+    int visualizationMode() const {
+        return currentVisualizationMode_;
+    }
 
     SDL_Window* window() const {
         return window_;
@@ -100,9 +113,11 @@ class Renderer {
     GLuint sandTexture_;
     TerrainUniformLocations terrainUniforms_;
     std::vector<float> terrainBaseColors_;
+    int currentVisualizationMode_ = 0;
 };
 
 void runDemo();
+void exportImages();
 
 } // namespace renderer
 

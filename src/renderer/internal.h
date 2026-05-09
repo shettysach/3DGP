@@ -82,6 +82,8 @@ struct TerrainGpuVertex {
     float baseColor[3];
     float params0[4];
     float params1[4];
+    float voronoiColor[3];
+    float wfcColor[3];
 };
 
 namespace glfn {

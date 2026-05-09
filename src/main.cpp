@@ -3,6 +3,7 @@
 
 namespace renderer {
 void runDemo();
+void exportImages();
 }
 
 namespace graph {
@@ -16,8 +17,10 @@ int main(int argc, char** argv) {
         graph::run();
     } else if (std::strcmp(mode, "view") == 0) {
         renderer::runDemo();
+    } else if (std::strcmp(mode, "export") == 0) {
+        renderer::exportImages();
     } else {
-        std::cerr << "Usage: terrain_demo [graph|view]\n";
+        std::cerr << "Usage: terrain_demo [graph|view|export]\n";
         return 1;
     }
 

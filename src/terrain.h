@@ -94,6 +94,7 @@ struct TerrainSettings {
     uint32_t seed = 1234u;
     bool useWFC = true;
     float voronoiCellSize = 24.0f;
+    bool exportImages = false;
     NoiseSettings noise;
     RiverSettings rivers;
     ClimateSettings climate;
@@ -118,6 +119,12 @@ struct TerrainVertex {
     uint8_t secondaryBiome = static_cast<uint8_t>(BiomeId::GrasslandPlain);
     float primaryBiomeWeight = 1.0f;
     float secondaryBiomeWeight = 0.0f;
+    float voronoiR = 0.0f;
+    float voronoiG = 0.0f;
+    float voronoiB = 0.0f;
+    float wfcR = 0.0f;
+    float wfcG = 0.0f;
+    float wfcB = 0.0f;
 };
 
 struct TerrainMesh {

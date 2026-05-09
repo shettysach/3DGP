@@ -9,12 +9,16 @@ layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec3 aBaseColor;
 layout(location = 3) in vec4 aParams0;
 layout(location = 4) in vec4 aParams1;
+layout(location = 5) in vec3 aVoronoiColor;
+layout(location = 6) in vec3 aWfcColor;
 
 uniform mat4 uViewProj;
 
 out vec3 vWorldPos;
 out vec3 vNormal;
 out vec3 vBaseColor;
+out vec3 vVoronoiColor;
+out vec3 vWfcColor;
 out vec4 vParams0;
 out vec4 vParams1;
 
@@ -22,6 +26,8 @@ void main() {
     vWorldPos = aPosition;
     vNormal = aNormal;
     vBaseColor = aBaseColor;
+    vVoronoiColor = aVoronoiColor;
+    vWfcColor = aWfcColor;
     vParams0 = aParams0;
     vParams1 = aParams1;
     gl_Position = uViewProj * vec4(aPosition, 1.0);
@@ -32,6 +38,8 @@ constexpr char kTerrainFragmentShader[] = R"glsl(#version 330 core
 in vec3 vWorldPos;
 in vec3 vNormal;
 in vec3 vBaseColor;
+in vec3 vVoronoiColor;
+in vec3 vWfcColor;
 in vec4 vParams0;
 in vec4 vParams1;
 
@@ -39,6 +47,7 @@ uniform sampler2D uGrassTex;
 uniform sampler2D uRockTex;
 uniform sampler2D uSandTex;
 uniform sampler2D uSnowTex;
+uniform int uVisualizationMode;
 
 out vec4 fragColor;
 
@@ -68,34 +77,44 @@ void main() {
     float temperature = vParams1.y;
     float precipitation = vParams1.z;
 
-    float rockSignal = slope * 0.42 + mountain * 0.92 + max(heightN - 0.58, 0.0) * 0.16;
-    float rock = smoothstep(0.48, 0.88, rockSignal);
-    float snow = smoothstep(0.76, 0.99, heightN + (1.0 - temperature) * 0.28 + slope * 0.04) *
-                 smoothstep(0.0, 0.55, 1.0 - moisture * 0.86) *
-                 smoothstep(0.01, 0.05, mountain);
-    float sand = smoothstep(0.08, 0.48, river) *
-                 smoothstep(0.0, 0.62, 1.0 - heightN) *
-                 smoothstep(0.0, 0.62, 1.0 - moisture);
-    float grass = clamp(1.0 - max(rock, snow), 0.0, 1.0) * (1.0 - sand * 0.72);
+    vec3 albedo;
+    
+    if (uVisualizationMode == 0) { // Default textured
+        float rockSignal = slope * 0.42 + mountain * 0.92 + max(heightN - 0.58, 0.0) * 0.16;
+        float rock = smoothstep(0.48, 0.88, rockSignal);
+        float snow = smoothstep(0.76, 0.99, heightN + (1.0 - temperature) * 0.28 + slope * 0.04) *
+                     smoothstep(0.0, 0.55, 1.0 - moisture * 0.86) *
+                     smoothstep(0.01, 0.05, mountain);
+        float sand = smoothstep(0.08, 0.48, river) *
+                     smoothstep(0.0, 0.62, 1.0 - heightN) *
+                     smoothstep(0.0, 0.62, 1.0 - moisture);
+        float grass = clamp(1.0 - max(rock, snow), 0.0, 1.0) * (1.0 - sand * 0.72);
 
-    float weightSum = max(grass + rock + sand + snow, 0.0001);
-    grass /= weightSum;
-    rock /= weightSum;
-    sand /= weightSum;
-    snow /= weightSum;
+        float weightSum = max(grass + rock + sand + snow, 0.0001);
+        grass /= weightSum;
+        rock /= weightSum;
+        sand /= weightSum;
+        snow /= weightSum;
 
-    vec3 grassDetail = texture(uGrassTex, vWorldPos.xz * 0.052).rgb;
-    vec3 sandDetail = texture(uSandTex, vWorldPos.xz * 0.067).rgb;
-    vec3 rockDetail = triplanarSample(uRockTex, vWorldPos, normal, 0.085);
-    vec3 snowDetail = triplanarSample(uSnowTex, vWorldPos, normal, 0.042);
+        vec3 grassDetail = texture(uGrassTex, vWorldPos.xz * 0.052).rgb;
+        vec3 sandDetail = texture(uSandTex, vWorldPos.xz * 0.067).rgb;
+        vec3 rockDetail = triplanarSample(uRockTex, vWorldPos, normal, 0.085);
+        vec3 snowDetail = triplanarSample(uSnowTex, vWorldPos, normal, 0.042);
 
-    vec3 fertileTint = mix(vec3(0.78, 0.68, 0.46), vec3(0.86, 0.95, 0.76), saturate(moisture * 0.62 + precipitation * 0.38));
-    vec3 grassMaterial = grassDetail * mix(vBaseColor * 1.16, fertileTint, 0.22);
-    vec3 rockMaterial = rockDetail * mix(vec3(0.66, 0.67, 0.69), vBaseColor * 1.08, 0.20);
-    vec3 sandMaterial = sandDetail * mix(vec3(0.92, 0.84, 0.62), vBaseColor * 1.03, 0.12);
-    vec3 snowMaterial = snowDetail * vec3(0.93, 0.97, 1.02);
+        vec3 fertileTint = mix(vec3(0.78, 0.68, 0.46), vec3(0.86, 0.95, 0.76), saturate(moisture * 0.62 + precipitation * 0.38));
+        vec3 grassMaterial = grassDetail * mix(vBaseColor * 1.16, fertileTint, 0.22);
+        vec3 rockMaterial = rockDetail * mix(vec3(0.66, 0.67, 0.69), vBaseColor * 1.08, 0.20);
+        vec3 sandMaterial = sandDetail * mix(vec3(0.92, 0.84, 0.62), vBaseColor * 1.03, 0.12);
+        vec3 snowMaterial = snowDetail * vec3(0.93, 0.97, 1.02);
 
-    vec3 albedo = grassMaterial * grass + rockMaterial * rock + sandMaterial * sand + snowMaterial * snow;
+        albedo = grassMaterial * grass + rockMaterial * rock + sandMaterial * sand + snowMaterial * snow;
+    } else if (uVisualizationMode == 1) { // Voronoi
+        albedo = vVoronoiColor;
+    } else if (uVisualizationMode == 2) { // WFC (Regional Biomes)
+        albedo = vWfcColor;
+    } else { // Blended Biomes
+        albedo = vBaseColor;
+    }
 
     vec3 lightDir = vec3(0.375, 0.893, 0.250);
     float diffuse = saturate(dot(normal, lightDir));

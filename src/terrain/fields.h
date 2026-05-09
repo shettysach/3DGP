@@ -29,6 +29,12 @@ struct TerrainFields {
     std::vector<uint8_t> secondaryBiomeIds;
     std::vector<float> primaryBiomeWeights;
     std::vector<float> secondaryBiomeWeights;
+    std::vector<float> voronoiColorsR;
+    std::vector<float> voronoiColorsG;
+    std::vector<float> voronoiColorsB;
+    std::vector<float> wfcColorsR;
+    std::vector<float> wfcColorsG;
+    std::vector<float> wfcColorsB;
 
     TerrainFields() = default;
 
@@ -57,6 +63,12 @@ struct TerrainFields {
         secondaryBiomeIds.assign(count, static_cast<uint8_t>(BiomeId::GrasslandPlain));
         primaryBiomeWeights.assign(count, 1.0f);
         secondaryBiomeWeights.assign(count, 0.0f);
+        voronoiColorsR.assign(count, 0.0f);
+        voronoiColorsG.assign(count, 0.0f);
+        voronoiColorsB.assign(count, 0.0f);
+        wfcColorsR.assign(count, 0.0f);
+        wfcColorsG.assign(count, 0.0f);
+        wfcColorsB.assign(count, 0.0f);
     }
 
     size_t size() const {

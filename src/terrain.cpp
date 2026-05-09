@@ -89,6 +89,12 @@ void buildVertices(TerrainMesh& mesh, const TerrainFields& fields,
             v.secondaryBiome = fields.secondaryBiomeIds[idx];
             v.primaryBiomeWeight = fields.primaryBiomeWeights[idx];
             v.secondaryBiomeWeight = fields.secondaryBiomeWeights[idx];
+            v.voronoiR = fields.voronoiColorsR[idx];
+            v.voronoiG = fields.voronoiColorsG[idx];
+            v.voronoiB = fields.voronoiColorsB[idx];
+            v.wfcR = fields.wfcColorsR[idx];
+            v.wfcG = fields.wfcColorsG[idx];
+            v.wfcB = fields.wfcColorsB[idx];
             const float nx = -fields.gradientXs[idx];
             const float ny = 1.0f;
             const float nz = -fields.gradientZs[idx];

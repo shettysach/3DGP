@@ -10,6 +10,7 @@
 #include "util.h"
 #include "voronoi.h"
 #include "wfc.h"
+#include "image_util.h"
 
 namespace terrain {
 
@@ -45,6 +46,29 @@ namespace {
         {"Snow", {0.98f, 0.99f, 1.00f}},
     }};
 
+    inline BiomeColor applyShading(const BiomeColor& c, float shading) {
+        return {c.r * shading, c.g * shading, c.b * shading};
+    }
+
+    float computeHillshade(const TerrainFields& fields, size_t idx) {
+        // Simple directional light (top-left)
+        float dx = fields.gradientXs[idx];
+        float dz = fields.gradientZs[idx];
+        float len = std::sqrt(dx * dx + 1.0f + dz * dz);
+        float nx = -dx / len;
+        float ny = 1.0f / len;
+        float nz = -dz / len;
+
+        // Light direction
+        float lx = -0.577f;
+        float ly = 0.577f;
+        float lz = -0.577f;
+
+        float dot = nx * lx + ny * ly + nz * lz;
+        // Blend ambient and directional
+        return std::clamp(0.3f + 0.7f * dot, 0.0f, 1.0f);
+    }
+
 } // namespace
 
 const char* biomeName(BiomeId biome) {
@@ -67,6 +91,25 @@ void computeBiomeFieldsWFC(
     std::cout << "[WFC] Generating Voronoi graph with cell size "
               << settings.voronoiCellSize << "..." << std::endl;
     VoronoiGraph graph(fields.width, fields.depth, settings.voronoiCellSize);
+
+    // Populate voronoi colors for visualization
+    const auto& gridToCellMap = graph.gridToCellMap();
+    for (size_t i = 0; i < fields.size(); ++i) {
+        uint32_t cellIdx = gridToCellMap[i];
+        fields.voronoiColorsR[i] = hashJitter(cellIdx, 123u);
+        fields.voronoiColorsG[i] = hashJitter(cellIdx, 456u);
+        fields.voronoiColorsB[i] = hashJitter(cellIdx, 789u);
+    }
+
+    if (settings.exportImages) {
+        std::vector<BiomeColor> colors(fields.width * fields.depth);
+        for (size_t i = 0; i < colors.size(); ++i) {
+            float shading = computeHillshade(fields, i);
+            colors[i] = applyShading({fields.voronoiColorsR[i], fields.voronoiColorsG[i], fields.voronoiColorsB[i]}, shading);
+        }
+        savePNG("voronoi_cells.png", fields.width, fields.depth, colors);
+        std::cout << "[WFC] Exported shaded voronoi_cells.png" << std::endl;
+    }
 
     // 2. Prepare Heuristics (average climate per cell)
     size_t cellCount = graph.cells().size();
@@ -108,12 +151,33 @@ void computeBiomeFieldsWFC(
     std::cout
         << "[WFC] SUCCESS! Map solved using constraint propagation and backtracking."
         << std::endl;
+
+    if (settings.exportImages) {
+        std::vector<BiomeColor> colors(fields.width * fields.depth);
+        const auto& gridToCellMap = graph.gridToCellMap();
+        for (size_t i = 0; i < colors.size(); ++i) {
+            uint32_t cellIdx = gridToCellMap[i];
+            float shading = computeHillshade(fields, i);
+            colors[i] = applyShading(biomeColor(solver.getResult(cellIdx)), shading);
+        }
+        savePNG("wfc_biomes.png", fields.width, fields.depth, colors);
+        std::cout << "[WFC] Exported shaded wfc_biomes.png" << std::endl;
+    }
+
+    // Populate WFC colors for visualization (raw regional biomes)
+    for (size_t i = 0; i < fields.size(); ++i) {
+        uint32_t cellIdx = gridToCellMap[i];
+        BiomeColor c = biomeColor(solver.getResult(cellIdx));
+        fields.wfcColorsR[i] = c.r;
+        fields.wfcColorsG[i] = c.g;
+        fields.wfcColorsB[i] = c.b;
+    }
+
     std::cout << "[WFC] Mapping regional biomes back to high-res pixel grid..."
               << std::endl;
     // 4. Map results back to grid with Voronoi distance-based interpolation
     const float blendWidth = 16.0f; // Width of the transition zone
     const auto& cells = graph.cells();
-    const auto& gridToCellMap = graph.gridToCellMap();
 
     for (int z = 0; z < fields.depth; ++z) {
         for (int x = 0; x < fields.width; ++x) {
@@ -158,6 +222,32 @@ void computeBiomeFieldsWFC(
             fields.primaryBiomeWeights[gIdx] = primaryWeight;
             fields.secondaryBiomeWeights[gIdx] = secondaryWeight;
         }
+    }
+
+    if (settings.exportImages) {
+        std::vector<BiomeColor> colors(fields.width * fields.depth);
+        for (size_t i = 0; i < colors.size(); ++i) {
+            BiomeColor c1 = biomeColor(static_cast<BiomeId>(fields.primaryBiomeIds[i]));
+            BiomeColor c2 = biomeColor(static_cast<BiomeId>(fields.secondaryBiomeIds[i]));
+            float w1 = fields.primaryBiomeWeights[i];
+            float w2 = fields.secondaryBiomeWeights[i];
+            float shading = computeHillshade(fields, i);
+            colors[i] = applyShading({
+                c1.r * w1 + c2.r * w2,
+                c1.g * w1 + c2.g * w2,
+                c1.b * w1 + c2.b * w2
+            }, shading);
+        }
+        savePNG("final_blended_biomes.png", fields.width, fields.depth, colors);
+        std::cout << "[WFC] Exported shaded final_blended_biomes.png" << std::endl;
+
+        // Also export a simple grayscale heightmap for context
+        for (size_t i = 0; i < colors.size(); ++i) {
+            float h = (fields.heights[i] - fields.minHeight) / (fields.maxHeight - fields.minHeight + 1e-6f);
+            colors[i] = {h, h, h};
+        }
+        savePNG("heightmap.png", fields.width, fields.depth, colors);
+        std::cout << "[WFC] Exported heightmap.png" << std::endl;
     }
 }
 

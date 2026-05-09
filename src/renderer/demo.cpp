@@ -114,17 +114,20 @@ void runDemo() {
         (static_cast<float>(settings.depth - 1) * settings.horizontalScale)
         * 0.5f;
     renderer
-        .setTarget(centerX, (mesh.minHeight + mesh.maxHeight) * 0.30f, centerZ);
-    renderer.zoom(220.0f);
+        .setTarget(centerX, (mesh.minHeight + mesh.maxHeight) * 0.35f, centerZ);
+    renderer.setDistance(static_cast<float>(settings.width) * 1.1f);
 
     std::cout << "Controls:\n";
-    std::cout << "  Left mouse drag: orbit\n";
-    std::cout << "  Right mouse drag: pan\n";
-    std::cout << "  Wheel: zoom\n";
-    std::cout << "  WASD: move\n";
-    std::cout << "  Q/E: move down/up\n";
-    std::cout << "  R: regenerate terrain\n";
-    std::cout << "  ESC: quit\n";
+    std::cout << "  Mouse Wheel: Zoom In / Zoom Out\n";
+    std::cout << "  Left Mouse Drag: Orbit Camera\n";
+    std::cout << "  Right Mouse Drag: Pan Camera\n";
+    std::cout << "  WASD: Move Camera\n";
+    std::cout << "  Q/E: Move Up/Down\n";
+    std::cout << "  SPACE: Reset View (Frame Entire Map)\n";
+    std::cout << "  R: Regenerate Terrain\n";
+    std::cout << "  1-4: Switch Visualization Modes\n";
+    std::cout << "  P: Export Terrain Stages to PNG\n";
+    std::cout << "  ESC: Quit\n";
     printBiomeStats(mesh);
 
     SDL_Event event;
@@ -161,6 +164,40 @@ void runDemo() {
                     std::cout << "Regenerated terrain with seed " << settings.seed << '\n';
                     printBiomeStats(mesh);
                     break;
+                case SDLK_p:
+                    settings.exportImages = true;
+                    generator.setSettings(settings);
+                    mesh = generator.generateMesh();
+                    settings.exportImages = false;
+                    generator.setSettings(settings);
+                    std::cout << "Exported terrain stages to PPM files.\n";
+                    break;
+                case SDLK_1:
+                    renderer.setVisualizationMode(0);
+                    std::cout << "Visualization: Normal (Textured)\n";
+                    break;
+                case SDLK_2:
+                    renderer.setVisualizationMode(1);
+                    std::cout << "Visualization: Voronoi Territories\n";
+                    break;
+                case SDLK_3:
+                    renderer.setVisualizationMode(2);
+                    std::cout << "Visualization: WFC Result (Regional Biomes)\n";
+                    break;
+                case SDLK_4:
+                    renderer.setVisualizationMode(3);
+                    std::cout << "Visualization: Blended Biomes\n";
+                    break;
+                case SDLK_SPACE: {
+                    const float cx = (static_cast<float>(settings.width - 1) * settings.horizontalScale) * 0.5f;
+                    const float cz = (static_cast<float>(settings.depth - 1) * settings.horizontalScale) * 0.5f;
+                    renderer.setTarget(cx, (mesh.minHeight + mesh.maxHeight) * 0.4f, cz);
+                    // Calculate distance to frame the map
+                    const float mapSize = static_cast<float>(std::max(settings.width, settings.depth));
+                    renderer.setDistance(mapSize * 1.1f);
+                    std::cout << "Camera reset to frame entire terrain.\n";
+                    break;
+                }
                 default:
                         break;
                 }
@@ -247,6 +284,38 @@ void runDemo() {
         renderer.render(mesh);
         renderer.swapBuffers();
     }
+}
+
+void exportImages() {
+    terrain::TerrainSettings settings;
+    settings.width = 1024;
+    settings.depth = 1024;
+    settings.horizontalScale = 1.0f;
+    settings.verticalScale = 96.0f;
+    settings.seed = 2026u;
+    settings.exportImages = true;
+
+    terrain::TerrainGenerator generator(settings);
+
+    // Try to load current graph if it exists
+    std::string graphPath = "graphs/current.json";
+    std::ifstream in(graphPath);
+    if (in) {
+        std::stringstream ss;
+        ss << in.rdbuf();
+        try {
+            graph::EditorGraph eg = graph::fromJson(ss.str());
+            auto cg = std::make_shared<graph::CompiledGraph>(graph::compile(eg));
+            generator.setBaseGraph(cg);
+            std::cout << "Loaded graph for export.\n";
+        } catch (...) {
+            std::cout << "Failed to load graph, using default.\n";
+        }
+    }
+
+    std::cout << "Generating terrain and exporting stages...\n";
+    generator.generateMesh();
+    std::cout << "Export complete.\n";
 }
 
 } // namespace renderer
