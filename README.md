@@ -12,6 +12,8 @@ Windows (x64):
 cmake -S . -B build -G "Visual Studio 17 2022"
 cmake --build build --config Release
 .\build\Release\terrain_demo.exe
+.\build\Release\terrain_demo.exe graph # for graph view
+.\build\Release\terrain_demo.exe view  # for render view
 ```
 
 `build.sh` uses CMake (`build/` directory), so repeated builds are incremental.
