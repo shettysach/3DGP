@@ -14,71 +14,71 @@ if(WIN32)
   set(OPENGL_LIBRARIES ${OPENGL_LIBRARIES})
   set(GRAPH_VIEW_SRC src/graph/graph_view_stub.cpp)
   set(THIRD_PARTY_LIBS nlohmann_json::nlohmann_json)
-elseif(APPLE)
-  find_package(SDL2 REQUIRED)
-  find_package(OpenGL REQUIRED)
-
-  include(FetchContent)
-  if(POLICY CMP0169)
-    cmake_policy(SET CMP0169 OLD)
-  endif()
-
-  # Fetch imgui
-  FetchContent_Declare(imgui
-    GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG v1.90.4)
-  FetchContent_Populate(imgui)
-  set(IMGUI_SRC_DIR ${imgui_SOURCE_DIR})
-  add_library(imgui STATIC
-    ${IMGUI_SRC_DIR}/imgui.cpp
-    ${IMGUI_SRC_DIR}/imgui_draw.cpp
-    ${IMGUI_SRC_DIR}/imgui_tables.cpp
-    ${IMGUI_SRC_DIR}/imgui_widgets.cpp
-    ${IMGUI_SRC_DIR}/imgui_demo.cpp
-  )
-  target_include_directories(imgui PUBLIC ${IMGUI_SRC_DIR})
-  add_library(imgui::imgui ALIAS imgui)
-
-  # Fetch imnodes
-  FetchContent_Declare(imnodes
-    GIT_REPOSITORY https://github.com/Nelarius/imnodes.git
-    GIT_TAG master)
-  FetchContent_Populate(imnodes)
-  add_library(imnodes STATIC
-    ${imnodes_SOURCE_DIR}/imnodes.cpp
-  )
-  target_include_directories(imnodes PUBLIC ${imnodes_SOURCE_DIR})
-  target_link_libraries(imnodes PUBLIC imgui)
-  add_library(imnodes::imnodes ALIAS imnodes)
-
-  # Fetch nlohmann_json
-  FetchContent_Declare(nlohmann_json
-    GIT_REPOSITORY https://github.com/nlohmann/json.git
-    GIT_TAG v3.11.3)
-  FetchContent_MakeAvailable(nlohmann_json)
-
-  include_directories(${SDL2_INCLUDE_DIRS})
-  set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
-  set(OPENGL_LIBRARIES OpenGL::GL)
-  set(THIRD_PARTY_LIBS imgui::imgui imnodes::imnodes nlohmann_json::nlohmann_json)
 else()
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(SDL2 REQUIRED sdl2)
-  pkg_check_modules(GL REQUIRED gl)
-  pkg_check_modules(GLU REQUIRED glu)
-  include_directories(${SDL2_INCLUDE_DIRS} ${GL_INCLUDE_DIRS} ${GLU_INCLUDE_DIRS})
-  set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
-  set(OPENGL_LIBRARIES ${GL_LIBRARIES} ${GLU_LIBRARIES})
-
-  find_package(imgui CONFIG REQUIRED)
-  find_package(imnodes CONFIG REQUIRED)
-  find_package(nlohmann_json CONFIG REQUIRED)
-
-  set(IMGUI_SRC_DIR "$ENV{IMGUI_SRC}")
-  if(NOT IMGUI_SRC_DIR)
-    message(FATAL_ERROR "IMGUI_SRC environment variable not set. Run nix develop first.")
+  if(APPLE)
+    find_package(SDL2 REQUIRED)
+    find_package(OpenGL REQUIRED)
+    include_directories(${SDL2_INCLUDE_DIRS})
+    set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
+    set(OPENGL_LIBRARIES OpenGL::GL)
+  else()
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SDL2 REQUIRED sdl2)
+    pkg_check_modules(GL REQUIRED gl)
+    pkg_check_modules(GLU REQUIRED glu)
+    include_directories(${SDL2_INCLUDE_DIRS} ${GL_INCLUDE_DIRS} ${GLU_INCLUDE_DIRS})
+    set(SDL2_LIBRARIES ${SDL2_LIBRARIES})
+    set(OPENGL_LIBRARIES ${GL_LIBRARIES} ${GLU_LIBRARIES})
   endif()
-  set(THIRD_PARTY_LIBS imgui::imgui imnodes::imnodes nlohmann_json::nlohmann_json)
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND DEFINED ENV{IMGUI_SRC})
+    find_package(imgui CONFIG REQUIRED)
+    find_package(imnodes CONFIG REQUIRED)
+    find_package(nlohmann_json CONFIG REQUIRED)
+    set(IMGUI_SRC_DIR "$ENV{IMGUI_SRC}")
+    set(THIRD_PARTY_LIBS imgui::imgui imnodes::imnodes nlohmann_json::nlohmann_json)
+  else()
+    include(FetchContent)
+    if(POLICY CMP0169)
+      cmake_policy(SET CMP0169 OLD)
+    endif()
+
+    # Fetch imgui
+    FetchContent_Declare(imgui
+      GIT_REPOSITORY https://github.com/ocornut/imgui.git
+      GIT_TAG v1.90.4)
+    FetchContent_Populate(imgui)
+    set(IMGUI_SRC_DIR ${imgui_SOURCE_DIR})
+    add_library(imgui STATIC
+      ${IMGUI_SRC_DIR}/imgui.cpp
+      ${IMGUI_SRC_DIR}/imgui_draw.cpp
+      ${IMGUI_SRC_DIR}/imgui_tables.cpp
+      ${IMGUI_SRC_DIR}/imgui_widgets.cpp
+      ${IMGUI_SRC_DIR}/imgui_demo.cpp
+    )
+    target_include_directories(imgui PUBLIC ${IMGUI_SRC_DIR})
+    add_library(imgui::imgui ALIAS imgui)
+
+    # Fetch imnodes
+    FetchContent_Declare(imnodes
+      GIT_REPOSITORY https://github.com/Nelarius/imnodes.git
+      GIT_TAG master)
+    FetchContent_Populate(imnodes)
+    add_library(imnodes STATIC
+      ${imnodes_SOURCE_DIR}/imnodes.cpp
+    )
+    target_include_directories(imnodes PUBLIC ${imnodes_SOURCE_DIR})
+    target_link_libraries(imnodes PUBLIC imgui)
+    add_library(imnodes::imnodes ALIAS imnodes)
+
+    # Fetch nlohmann_json
+    FetchContent_Declare(nlohmann_json
+      GIT_REPOSITORY https://github.com/nlohmann/json.git
+      GIT_TAG v3.11.3)
+    FetchContent_MakeAvailable(nlohmann_json)
+
+    set(THIRD_PARTY_LIBS imgui::imgui imnodes::imnodes nlohmann_json::nlohmann_json)
+  endif()
 endif()
 
 if(NOT GRAPH_VIEW_SRC)

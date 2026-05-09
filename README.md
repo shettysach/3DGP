@@ -1,10 +1,10 @@
-Build
+Build & Run
 
 Linux/macOS:
 ```bash
 ./build.sh
 ./build/terrain_demo graph # for graph view
-./build/terrain_demo view # for render view
+./build/terrain_demo view  # for render view
 ```
 
 Windows (x64):
@@ -15,3 +15,12 @@ cmake --build build --config Release
 ```
 
 `build.sh` uses CMake (`build/` directory), so repeated builds are incremental.
+
+Dependencies
+
+- **CMake** (3.16+)
+- **SDL2**
+- **OpenGL** (GL + GLU)
+- **C++ compiler** (GCC/Clang with C++17 support)
+- **pkg-config** (Linux only)
+- **imgui**, **imnodes**, **nlohmann_json** — fetched automatically by CMake on Linux/macOS
