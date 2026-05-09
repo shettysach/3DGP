@@ -4,8 +4,6 @@
 
 namespace graph {
 
-// === Node Definition Table ===
-
 namespace {
 
     const NodeDef kNodeDefs[] = {
@@ -197,118 +195,96 @@ NodeParams defaultParams(NodeKind kind) {
     throw std::invalid_argument("Unknown node kind");
 }
 
-// === Default Graph ===
-//
-//  Domain-warp subgraph (Position → 2×Fbm → CreateVec2 → Add2)
-//    ↓
-//  8 source noise nodes (each samples at warped coord)
-//    ↓
-//  4 terrain nodes (Mountain, Valley, Plains, Plateau)
-//    ↓
-//  Blend (final sink)
-//
 EditorGraph defaultGraph() {
     EditorGraph g;
 
     const float baseFreq = 0.007f;
     const float warpFreq = 0.003f;
 
-    // ── Terrain noise generators (8 nodes) ──────────────────────────────────
-
-    // Core shape signals
     g.nodes.push_back(
         {0,
          NodeKind::Fbm,
          1050.0f,
          50.0f,
          NoiseParams {baseFreq, 6, 2.0f, 0.50f, 2.0f, 0.0f, 0.0f}}
-    ); // continental
+    );
     g.nodes.push_back(
         {1,
          NodeKind::RidgedFbm,
          1050.0f,
          250.0f,
          NoiseParams {baseFreq, 6, 2.0f, 0.50f, 2.0f, 0.0f, 0.0f}}
-    ); // ridges
+    );
     g.nodes.push_back(
         {2,
          NodeKind::Fbm,
          1050.0f,
          450.0f,
          NoiseParams {baseFreq * 0.26f, 3, 2.0f, 0.52f, 2.0f, -191.7f, 83.4f}}
-    ); // basin
+    );
     g.nodes.push_back(
         {3,
          NodeKind::Fbm,
          1050.0f,
          650.0f,
          NoiseParams {baseFreq * 0.70f, 4, 2.0f, 0.50f, 2.0f, 130.0f, -50.0f}}
-    ); // plainsBase
+    );
     g.nodes.push_back(
         {4,
          NodeKind::Fbm,
          1050.0f,
          850.0f,
          NoiseParams {baseFreq * 0.60f, 3, 2.0f, 0.50f, 2.0f, 0.0f, 0.0f}}
-    ); // plateauFeature
+    );
 
-    // Mask signals — Perlin to match original internal generation
     g.nodes.push_back(
         {5,
          NodeKind::Perlin,
          1050.0f,
          1050.0f,
          NoiseParams {baseFreq * 0.30f, 1, 2.0f, 0.50f, 2.0f, 500.0f, -250.0f}}
-    ); // rangeMask
+    );
     g.nodes.push_back(
         {6,
          NodeKind::Perlin,
          1050.0f,
          1250.0f,
          NoiseParams {baseFreq * 0.17f, 1, 2.0f, 0.50f, 2.0f, 420.0f, -301.0f}}
-    ); // rimMask
+    );
     g.nodes.push_back(
         {7,
          NodeKind::Perlin,
          1050.0f,
          1450.0f,
          NoiseParams {baseFreq * 0.40f, 1, 2.0f, 0.50f, 2.0f, 0.0f, 0.0f}}
-    ); // plateauMask
+    );
 
-    // ── Terrain nodes ───────────────────────────────────────────────────────
     g.nodes.push_back(
         {8, NodeKind::Mountain, 1450.0f, 250.0f, MountainParams {}}
     );
-    g.nodes.push_back(
-        {9, NodeKind::Valley, 1450.0f, 450.0f, ValleyParams {}}
-    );
-    g.nodes.push_back(
-        {10, NodeKind::Plains, 1450.0f, 750.0f, PlainsParams {}}
-    );
+    g.nodes.push_back({9, NodeKind::Valley, 1450.0f, 450.0f, ValleyParams {}});
+    g.nodes.push_back({10, NodeKind::Plains, 1450.0f, 750.0f, PlainsParams {}});
     g.nodes.push_back(
         {11, NodeKind::Plateau, 1450.0f, 1050.0f, PlateauParams {}}
     );
 
-    // ── Modifier nodes ──────────────────────────────────────────────────────
     g.nodes.push_back(
         {19,
          NodeKind::Smoothstep,
          1250.0f,
          1050.0f,
          SmoothstepParams {0.42f, 0.72f}}
-    ); // rangeMask smoothstep
+    );
     g.nodes.push_back(
         {20,
          NodeKind::Smoothstep,
          1250.0f,
          1250.0f,
          SmoothstepParams {0.38f, 0.74f}}
-    ); // rimMask smoothstep
+    );
 
-    // ── Blend sink ──────────────────────────────────────────────────────────
     g.nodes.push_back({12, NodeKind::Blend, 1850.0f, 600.0f, BlendParams {}});
 
-    // ── Domain-warp subgraph ─────────────────────────────────────────────────
     g.nodes.push_back(
         {13, NodeKind::Position, 50.0f, 50.0f, std::monostate {}}
     );
@@ -318,14 +294,14 @@ EditorGraph defaultGraph() {
          250.0f,
          250.0f,
          NoiseParams {warpFreq, 3, 2.0f, 0.50f, 2.0f, 0.0f, 0.0f}}
-    ); // warpX
+    );
     g.nodes.push_back(
         {15,
          NodeKind::Fbm,
          250.0f,
          450.0f,
          NoiseParams {warpFreq, 3, 2.0f, 0.50f, 2.0f, 317.4f, -271.8f}}
-    ); // warpZ
+    );
     g.nodes.push_back(
         {16,
          NodeKind::CreateVec2,
@@ -336,40 +312,35 @@ EditorGraph defaultGraph() {
     g.nodes.push_back(
         {17, NodeKind::Scale2, 650.0f, 350.0f, Scale2Params {8.0f}}
     );
-    g.nodes.push_back(
-        {18, NodeKind::Add2, 800.0f, 50.0f, std::monostate {}}
-    ); // warpedPos
+    g.nodes.push_back({18, NodeKind::Add2, 800.0f, 50.0f, std::monostate {}});
 
-    // ── Links: terrain nodes → Blend ────────────────────────────────────────
-    g.links.push_back({0, {8, 0}, {12, 0}}); // Mountain → Blend:mountain
-    g.links.push_back({1, {9, 0}, {12, 1}}); // Valley   → Blend:valley
-    g.links.push_back({2, {10, 0}, {12, 2}}); // Plains   → Blend:plains
-    g.links.push_back({3, {11, 0}, {12, 3}}); // Plateau  → Blend:plateau
+    g.links.push_back({0, {8, 0}, {12, 0}});
+    g.links.push_back({1, {9, 0}, {12, 1}});
+    g.links.push_back({2, {10, 0}, {12, 2}});
+    g.links.push_back({3, {11, 0}, {12, 3}});
 
-    // ── Links: noise → terrain nodes ────────────────────────────────────────
-    g.links.push_back({4, {0, 0}, {8, 0}}); // continental   → Mountain
-    g.links.push_back({5, {1, 0}, {8, 1}}); // ridges        → Mountain
-    g.links.push_back({6, {5, 0}, {19, 0}}); // rangeMask     → Smoothstep
-    g.links.push_back({30, {19, 0}, {8, 2}}); // Smoothstep    → Mountain:rangeMask
-    g.links.push_back({7, {0, 0}, {9, 0}}); // continental   → Valley
-    g.links.push_back({8, {2, 0}, {9, 1}}); // basin         → Valley
-    g.links.push_back({9, {6, 0}, {20, 0}}); // rimMask       → Smoothstep
-    g.links.push_back({31, {20, 0}, {9, 2}}); // Smoothstep    → Valley:rimMask
-    g.links.push_back({10, {0, 0}, {10, 0}}); // continental   → Plains
-    g.links.push_back({11, {3, 0}, {10, 1}}); // plainsBase    → Plains
-    g.links.push_back({12, {0, 0}, {11, 0}}); // continental     → Plateau
-    g.links.push_back({13, {4, 0}, {11, 1}}); // plateauFeature → Plateau
-    g.links.push_back({14, {7, 0}, {11, 2}}); // plateauMask    → Plateau
+    g.links.push_back({4, {0, 0}, {8, 0}});
+    g.links.push_back({5, {1, 0}, {8, 1}});
+    g.links.push_back({6, {5, 0}, {19, 0}});
+    g.links.push_back({30, {19, 0}, {8, 2}});
+    g.links.push_back({7, {0, 0}, {9, 0}});
+    g.links.push_back({8, {2, 0}, {9, 1}});
+    g.links.push_back({9, {6, 0}, {20, 0}});
+    g.links.push_back({31, {20, 0}, {9, 2}});
+    g.links.push_back({10, {0, 0}, {10, 0}});
+    g.links.push_back({11, {3, 0}, {10, 1}});
+    g.links.push_back({12, {0, 0}, {11, 0}});
+    g.links.push_back({13, {4, 0}, {11, 1}});
+    g.links.push_back({14, {7, 0}, {11, 2}});
 
-    // ── Links: domain-warp composition ──────────────────────────────────────
-    g.links.push_back({15, {13, 0}, {14, 0}}); // Position → warpX
-    g.links.push_back({16, {13, 0}, {15, 0}}); // Position → warpZ
-    g.links.push_back({17, {14, 0}, {16, 0}}); // warpX → CreateVec2.x
-    g.links.push_back({18, {15, 0}, {16, 1}}); // warpZ → CreateVec2.y
-    g.links.push_back({19, {16, 0}, {17, 0}}); // CreateVec2 → Scale2
-    g.links.push_back({20, {13, 0}, {18, 0}}); // Position → Add2.a
-    g.links.push_back({21, {17, 0}, {18, 1}}); // Scale2 → Add2.b
-    // warpedPos feeds all 8 noise nodes as their coord input
+    g.links.push_back({15, {13, 0}, {14, 0}});
+    g.links.push_back({16, {13, 0}, {15, 0}});
+    g.links.push_back({17, {14, 0}, {16, 0}});
+    g.links.push_back({18, {15, 0}, {16, 1}});
+    g.links.push_back({19, {16, 0}, {17, 0}});
+    g.links.push_back({20, {13, 0}, {18, 0}});
+    g.links.push_back({21, {17, 0}, {18, 1}});
+
     g.links.push_back({22, {18, 0}, {0, 0}});
     g.links.push_back({23, {18, 0}, {1, 0}});
     g.links.push_back({24, {18, 0}, {2, 0}});
@@ -382,114 +353,91 @@ EditorGraph defaultGraph() {
     return g;
 }
 
-// === Preset 1: Bilinear Continent ===
-//
-//  Position feeds noise directly (no domain warping).
-//  Four corner noises (NW, NE, SW, SE) are bilinearly blended via Lerp nodes
-//  to create a regionally varying continental signal.
-//  Three terrain features: Mountain, Valley, Plains.
-//
 EditorGraph preset1Graph() {
     EditorGraph g;
 
     const float baseFreq = 0.007f;
     const float blendFreq = 0.0015f;
 
-    // ── Coordinate source ───────────────────────────────────────────────────
-    g.nodes.push_back(
-        {0, NodeKind::Position, 50.0f, 50.0f, std::monostate {}}
-    );
+    g.nodes.push_back({0, NodeKind::Position, 50.0f, 50.0f, std::monostate {}});
 
-    // ── Corner noises (4 nodes) ─────────────────────────────────────────────
     g.nodes.push_back(
         {1,
          NodeKind::Fbm,
          300.0f,
          50.0f,
          NoiseParams {baseFreq, 5, 2.0f, 0.50f, 2.0f, 0.0f, 0.0f}}
-    ); // NW
+    );
     g.nodes.push_back(
         {2,
          NodeKind::RidgedFbm,
          300.0f,
          250.0f,
          NoiseParams {baseFreq, 5, 2.0f, 0.50f, 2.0f, 317.4f, -271.8f}}
-    ); // NE
+    );
     g.nodes.push_back(
         {3,
          NodeKind::FractalPerlin,
          300.0f,
          450.0f,
          NoiseParams {baseFreq, 5, 2.0f, 0.50f, 2.0f, -191.7f, 83.4f}}
-    ); // SW
+    );
     g.nodes.push_back(
         {4,
          NodeKind::Fbm,
          300.0f,
          650.0f,
          NoiseParams {baseFreq * 0.8f, 5, 2.0f, 0.52f, 2.0f, 130.0f, -50.0f}}
-    ); // SE
+    );
 
-    // ── Blend masks (2 nodes) ───────────────────────────────────────────────
     g.nodes.push_back(
         {5,
          NodeKind::Fbm,
          50.0f,
          300.0f,
          NoiseParams {blendFreq, 3, 2.0f, 0.50f, 2.0f, 500.0f, -250.0f}}
-    ); // blendX
+    );
     g.nodes.push_back(
         {6,
          NodeKind::Fbm,
          50.0f,
          500.0f,
          NoiseParams {blendFreq, 3, 2.0f, 0.50f, 2.0f, 420.0f, -301.0f}}
-    ); // blendY
+    );
 
-    // ── Bilinear Lerp composition (3 nodes) ─────────────────────────────────
     g.nodes.push_back(
         {7, NodeKind::Lerp, 550.0f, 150.0f, LerpParams {0.0f, 1.0f, 0.5f}}
-    ); // top row: NW ↔ NE
+    );
     g.nodes.push_back(
         {8, NodeKind::Lerp, 550.0f, 350.0f, LerpParams {0.0f, 1.0f, 0.5f}}
-    ); // bottom row: SW ↔ SE
+    );
     g.nodes.push_back(
         {9, NodeKind::Lerp, 800.0f, 250.0f, LerpParams {0.0f, 1.0f, 0.5f}}
-    ); // final: top ↔ bottom
+    );
 
-    // ── Terrain masks (2 nodes) ─────────────────────────────────────────────
     g.nodes.push_back(
         {10,
          NodeKind::Perlin,
          1050.0f,
          50.0f,
          NoiseParams {baseFreq * 0.30f, 1, 2.0f, 0.50f, 2.0f, 0.0f, 0.0f}}
-    ); // rangeMask
+    );
     g.nodes.push_back(
         {11,
          NodeKind::Perlin,
          1050.0f,
          250.0f,
          NoiseParams {baseFreq * 0.17f, 1, 2.0f, 0.50f, 2.0f, 0.0f, 0.0f}}
-    ); // rimMask
+    );
 
-    // ── Terrain nodes (3 nodes) ─────────────────────────────────────────────
     g.nodes.push_back(
         {12, NodeKind::Mountain, 1350.0f, 50.0f, MountainParams {}}
     );
-    g.nodes.push_back(
-        {13, NodeKind::Valley, 1350.0f, 250.0f, ValleyParams {}}
-    );
-    g.nodes.push_back(
-        {14, NodeKind::Plains, 1350.0f, 450.0f, PlainsParams {}}
-    );
+    g.nodes.push_back({13, NodeKind::Valley, 1350.0f, 250.0f, ValleyParams {}});
+    g.nodes.push_back({14, NodeKind::Plains, 1350.0f, 450.0f, PlainsParams {}});
 
-    // ── Blend sink ──────────────────────────────────────────────────────────
-    g.nodes.push_back(
-        {15, NodeKind::Blend, 1650.0f, 250.0f, BlendParams {}}
-    );
+    g.nodes.push_back({15, NodeKind::Blend, 1650.0f, 250.0f, BlendParams {}});
 
-    // ── Links: Position → all noise generators ──────────────────────────────
     g.links.push_back({0, {0, 0}, {1, 0}});
     g.links.push_back({1, {0, 0}, {2, 0}});
     g.links.push_back({2, {0, 0}, {3, 0}});
@@ -499,35 +447,32 @@ EditorGraph preset1Graph() {
     g.links.push_back({6, {0, 0}, {10, 0}});
     g.links.push_back({7, {0, 0}, {11, 0}});
 
-    // ── Links: bilinear composition ─────────────────────────────────────────
-    g.links.push_back({8, {1, 0}, {7, 0}});  // NW → Lerp:a
-    g.links.push_back({9, {2, 0}, {7, 1}});  // NE → Lerp:b
-    g.links.push_back({10, {5, 0}, {7, 2}}); // blendX → Lerp:t
+    g.links.push_back({8, {1, 0}, {7, 0}});
+    g.links.push_back({9, {2, 0}, {7, 1}});
+    g.links.push_back({10, {5, 0}, {7, 2}});
 
-    g.links.push_back({11, {3, 0}, {8, 0}});  // SW → Lerp:a
-    g.links.push_back({12, {4, 0}, {8, 1}});  // SE → Lerp:b
-    g.links.push_back({13, {5, 0}, {8, 2}});  // blendX → Lerp:t
+    g.links.push_back({11, {3, 0}, {8, 0}});
+    g.links.push_back({12, {4, 0}, {8, 1}});
+    g.links.push_back({13, {5, 0}, {8, 2}});
 
-    g.links.push_back({14, {7, 0}, {9, 0}});  // top → Lerp:a
-    g.links.push_back({15, {8, 0}, {9, 1}});  // bottom → Lerp:b
-    g.links.push_back({16, {6, 0}, {9, 2}});  // blendY → Lerp:t
+    g.links.push_back({14, {7, 0}, {9, 0}});
+    g.links.push_back({15, {8, 0}, {9, 1}});
+    g.links.push_back({16, {6, 0}, {9, 2}});
 
-    // ── Links: noise → terrain nodes ────────────────────────────────────────
-    g.links.push_back({17, {9, 0}, {12, 0}});  // continental → Mountain
-    g.links.push_back({18, {9, 0}, {12, 1}});  // continental → Mountain:ridges
-    g.links.push_back({19, {10, 0}, {12, 2}}); // rangeMask → Mountain
+    g.links.push_back({17, {9, 0}, {12, 0}});
+    g.links.push_back({18, {9, 0}, {12, 1}});
+    g.links.push_back({19, {10, 0}, {12, 2}});
 
-    g.links.push_back({20, {9, 0}, {13, 0}});  // continental → Valley
-    g.links.push_back({21, {9, 0}, {13, 1}});  // continental → Valley:basin
-    g.links.push_back({22, {11, 0}, {13, 2}}); // rimMask → Valley
+    g.links.push_back({20, {9, 0}, {13, 0}});
+    g.links.push_back({21, {9, 0}, {13, 1}});
+    g.links.push_back({22, {11, 0}, {13, 2}});
 
-    g.links.push_back({23, {9, 0}, {14, 0}});  // continental → Plains
-    g.links.push_back({24, {9, 0}, {14, 1}});  // continental → Plains:plainsBase
+    g.links.push_back({23, {9, 0}, {14, 0}});
+    g.links.push_back({24, {9, 0}, {14, 1}});
 
-    // ── Links: terrain nodes → Blend ────────────────────────────────────────
-    g.links.push_back({25, {12, 0}, {15, 0}}); // Mountain → Blend
-    g.links.push_back({26, {13, 0}, {15, 1}}); // Valley → Blend
-    g.links.push_back({27, {14, 0}, {15, 2}}); // Plains → Blend
+    g.links.push_back({25, {12, 0}, {15, 0}});
+    g.links.push_back({26, {13, 0}, {15, 1}});
+    g.links.push_back({27, {14, 0}, {15, 2}});
 
     return g;
 }

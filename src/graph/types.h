@@ -8,12 +8,8 @@
 
 namespace graph {
 
-// === Ids ===
-
 using NodeId = int32_t;
 using LinkId = int32_t;
-
-// === Data Types ===
 
 struct Vec2 {
     float x = 0.0f;
@@ -21,8 +17,6 @@ struct Vec2 {
 };
 
 enum class PinType : uint8_t { Float, Vec2 };
-
-// === Node Kinds ===
 
 enum class NodeKind : uint8_t {
     Fbm,
@@ -44,14 +38,10 @@ enum class NodeKind : uint8_t {
     Scale2,
 };
 
-// === Pin References ===
-
 struct PinRef {
     NodeId nodeId = 0;
     uint8_t slot = 0;
 };
-
-// === Params ===
 
 struct NoiseParams {
     float frequency = 0.007f;
@@ -100,9 +90,7 @@ struct LerpParams {
     float t = 0.5f;
 };
 
-struct BlendParams {
-    // no tunables currently
-};
+struct BlendParams {};
 
 struct CreateVec2Params {
     float x = 0.0f;
@@ -127,8 +115,6 @@ using NodeParams = std::variant<
     Scale2Params,
     std::monostate>;
 
-// === Editor Graph Model ===
-
 struct EditorNode {
     NodeId id = 0;
     NodeKind kind = NodeKind::Fbm;
@@ -148,8 +134,6 @@ struct EditorGraph {
     std::vector<EditorLink> links;
 };
 
-// === Compiled Graph ===
-
 struct CompiledNode {
     NodeKind kind;
     NodeParams params;
@@ -159,8 +143,6 @@ struct CompiledNode {
 struct CompiledGraph {
     std::vector<CompiledNode> nodes;
 };
-
-// === Node Definition Table ===
 
 struct PinDef {
     const char* label;
@@ -174,16 +156,12 @@ struct NodeDef {
     std::vector<PinDef> outputs;
 };
 
-// Returns static pin layout for a given node kind.
 const NodeDef& nodeDefinition(NodeKind kind);
 
-// Returns default params for a given node kind.
 NodeParams defaultParams(NodeKind kind);
 
-// Builds the default graph.
 EditorGraph defaultGraph();
 
-// Builds the bilinear-continent preset graph.
 EditorGraph preset1Graph();
 
 } // namespace graph

@@ -1,0 +1,222 @@
+\documentclass[12pt]{article}
+
+% Layout
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\doublespacing
+
+% Encoding
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+% Math & formatting
+\usepackage{amsfonts}
+\usepackage{array}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% Graphics & figures
+\usepackage{graphicx}
+\usepackage{float}
+
+% Tables
+\usepackage{booktabs}
+
+% Links
+\usepackage{hyperref}
+\usepackage{url}
+
+% Typography
+\usepackage{microtype}
+\usepackage{xcolor}
+
+% Bibliography
+\usepackage{biblatex}
+
+% Optional spacing/format control
+\usepackage{placeins}
+\usepackage{titlesec}
+
+
+\addbibresource{references.bib} %Import the bibliography file
+
+\author{%
+    Rohan Sinha  \hspace{2cm}  Sachith Shetty  \hspace{2cm}   Tianning Gao \\
+    \texttt{sinharoh@usc.edu \quad sachithc@usc.edu \quad gaotiann@usc.edu}
+}
+
+\date{} % 
+\title{Procedural Terrain from Constraints and Graphs \\[2em]}
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+{Procedural terrain generation methods can produce visually rich landscapes but often lack explicit mechanisms to control large-scale spatial structure. As a result, while local detail is well captured, it can be difficult to enforce coherent relationships between features such as biome distribution and terrain types. In this project, we address this limitation by formulating terrain generation as a constraint-driven process rather than relying solely on noise synthesis. Our approach combines composable noise-based scalar fields with a graph-based constraint framework. The terrain domain is partitioned into Voronoi regions, and biomes are assigned at the region level using a Wave Function Collapse (WFC) solver that enforces adjacency constraints. This allows the system to preserve local detail from procedural noise while introducing a higher-level structure in biome placement and transitions. The generated fields are then converted into a renderable triangle mesh, with per-vertex attributes such as slope and biome weights, allowing real-time rendering in OpenGL. }
+\end{abstract}
+
+
+\section{Introduction}
+
+\subsection{Project Overview}
+Procedural terrain generation is widely used in games and simulations to efficiently create large and detailed environments. Most existing approaches rely heavily on noise functions such as Perlin or Simplex noise to generate terrain heightfields. Although these methods are effective at producing rich local detail, they provide limited control over large-scale spatial structure and relationships between terrain features, such as biome distribution and environmental consistency.
+In this project, we propose a constraint-driven terrain generation system that integrates procedural noise with graph-based spatial reasoning. Terrain is first generated as a set of scalar fields using a composable node-based graph of noise functions. The domain is then partitioned into Voronoi regions, which serve as units for higher-level reasoning. Biomes are assigned to these regions using a Wave Function Collapse (WFC) solver that enforces adjacency constraints. The resulting structured fields are then converted into a renderable triangle mesh, with per-vertex attributes used for real-time visualization in OpenGL.
+
+\subsection{Main Contributions}
+\begin{itemize}
+    \item A constraint-driven terrain generation framework that combines procedural noise with graph-based spatial reasoning to introduce higher-level structure into terrain synthesis.
+    
+    \item A Voronoi-based region abstraction that enables biome assignment at a regional level, improving coherence compared to per-grid or per-pixel approaches.
+    
+    \item An adaptation of the Wave Function Collapse (WFC) algorithm for biome placement, incorporating adjacency constraints to enforce spatially coherent biome selection.
+    
+    \item A constraint-solving procedure based on entropy-driven selection, constraint propagation, and backtracking, allowing the system to resolve conflicts and maintain valid biome configurations.
+    
+    \item A complete pipeline that converts scalar fields into a renderable triangle mesh with per-vertex attributes such as slope and biome weights, enabling real-time rendering in OpenGL.
+    
+    \item Integration of additional procedural effects, including gradient-based river carving and smooth biome blending, to enhance visual quality and continuity.
+\end{itemize}
+
+
+
+\section{Background and Related Work}
+
+\subsection{Existing Methods}
+% Explain prior methods (math + algorithms)
+% e.g., 3D ConvNets, COLMAP, RANSAC, etc.
+
+\subsection{Related Work}
+% Summarize key papers (with citations)
+% Compare them briefly
+
+\subsection{Comparison to Existing Projects}
+% How your project is similar/different
+
+
+\section{Methodology}
+
+\subsection{Overview of Approach}
+% High-level pipeline
+Our terrain generation pipeline is designed to progressively transforms procedural fields into a structured and visually coherent biome distribution.
+
+We begin by generating a continuous heightfield over a 2D domain using noise-based functions. This serves as the primary input for subsequent processing.
+
+To introduce higher level spatial structure, the terrain domain is divided into Voronoi regions. Each region groups together multiple grid points and serves as the basic unit for biome assignment. This region based representation reduces sensitivity to local noise.
+
+Biomes are then assigned using a Wave Function Collapse (WFC) solver operating over the region graph. The solver adjusts relationships between neighboring regions to enforce compatibility constraints and encourage coherent biome layouts.
+
+Once a biome is assigned to each region, the results are mapped back to the original terrain grid. Finally, a smoothing step is applied to biome weights to soften transitions between neighboring regions and reduce visual discontinuities.
+
+\subsection{Preprocessing}
+
+The user-defined editor graph is compiled into a flat, topologically sorted array of nodes with resolved input indices. This eliminates runtime graph traversal overhead and allows the executor to evaluate nodes in a single forward pass. A noise context is initialized by shuffling a 256-value permutation table based on the user seed and doubling it to 512 entries, enabling efficient bitwise indexing in the Simplex and Perlin noise implementations.
+
+\subsection{Noise Synthesis and Domain Warping}
+
+Scalar fields are generated by evaluating the compiled node graph. A Position node emits world-space $(x,z)$ coordinates, which can be warped by a subgraph of FBM noise nodes to create domain distortion. The warped coordinates feed into noise generators (Simplex, Perlin, FBM, Ridged FBM) that output values in $[0,1]$. The executor recursively evaluates upstream dependencies, caches per-node outputs, and processes every pixel in the $w \times d$ domain in one topological pass.
+
+
+
+\subsection{Terrain Feature Nodes}
+
+Rather than a single heightfield, the system uses specialized terrain nodes:
+\begin{itemize}
+    \item \textbf{Mountain} mixes continental shape, ridged noise, and a range mask to produce sharp peaks with a coverage-based weight.
+    \item \textbf{Valley} carves depressions using basin noise and a rim mask, outputting depth and influence weight.
+    \item \textbf{Plains} blends continental and plains-base signals with macro-relief and hilliness offsets for rolling lowlands.
+    \item \textbf{Plateau} raises flat tablelands where a mask signal exceeds a threshold, with rim boosting for cliff edges.
+\end{itemize}
+These node outputs converge at the Blend node, which mixes mountain and plains/plateau heights based on their weights, subtracts valley depth, and injects a fine detail noise pass for surface roughness.
+
+\subsection{Algorithm Description}
+
+The pipeline proceeds through several procedural stages.
+
+\textbf{Graph execution.} The executor traverses the compiled graph starting from the Blend root node. For each node, it recursively evaluates inputs and caches outputs. Noise nodes sample warped world coordinates, while terrain nodes (Mountain, Valley, Plains, Plateau) compute height and weight vectors that the Blend node mixes into the final heightfield.
+
+\textbf{River carving.} River networks are extracted via a priority-flood fill starting from boundary cells to compute drainage direction and water accumulation. High-accumulation, high-elevation cells become sources. Each source traces a path downstream, which is smoothed and meandered with sine-wave displacement before carving a depth channel into the heightfield with smooth bank falloff.
+
+\textbf{Voronoi partitioning.} The terrain grid is partitioned into jittered Voronoi cells. Each cell stores its center, neighbor indices, and the grid points it owns. Neighbor adjacency is computed on the jittered grid to support regional constraint solving.
+
+Biome assignment then operates on these regions to produce large, continuous ecological areas while avoiding isolated pixel-scale patches. A WFC solver iteratively collapses Voronoi cells using entropy-based selection and weighted random choice. Neighboring cells influence selection probabilities: if adjacent cells share a similar ecological type, the solver increases the weight of biomes from that same group, encouraging spatial continuity and reducing fragmentation.
+
+\begin{algorithm}
+\caption{Biome Assignment using WFC}
+\begin{algorithmic}[1]
+\While{there are uncollapsed Voronoi cells}
+    \State $cell \gets$ cell with lowest entropy
+    \State $candidates \gets$ possible biomes for $cell$
+    
+    \For{each biome in $candidates$}
+        \State compute biome weight
+        \If{neighbors have similar ecology}
+            \State increase biome weight
+        \EndIf
+    \EndFor
+    
+    \State $selected \gets$ random weighted choice
+    \State assign $selected$ to $cell$
+    \State propagate constraints to neighbors
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+Once all Voronoi cells are assigned a biome, the results are mapped back to the terrain grid. Each grid point inherits the biome of the Voronoi cell to which it belongs. Because all points within a region share the same assignment, this step naturally eliminates small, isolated biome patches. Finally, a smoothing operation is applied to soften transitions between biome boundaries and reduce sudden changes.
+
+\subsection{Tools and Technologies}
+
+The system is implemented in C++17. All noise functions (Simplex, Perlin, FBM, and ridged variants) are hand-written rather than relying on external libraries. OpenGL 3.3 is used for real-time rendering, with SDL2 for windowing and input. The node graph is executed by a custom topological evaluator. No deep-learning frameworks or external terrain middleware are used.
+
+\subsection{Course Concepts Used}
+
+This project integrates several core concepts from the course.
+
+\begin{itemize}
+    \item \textbf{Week 5: Triangles and Meshes.} The final output is a regular grid triangulated into indexed triangles. Per-vertex attributes include position, normal, slope, and biome weights, uploaded to GPU VAO/VBO buffers.
+    \item \textbf{Week 6: Texture Mapping and Filtering.} The renderer blends procedural grass, rock, sand, and snow textures based on biome and slope. Boundary smoothing uses a smoothstep filter across Voronoi distances to reduce aliasing.
+    \item \textbf{Week 7: Noise.} The project relies on Simplex and Perlin noise, FBM, and ridged FBM. Domain warping displaces sample coordinates with low-frequency FBM before feeding higher-frequency noise nodes.
+    \item \textbf{Week 8: Procedural Generation.} All content is procedural: the heightfield comes from a composable node graph, rivers are derived from drainage simulation, and biomes are assigned via WFC with adjacency constraints.
+\end{itemize}
+
+
+\section{Experiments and Evaluation}
+
+\subsection{Dataset and Setup}
+% Data, splits, preprocessing
+
+\subsection{Results}
+% Tables + metrics
+
+\subsection{Ablation Study}
+% Your model comparisons
+
+\subsection{Analysis}
+% What works well
+
+\subsection{Limitations}
+% What doesn’t work / constraints
+
+
+\section{Discussion}
+
+% Interpret results more deeply
+% Why your method behaves this way
+
+
+\section{Conclusion}
+
+\subsection{Key Takeaways}
+% What you learned
+Through this project, we learned that combining procedural noise with graph-based constraints offers a powerful balance between rich local detail and coherent large-scale terrain structure. The Voronoi region abstraction proved effective for biome assignment, enabling constraint solving at a spatial scale that reduces noise sensitivity while maintaining visual plausibility. Adapting the Wave Function Collapse algorithm for biome placement with adjacency constraints successfully encouraged contiguous, ecologically consistent biome distributions. Additionally, the node-based composable graph provided a flexible and reusable framework for terrain synthesis, allowing intuitive mixing of diverse terrain features such as mountains, valleys, and plateaus. Finally, integrating drainage simulation and river carving demonstrated that augmenting pure noise-based heightfields with physical-inspired processes can significantly enhance realism.
+
+\subsection{Team Contributions}
+% Who did what
+
+\subsection{Future Work}
+% Optional but recommended
+Looking ahead, several directions could extend this work. First, the biome constraint system could be expanded to support hierarchical biomes (e.g., sub-biomes within forests) and more complex adjacency rules that incorporate elevation, moisture, and temperature. Second, adding erosion simulation---both thermal and hydraulic---after initial heightfield generation would further enhance terrain realism. Third, vegetation and object placement (such as trees, rocks, and foliage) could be driven by biome and slope constraints to enrich the scene. Fourth, performance could be improved by parallelizing the WFC solver or offloading constraint propagation to the GPU, enabling larger terrain grids in real time. Finally, developing a visual node editor would allow users to interactively author noise graphs and constraint rules, lowering the barrier to creating custom terrain pipelines.
+
+
+\printbibliography
+
+\end{document}

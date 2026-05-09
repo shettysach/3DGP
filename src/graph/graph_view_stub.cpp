@@ -1,6 +1,6 @@
-#include "graph/view.h"
-
 #include <iostream>
+
+#include "graph/view.h"
 
 namespace graph {
 

@@ -3,7 +3,8 @@ Build
 Linux/macOS:
 ```bash
 ./build.sh
-./build/terrain_demo
+./build/terrain_demo graph # for graph view
+./build/terrain_demo view # for render view
 ```
 
 Windows (x64):
